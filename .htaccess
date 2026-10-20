@@ -1,0 +1,17 @@
+# Shared-hosting fallback: use this ONLY when you cannot point your domain's document root at /public.
+# (Best practice: set the document root to the "public" folder and ignore this file.)
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Never serve application internals, even if the rewrite below fails.
+    RewriteRule ^(\.env|\.git|app|bootstrap|config|database|routes|storage|tests|vendor|scripts|artisan|composer\.(json|lock)|phpunit\.xml)(/|$) - [F,L]
+
+    # Everything else is handled by public/
+    RewriteCond %{REQUEST_URI} !^/public/
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
+
+# Block dotfiles and sensitive extensions
+<FilesMatch "^\.(?!well-known)|\.(env|log|sqlite|sql|bak)$">
+    Require all denied
+</FilesMatch>
