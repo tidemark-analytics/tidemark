@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.9.3] - 2026-10-20
+
+### Fixed
+- Public dashboards redirected signed-out visitors to the login page, because the site switcher requested the signed-in-only site list. Signed-out viewers now see the dashboard.
+
 ## [0.9.2] - 2026-10-20
 
 ### Fixed

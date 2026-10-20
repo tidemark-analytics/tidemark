@@ -1,5 +1,5 @@
 // The site dashboard: toolbar (site, filters, date), top stats + graph, then the report panels.
-import { html, useState, useEffect, useMemo, useRef, useApi, api, useLocation, setQuery, setFilters, parseFilters, navigate, Link, Icon, toast, PERIODS, FILTER_OPS, FILTER_DIMS, dimLabel, todayStr, shiftDate, fmt, fmtShort, dur, countryName, shareAuth, share, useDocTitle, useScope, BASE } from './lib.js';
+import { html, useState, useEffect, useMemo, useRef, useApi, api, useLocation, setQuery, setFilters, parseFilters, navigate, Link, Icon, toast, PERIODS, FILTER_OPS, FILTER_DIMS, dimLabel, todayStr, shiftDate, fmt, fmtShort, dur, countryName, shareAuth, share, useDocTitle, useScope, BASE, UserCtx, useContext } from './lib.js';
 import { Pop, Modal, Loading, Empty, Field, CodeBlock, useDebounced } from './ui.js';
 import { LineChart, ChartTable, bucketText } from './chart.js';
 import { Sources, Pages, Locations, Devices, Behaviours } from './reports.js';
@@ -254,6 +254,7 @@ function SharePassword({ domain, onDone }) {
 }
 
 export function Dashboard({ domain, shared }) {
+  const { user } = useContext(UserCtx) || {};
   const site = useApi(`/sites/${domain}`, null, [domain]);
   const [rev, setRev] = useState(0);
   const [intervals, setIntervals] = useState(null);
@@ -278,7 +279,7 @@ export function Dashboard({ domain, shared }) {
   const poll = live ? 10000 : 0;
   return html`<main class="main dash" id="main" key=${rev}>
     <div class="toolbar sticky">
-      <${SiteSwitcher} site=${s} linkable=${!shared} />
+      <${SiteSwitcher} site=${s} linkable=${!shared && !!user} />
       <${CurrentVisitors} site=${s} scope=${scope} />
       <span class="grow"></span>
       <${FilterButton} site=${s} scope=${scope} filter=${filter} setFilter=${setFilter} />
