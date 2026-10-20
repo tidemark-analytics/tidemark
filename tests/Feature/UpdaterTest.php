@@ -8,6 +8,7 @@ use App\Updates\Updater;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 use ZipArchive;
 
@@ -148,5 +149,73 @@ class UpdaterTest extends TestCase
         $this->assertFileExists(storage_path('app/updates/incoming.zip'));
         $this->deleteJson('/api/admin/update')->assertOk();
         $this->assertFileDoesNotExist(storage_path('app/updates/incoming.zip'));
+    }
+
+    /** @return array{0:string,1:string} the zip's bytes and its sha256 */
+    private function fakeGithub(string $version, ?string $sha = null, string $assetUrl = 'https://github.com/tidemark-analytics/tidemark/releases/download/v%s/tidemark-%s.zip'): array
+    {
+        $bytes = file_get_contents($this->release($version));
+        $sha ??= hash('sha256', $bytes);
+        $zipUrl = sprintf($assetUrl, $version, $version);
+        Http::fake([
+            'api.github.com/*' => Http::response(['tag_name' => 'v'.$version, 'body' => 'Notes', 'html_url' => 'https://github.com/x/y/releases/tag/v'.$version, 'published_at' => '2026-10-20T00:00:00Z', 'assets' => [
+                ['name' => "tidemark-{$version}.zip", 'browser_download_url' => $zipUrl, 'size' => strlen($bytes)],
+                ['name' => "tidemark-{$version}.zip.sha256", 'browser_download_url' => $zipUrl.'.sha256', 'size' => 85],
+            ]]),
+            '*.sha256' => Http::response("{$sha}  tidemark-{$version}.zip\n"),
+            '*.zip' => Http::response($bytes),
+        ]);
+
+        return [$bytes, $sha];
+    }
+
+    public function test_latest_release_is_read_from_github(): void
+    {
+        $this->fakeGithub('1.5.0');
+        $latest = (new Updater($this->base))->latest(true);
+        $this->assertSame(['1.5.0', '1.0.0', true, 'Notes'], [$latest['version'], $latest['current'], $latest['newer'], $latest['notes']]);
+        $this->assertStringEndsWith('tidemark-1.5.0.zip.sha256', $latest['sha_url']);
+    }
+
+    public function test_download_verifies_the_checksum_then_stages_the_zip(): void
+    {
+        $this->fakeGithub('1.5.0');
+        $updater = new Updater($this->base);
+        $info = $updater->downloadLatest();
+        $this->assertSame('1.5.0', $info['version']);
+        $this->assertFileExists($updater->stagedPath());
+        $this->assertSame('1.5.0', $updater->apply($updater->stagedPath())['to']);
+    }
+
+    public function test_a_checksum_mismatch_discards_the_download(): void
+    {
+        $this->fakeGithub('1.5.0', str_repeat('a', 64));
+        $updater = new Updater($this->base);
+        try {
+            $updater->downloadLatest();
+            $this->fail('should reject');
+        } catch (UpdateException $e) {
+            $this->assertStringContainsString('checksum', $e->getMessage());
+        }
+        $this->assertFileDoesNotExist($updater->stagedPath());
+        $this->assertFileDoesNotExist($updater->stagedPath().'.download');
+    }
+
+    public function test_assets_outside_the_configured_repository_are_refused(): void
+    {
+        $this->fakeGithub('1.5.0', null, 'https://evil.example/releases/download/v%s/tidemark-%s.zip');
+        $this->expectException(UpdateException::class);
+        (new Updater($this->base))->downloadLatest();
+    }
+
+    public function test_github_check_and_download_endpoints_are_admin_only(): void
+    {
+        $this->fakeGithub('1.5.0');
+        $member = User::create(['name' => 'M', 'email' => 'm2@example.com', 'password' => 'password']);
+        $this->withHeader('X-Requested-With', 'XMLHttpRequest');
+        $this->actingAs($member)->getJson('/api/admin/update/check')->assertForbidden();
+        $this->postJson('/api/admin/update/download')->assertForbidden();
+        $member->forceFill(['is_admin' => true])->save();
+        $this->getJson('/api/admin/update/check?fresh=1')->assertOk()->assertJsonPath('latest.version', '1.5.0');
     }
 }

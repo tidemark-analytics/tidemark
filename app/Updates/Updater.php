@@ -3,6 +3,8 @@
 namespace App\Updates;
 
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use ZipArchive;
 
 /**
@@ -81,6 +83,96 @@ class Updater
     public function canWrite(): bool
     {
         return is_writable($this->base) && is_writable($this->base.'/app') && is_writable($this->dir());
+    }
+
+    /**
+     * The newest published release on GitHub (cached for six hours unless $fresh).
+     * Only called when an administrator opens the Updates page — Tidemark never phones home on its own.
+     *
+     * @return array{version:string,current:string,newer:bool,notes:string,url:string,published_at:?string,zip_url:?string,sha_url:?string,size:?int}
+     *
+     * @throws UpdateException
+     */
+    public function latest(bool $fresh = false): array
+    {
+        $repo = (string) config('tidemark.update_repo');
+        if ($fresh) {
+            Cache::forget('tdm:latest-release');
+        }
+        $release = Cache::remember('tdm:latest-release', 6 * 3600, function () use ($repo) {
+            try {
+                $res = Http::timeout(15)->withHeaders(['Accept' => 'application/vnd.github+json', 'User-Agent' => 'Tidemark/'.$this->version()])->get("https://api.github.com/repos/{$repo}/releases/latest");
+            } catch (\Throwable) {
+                throw new UpdateException('Could not reach GitHub. Check the server\'s internet access, or upload the release zip manually.');
+            }
+            if ($res->status() === 404) {
+                throw new UpdateException('No published release was found.');
+            }
+            if ($res->failed()) {
+                throw new UpdateException('GitHub answered with an error ('.$res->status().'). Try again later.');
+            }
+
+            return $res->json();
+        });
+
+        $assets = collect($release['assets'] ?? []);
+        $zip = $assets->first(fn ($a) => preg_match('/^tidemark-.+\.zip$/', $a['name'] ?? ''));
+        $sha = $zip ? $assets->first(fn ($a) => ($a['name'] ?? '') === $zip['name'].'.sha256') : null;
+        $version = ltrim((string) ($release['tag_name'] ?? ''), 'v');
+        $current = $this->version();
+
+        return [
+            'version' => $version, 'current' => $current,
+            'newer' => $version !== '' && ($current === 'dev' || version_compare($version, $current, '>')),
+            'notes' => (string) ($release['body'] ?? ''), 'url' => (string) ($release['html_url'] ?? ''), 'published_at' => $release['published_at'] ?? null,
+            'zip_url' => $zip['browser_download_url'] ?? null, 'sha_url' => $sha['browser_download_url'] ?? null, 'size' => $zip['size'] ?? null,
+        ];
+    }
+
+    /**
+     * Download the latest release zip into the staging slot and verify its checksum.
+     *
+     * @return array{version:string,current:string,newer:bool,root:string,files:int}
+     *
+     * @throws UpdateException
+     */
+    public function downloadLatest(): array
+    {
+        $latest = $this->latest(true);
+        $prefix = 'https://github.com/'.config('tidemark.update_repo').'/releases/download/';
+        if (! $latest['zip_url'] || ! str_starts_with($latest['zip_url'], $prefix)) {
+            throw new UpdateException('The latest release has no downloadable zip.');
+        }
+        if (! $latest['sha_url'] || ! str_starts_with($latest['sha_url'], $prefix)) {
+            throw new UpdateException('The latest release has no checksum file, so it cannot be verified.');
+        }
+        @set_time_limit(0);
+        $target = $this->stagedPath();
+        $tmp = $target.'.download';
+        try {
+            $sum = Http::timeout(30)->withHeaders(['User-Agent' => 'Tidemark/'.$this->version()])->get($latest['sha_url']);
+            Http::timeout(600)->withHeaders(['User-Agent' => 'Tidemark/'.$this->version()])->sink($tmp)->get($latest['zip_url'])->throw();
+        } catch (\Throwable) {
+            @unlink($tmp);
+            throw new UpdateException('The download failed. Try again, or upload the release zip manually.');
+        }
+        $expected = strtolower(substr(trim((string) $sum->body()), 0, 64));
+        if (! preg_match('/^[a-f0-9]{64}$/', $expected) || ! hash_equals($expected, hash_file('sha256', $tmp))) {
+            @unlink($tmp);
+            throw new UpdateException('The downloaded file did not match its checksum and was discarded.');
+        }
+        rename($tmp, $target);
+        try {
+            $info = $this->inspect($target);
+            if ($info['version'] !== $latest['version']) {
+                throw new UpdateException('The downloaded release does not match the version GitHub announced.');
+            }
+        } catch (UpdateException $e) {
+            @unlink($target);
+            throw $e;
+        }
+
+        return $info;
     }
 
     /**

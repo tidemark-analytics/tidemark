@@ -58,6 +58,29 @@ class UpdateController extends Controller
         }
     }
 
+    public function check(Request $r)
+    {
+        $this->admin($r);
+        try {
+            return ['latest' => $this->updater->latest($r->boolean('fresh'))];
+        } catch (UpdateException $e) {
+            return ['latest' => null, 'error' => $e->getMessage()];
+        }
+    }
+
+    /** Download the latest GitHub release, verify it, then install it. */
+    public function download(Request $r)
+    {
+        $this->admin($r);
+        try {
+            $this->updater->downloadLatest();
+
+            return ['result' => $this->updater->apply($this->updater->stagedPath())];
+        } catch (UpdateException $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
+    }
+
     public function discard(Request $r)
     {
         $this->admin($r);

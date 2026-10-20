@@ -2,6 +2,9 @@
 
 return [
 
+    // GitHub repository checked for new releases when an administrator opens Account settings → Updates.
+    'update_repo' => env('TIDEMARK_UPDATE_REPO', 'tidemark-analytics/tidemark'),
+
     // Installed release, stamped into the VERSION file by scripts/build-release.sh.
     'version' => is_file(base_path('VERSION')) ? trim((string) file_get_contents(base_path('VERSION'))) : 'dev',
 

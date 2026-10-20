@@ -77,6 +77,8 @@ Route::middleware('api.auth')->group(function () {
     Route::delete('/admin/users/{user}', [AdminController::class, 'destroy']);
 
     Route::get('/admin/update', [UpdateController::class, 'show']);
+    Route::get('/admin/update/check', [UpdateController::class, 'check']);
+    Route::post('/admin/update/download', [UpdateController::class, 'download']);
     Route::post('/admin/update/chunk', [UpdateController::class, 'chunk']);
     Route::post('/admin/update/apply', [UpdateController::class, 'apply']);
     Route::delete('/admin/update', [UpdateController::class, 'discard']);

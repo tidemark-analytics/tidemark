@@ -2,6 +2,14 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.9.0] - 2026-10-20
+
+### Added
+- One-click updates: Account settings → Updates checks GitHub for the latest release, downloads it, verifies its SHA-256 checksum and installs it. Nothing is requested until an administrator opens that page; set `TIDEMARK_UPDATE_REPO` to point at a fork.
+
+### Changed
+- CI uses `actions/checkout` and `actions/upload-artifact` v7.
+
 ## [0.8.0] - 2026-10-20
 
 First public release.
