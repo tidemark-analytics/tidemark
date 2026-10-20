@@ -1,0 +1,46 @@
+name: Bug report
+description: Something isn't working as expected
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you expect, and what happened instead? Screenshots help.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Go to …
+        2. Click …
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Tidemark version
+      description: Shown under Account settings → Updates.
+      placeholder: 0.8.0
+    validations:
+      required: true
+  - type: dropdown
+    id: database
+    attributes:
+      label: Database
+      options: [SQLite, MySQL, MariaDB, PostgreSQL]
+    validations:
+      required: true
+  - type: input
+    id: php
+    attributes:
+      label: PHP version and hosting
+      placeholder: PHP 8.3, shared hosting (cPanel)
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Relevant lines from storage/logs/laravel.log or the browser console. Remove anything private.
+      render: shell

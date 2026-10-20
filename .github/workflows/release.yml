@@ -1,0 +1,63 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to build (e.g. 0.8.1) — builds the zip as an artifact only
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, pdo_sqlite, zip, fileinfo
+          coverage: none
+          tools: composer:v2
+
+      - name: Resolve version
+        id: v
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then V="${GITHUB_REF_NAME#v}"; else V="${{ inputs.version }}"; fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+
+      - name: Check the tag matches VERSION
+        if: github.ref_type == 'tag'
+        run: |
+          [ "$(cat VERSION)" = "${{ steps.v.outputs.version }}" ] || { echo "VERSION file ($(cat VERSION)) does not match tag ${GITHUB_REF_NAME}"; exit 1; }
+
+      - name: Test
+        run: |
+          composer install --no-interaction --prefer-dist
+          cp .env.example .env && php artisan key:generate
+          php artisan test
+
+      - name: Build the release zip
+        run: |
+          rm -rf vendor
+          scripts/build-release.sh "${{ steps.v.outputs.version }}"
+          cd dist && sha256sum "tidemark-${{ steps.v.outputs.version }}.zip" > "tidemark-${{ steps.v.outputs.version }}.zip.sha256"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tidemark-${{ steps.v.outputs.version }}
+          path: dist/*
+
+      - name: Publish the GitHub release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          V="${{ steps.v.outputs.version }}"
+          NOTES="$(awk -v v="$V" '$0 ~ "^## \\["v"\\]" {f=1; next} /^## \[/ {f=0} f' CHANGELOG.md)"
+          [ -n "$NOTES" ] || NOTES="Release $V"
+          gh release create "${GITHUB_REF_NAME}" dist/* --title "Tidemark $V" --notes "$NOTES"
