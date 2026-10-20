@@ -13,7 +13,7 @@ echo "→ Staging ${NAME}"
 mkdir -p "$STAGE" "$OUT"
 rsync -a --exclude='.git' --exclude='.env' --exclude='.env.backup' --exclude='/vendor' --exclude='/node_modules' \
   --exclude='/dist' --exclude='/tests' --exclude='/storage/logs/*' --exclude='/storage/framework/cache/data/*' \
-  --exclude='/storage/framework/sessions/*' --exclude='/storage/framework/views/*' --exclude='/storage/app/installed' \
+  --exclude='/storage/framework/sessions/*' --exclude='/storage/framework/views/*' --exclude='/storage/app/installed' --exclude='/storage/framework/migrated-version' --exclude='/storage/framework/update-pending' --exclude='/storage/app/updates' \
   --exclude='/database/*.sqlite' --exclude='/bootstrap/cache/*.php' --exclude='.phpunit.*' --exclude='phpunit.xml' \
   --exclude='/.agents' --exclude='/.cursor' --exclude='/.zed' --exclude='/.mcp.json' --exclude='/boost.json' \
   --exclude='/resources/brand' --exclude='/.github' --exclude='/.gitattributes' --exclude='/.editorconfig' --exclude='/CONTRIBUTING.md' --exclude='/SECURITY.md' --exclude='/CODE_OF_CONDUCT.md' --exclude='/CHANGELOG.md' --exclude='/AGENTS.md' --exclude='/CLAUDE.md' --exclude='/.claude' --exclude='.DS_Store' \

@@ -32,3 +32,6 @@ Thumbs.db
 /.claude
 /.mcp.json
 /.github/*.local
+/storage/framework/migrated-version
+/storage/framework/update-pending
+/storage/app/updates
