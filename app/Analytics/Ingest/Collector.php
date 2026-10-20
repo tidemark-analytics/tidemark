@@ -1,0 +1,168 @@
+<?php
+
+namespace App\Analytics\Ingest;
+
+use App\Analytics\Support\Sources;
+use App\Models\Site;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+
+/**
+ * Accepts Plausible's event payload — {n: name, u: url, d: domain, r: referrer, w: screen width, p: props, h: hash mode} —
+ * so existing Plausible snippets work by changing only the script URL.
+ */
+class Collector
+{
+    public function __construct(private EventSink $sink) {}
+
+    /** @return array{status:int, body:string} */
+    public function handle(Request $request): array
+    {
+        $p = json_decode($request->getContent(), true);
+        if (! is_array($p)) {
+            $p = $request->all();
+        }
+        $name = trim((string) ($p['n'] ?? $p['name'] ?? ''));
+        $url = (string) ($p['u'] ?? $p['url'] ?? '');
+        $domain = (string) ($p['d'] ?? $p['domain'] ?? '');
+        if ($name === '' || $url === '' || $domain === '') {
+            return ['status' => 400, 'body' => 'Missing event name, url or domain'];
+        }
+        $parts = parse_url($url);
+        if (! $parts || ! in_array(strtolower($parts['scheme'] ?? ''), ['http', 'https'], true)) {
+            return ['status' => 400, 'body' => 'Invalid url'];
+        }
+
+        $site = $this->site($domain);
+        if (! $site) {
+            return ['status' => 404, 'body' => 'Unknown site'];
+        }
+
+        $ua = (string) $request->userAgent();
+        $agent = UserAgent::parse($ua);
+        if ($agent['bot'] && ! config('tidemark.disable_bot_filter')) {
+            return ['status' => 202, 'body' => 'ok'];
+        }
+        $ip = Geo::clientIp($request);
+        $hostname = strtolower($parts['host'] ?? '');
+        $pathname = ($parts['path'] ?? '') === '' ? '/' : $parts['path'];
+        if (! empty($p['h']) && ! empty($parts['fragment'])) {
+            $pathname .= '#'.$parts['fragment'];
+        }
+        $pathname = mb_substr($pathname, 0, 500);
+
+        $geo = Geo::resolve($request, $ip);
+        if ($this->shielded($site, $ip, $geo['country'], $pathname, $hostname)) {
+            return ['status' => 202, 'body' => 'ok'];
+        }
+
+        parse_str($parts['query'] ?? '', $q);
+        $q = array_map(fn ($v) => is_string($v) ? mb_substr($v, 0, 255) : null, $q);
+        $referrer = $q['ref'] ?? $q['source'] ?? $q['utm_source'] ?? null;
+        $referrer = isset($p['r']) && $p['r'] ? (string) $p['r'] : ($referrer && str_contains($referrer, '.') ? $referrer : null);
+        $utm = ['source' => $q['utm_source'] ?? null, 'medium' => $q['utm_medium'] ?? null, 'campaign' => $q['utm_campaign'] ?? null, 'content' => $q['utm_content'] ?? null, 'term' => $q['utm_term'] ?? null];
+        $src = Sources::classify($referrer, $utm, $site['domain']);
+
+        $this->sink->record([
+            'site_id' => $site['id'],
+            'visitor_id' => $this->visitorId($site['id'], $ip, $ua),
+            'at' => now()->format('Y-m-d H:i:s'),
+            'name' => mb_substr($name, 0, 120),
+            'pathname' => $pathname,
+            'hostname' => mb_substr($hostname, 0, 100),
+            'referrer' => $src['referrer'], 'source' => $src['source'], 'channel' => $src['channel'], 'utm' => $utm,
+            'country' => $geo['country'], 'region' => $geo['region'], 'city' => $geo['city'],
+            'browser' => $agent['browser'], 'os' => $agent['os'],
+            'device' => Sources::deviceFromWidth(isset($p['w']) ? (int) $p['w'] : null, $agent['mobile'], $agent['tablet']),
+            'props' => $this->props($p['p'] ?? $p['props'] ?? null),
+        ]);
+
+        return ['status' => 202, 'body' => 'ok'];
+    }
+
+    /** Anonymous visitor id: HMAC of ip + user agent + site, keyed by a salt that changes every day. Nothing is stored that could be reversed. */
+    private function visitorId(string $siteId, ?string $ip, string $ua): string
+    {
+        $salt = (config('tidemark.salt') ?: config('app.key')).gmdate('Y-m-d');
+
+        return substr(hash_hmac('sha256', $siteId.'|'.$ip.'|'.$ua, $salt), 0, 32);
+    }
+
+    /** @return array<string,string> */
+    private function props(mixed $raw): array
+    {
+        if (is_string($raw)) {
+            $raw = json_decode($raw, true);
+        }
+        $out = [];
+        foreach (is_array($raw) ? $raw : [] as $k => $v) {
+            if (! is_scalar($v) || count($out) >= 30) {
+                continue;
+            }
+            $out[mb_substr((string) $k, 0, 120)] = mb_substr(is_bool($v) ? ($v ? 'true' : 'false') : (string) $v, 0, 500);
+        }
+
+        return $out;
+    }
+
+    /** @return array{id:string, domain:string, shields:array<string,array<int,string>>}|null */
+    private function site(string $domain): ?array
+    {
+        foreach (array_filter(array_map('trim', explode(',', strtolower($domain)))) as $candidate) {
+            $candidate = preg_replace('/^www\./', '', $candidate);
+            $found = Cache::remember('tdm:site:'.$candidate, 60, function () use ($candidate) {
+                $site = Site::where('domain', $candidate)->first();
+
+                return $site ? ['id' => $site->id, 'domain' => $site->domain, 'shields' => $site->shields()->get()->groupBy('type')->map(fn ($g) => $g->pluck('value')->all())->all()] : 0;
+            });
+            if ($found) {
+                return $found;
+            }
+        }
+
+        return null;
+    }
+
+    private function shielded(array $site, ?string $ip, ?string $country, string $path, string $hostname): bool
+    {
+        $s = $site['shields'];
+        $ignored = array_merge($s['ip'] ?? [], config('tidemark.ignore_ips'));
+        foreach ($ignored as $rule) {
+            if ($ip && ($rule === $ip || fnmatch($rule, $ip) || (str_contains($rule, '/') && self::inCidr($ip, $rule)))) {
+                return true;
+            }
+        }
+        if ($country && in_array($country, $s['country'] ?? [], true)) {
+            return true;
+        }
+        foreach ($s['page'] ?? [] as $rule) {
+            if (fnmatch(str_replace('**', '*', $rule), $path)) {
+                return true;
+            }
+        }
+        $allowed = array_merge($s['hostname'] ?? [], config('tidemark.allowed_hostnames'));
+
+        return $allowed && ! array_filter($allowed, fn ($h) => fnmatch($h, $hostname));
+    }
+
+    private static function inCidr(string $ip, string $cidr): bool
+    {
+        [$net, $bits] = array_pad(explode('/', $cidr, 2), 2, 32);
+        $ipBin = @inet_pton($ip);
+        $netBin = @inet_pton($net);
+        if ($ipBin === false || $netBin === false || strlen($ipBin) !== strlen($netBin)) {
+            return false;
+        }
+        $bits = (int) $bits;
+        $bytes = intdiv($bits, 8);
+        if (substr($ipBin, 0, $bytes) !== substr($netBin, 0, $bytes)) {
+            return false;
+        }
+        if ($bits % 8 === 0) {
+            return true;
+        }
+        $mask = ~(0xFF >> ($bits % 8)) & 0xFF;
+
+        return (ord($ipBin[$bytes]) & $mask) === (ord($netBin[$bytes]) & $mask);
+    }
+}
