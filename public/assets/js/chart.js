@@ -109,8 +109,9 @@ export function WorldMap({ rows, onPick, valueLabel = 'Visitors' }) {
     <svg viewBox=${`0 0 ${world.w} ${world.h}`} role="img" aria-label="Map of visitors by country" onMouseLeave=${() => setTip(null)}>
       ${Object.entries(world.c).map(([code, c]) => {
         const v = byCode[code];
-        return html`<path d=${c.d} class=${'country' + (v ? ' has' : '')} style=${v ? `fill-opacity:${level(v)}` : ''} onMouseMove=${(e) => { const r = ref.current.getBoundingClientRect(); setTip({ x: e.clientX - r.left, y: e.clientY - r.top, name: c.n, v }); }} onClick=${() => v && onPick && onPick(code)} />`;
+        return html`<path d=${c.d} class=${'country' + (v ? ' has' : '')} style=${v ? `fill-opacity:${level(v)}` : ''} onMouseMove=${(e) => { const r = ref.current.getBoundingClientRect(); setTip({ x: e.clientX - r.left, y: e.clientY - r.top, name: c.n, v, code }); }} onClick=${() => v && onPick && onPick(code)} />`;
       })}
+      ${tip && world.c[tip.code] && html`<path d=${world.c[tip.code].d} class="country-hot" />`}
     </svg>
     ${tip && html`<div class="tooltip" style=${`left:${Math.min(tip.x, Math.max(width - 90, 0))}px;top:${tip.y - 14}px`}><div class="tt-r"><span>${tip.name}</span><b>${tip.v ? fmt(tip.v) : '—'}</b></div><div class="tt-h" style="margin:0">${valueLabel}</div></div>`}
   </div>`;

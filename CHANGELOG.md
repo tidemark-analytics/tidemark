@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.10.4] - 2026-10-20
+
+### Fixed
+- On the world map, a hovered country's outline was partly hidden behind neighboring countries that are drawn after it. The outline is now drawn on top of all of them.
+
 ## [0.10.3] - 2026-10-20
 
 ### Fixed

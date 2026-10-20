@@ -469,7 +469,8 @@ table.t th:last-child, table.t td:last-child { padding-right: 18px; }
 .worldmap svg { width: 100%; height: auto; display: block; }
 .country { fill: var(--surface-3); stroke: var(--surface); stroke-width: 0.6; transition: fill 0.12s; }
 .country.has { fill: var(--series-1); cursor: pointer; }
-.country:hover { stroke: var(--ink-3); }
+/* the hovered country's outline is drawn again on top of all others, so neighbors drawn later can't cover part of it */
+.country-hot { fill: none; stroke: var(--ink); stroke-width: 1.4; stroke-linejoin: round; vector-effect: non-scaling-stroke; pointer-events: none; }
 .waiting { display: flex; gap: 18px; padding: 20px; align-items: flex-start; border-style: dashed; border-color: var(--line-2); }
 .waiting h2 { margin-bottom: 4px; }
 .waiting p { margin-bottom: 12px; }
