@@ -34,7 +34,8 @@ function TopGraph({ site, scope, live, onIntervals }) {
   const defs = scope.goal ? GOAL_METRICS : METRICS;
   const current = defs[metric] ? metric : Object.keys(defs)[0];
   const [name, format] = defs[current];
-  const g = graph.data;
+  // while the filter changes, the previous response may use the other set of metrics; treat that as still loading
+  const g = graph.data && graph.data.plot[current] ? graph.data : null;
   useEffect(() => { if (g) onIntervals({ list: g.intervals, current: g.interval }); }, [g && g.interval, g && g.intervals.join()]);
   const stats = top.data && top.data.stats;
   const comparing = top.data && top.data.comparing;
@@ -49,8 +50,8 @@ function TopGraph({ site, scope, live, onIntervals }) {
     })}</div>
     <div class=${'graph-b ' + (busy && g ? 'stale' : '')}>
       ${graph.error && !g ? html`<div class="panel-empty" style="min-height:300px"><b>Couldn't load the graph</b><p class="muted">${graph.error.message}</p><button class="btn sm" onClick=${() => { graph.reload(); top.reload(); }}>Try again</button></div>` : !g ? html`<div class="skeleton" style="height:300px"></div>` : asTable
-        ? html`<${ChartTable} labels=${g.labels} values=${g.plot[current]} prev=${g.comparison && g.comparison.plot[current]} format=${format} name=${name} interval=${g.interval} />`
-        : html`<${LineChart} labels=${g.labels} values=${g.plot[current]} prev=${g.comparison ? g.comparison.plot[current] : null} prevLabels=${g.comparison && g.comparison.labels} format=${format} name=${name} interval=${g.interval} live=${live} />`}
+        ? html`<${ChartTable} labels=${g.labels} values=${g.plot[current]} prev=${(g.comparison && g.comparison.plot[current]) || null} format=${format} name=${name} interval=${g.interval} />`
+        : html`<${LineChart} labels=${g.labels} values=${g.plot[current]} prev=${g.comparison && g.comparison.plot[current] ? g.comparison.plot[current] : null} prevLabels=${g.comparison && g.comparison.labels} format=${format} name=${name} interval=${g.interval} live=${live} />`}
       <div class="graph-foot">
         <span class="legend"><span><i style="background:var(--series-1)"></i>${name}</span>${g && g.comparison && html`<span><i style="background:var(--series-2)"></i>Comparison</span>`}</span>
         <button class="more" onClick=${() => setAsTable(!asTable)}>${asTable ? 'View as chart' : 'View as table'}</button>

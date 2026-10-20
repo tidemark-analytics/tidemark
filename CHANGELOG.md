@@ -2,6 +2,14 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.10.1] - 2026-10-20
+
+### Added
+- Clicking a goal such as "Outbound Link: Click" or "File Download" now drills down: the Behaviors panel shows an "Outbound links" / "File downloads" / "Form submissions" tab listing the URLs (or pages) behind it, with conversions and conversion rate. Outbound and download URLs have an open-in-new-tab icon.
+
+### Fixed
+- Clearing a goal filter with its × updated the address bar but left the dashboard stuck on the filtered view (the graph crashed on stale data). It now clears properly.
+
 ## [0.10.0] - 2026-10-20
 
 ### Added

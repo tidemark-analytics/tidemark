@@ -577,3 +577,8 @@ td > .pill { vertical-align: middle; }
 .subnav a .notif { margin-left: auto; }
 .subnav a { display: flex; align-items: center; }
 .muted.small { font-size: 12.5px; }
+
+.mrow .ext { display: inline-grid; place-items: center; margin-left: 6px; color: var(--ink-3); opacity: 0; border-radius: 4px; width: 18px; height: 18px; flex: none; }
+.mrow:hover .ext, .mrow .ext:focus-visible { opacity: 1; }
+.mrow .ext:hover { color: var(--accent-ink); background: var(--surface-3); }
+@media (pointer: coarse) { .mrow .ext { opacity: 1; } }

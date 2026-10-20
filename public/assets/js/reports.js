@@ -24,7 +24,7 @@ const columnsFor = (dim, goalMode) => (goalMode ? COLUMNS._goal : COLUMNS[dim] |
 const pickRow = (dim, row) => addFilter(dim, row.name);
 
 /** A ranked list with proportional bars. */
-export function RankedList({ rows, dim, goalMode, loading, empty = 'No data yet', head, onPick = pickRow, limit, error, onRetry, filtered }) {
+export function RankedList({ rows, dim, goalMode, loading, empty = 'No data yet', head, onPick = pickRow, limit, error, onRetry, filtered, linkOut }) {
   if (error && !rows) return html`<div class="panel-empty"><b>Couldn't load this report</b><p class="muted">${error.message}</p>${onRetry && html`<button class="btn sm" onClick=${onRetry}><${Icon} name="refresh-cw" size=${13} /> Try again</button>`}</div>`;
   if (!rows) return html`<div class="stack sm" aria-busy="true">${Array.from({ length: 6 }, (_, i) => html`<div class="skeleton" style=${`height:28px;width:${100 - i * 6}%`}></div>`)}</div>`;
   const shown = limit ? rows.slice(0, limit) : rows;
@@ -34,7 +34,7 @@ export function RankedList({ rows, dim, goalMode, loading, empty = 'No data yet'
     <div class="mhead"><span>${head}</span><span>${goalMode ? html`<span class="cr w">Conversions</span><span class="cr2">CR</span>` : 'Visitors'}</span></div>
     ${shown.map((r) => html`<button class="mrow" onClick=${() => onPick(dim, r)} title=${`Filter by ${r.name}`}>
       <span class="bar" style=${`width:${(r.visitors / max) * 100}%`}></span>
-      <span class="l"><${Label} dim=${dim} name=${r.name} /></span>
+      <span class="l"><${Label} dim=${dim} name=${r.name} />${linkOut && /^https?:\/\//i.test(r.name) && html`<span class="ext" role="link" tabindex="0" aria-label="Open in a new tab" title="Open in a new tab" onClick=${(e) => { e.stopPropagation(); window.open(r.name, '_blank', 'noopener,noreferrer'); }} onKeyDown=${(e) => { if (e.key === 'Enter') { e.stopPropagation(); window.open(r.name, '_blank', 'noopener,noreferrer'); } }}><${Icon} name="external-link" size=${12} /></span>`}</span>
       <span class="r">${goalMode ? html`<span class="cr w">${fmtShort(r.visitors)}</span><small class="cr2">${r.conversion_rate}%</small>` : fmtShort(r.visitors)}</span></button>`)}
   </div>`;
 }
@@ -64,8 +64,9 @@ const storedTab = (id, fallback) => { try { return localStorage.getItem('tidemar
 const saveTab = (id, v) => { try { localStorage.setItem('tidemark.tab.' + id, v); } catch (e) { /* ignore */ } };
 
 /** A card with tabs; each tab renders its own body, and `details` opens the full list. */
-function Panel({ id, title, tabs, children, wide }) {
-  const [tab, setTab] = useState(() => (tabs.find((t) => t.key === storedTab(id)) || tabs[0]).key);
+function Panel({ id, title, tabs, children, wide, prefer }) {
+  const [tab, setTab] = useState(() => (tabs.find((t) => t.key === prefer) || tabs.find((t) => t.key === storedTab(id)) || tabs[0]).key);
+  useEffect(() => { if (prefer) setTab(prefer); }, [prefer]);
   const active = tabs.find((t) => t.key === tab) || tabs[0];
   return html`<section class=${'card panel' + (wide ? ' wide' : '')} aria-label=${title}>
     <div class="card-h"><h3>${title}</h3><div class="tabs" role="tablist">${tabs.map((t) => html`<button role="tab" aria-selected=${t.key === active.key} class=${t.key === active.key ? 'on' : ''} onClick=${() => { setTab(t.key); saveTab(id, t.key); }}>${t.label}</button>`)}</div></div>
@@ -131,25 +132,35 @@ function GoalsBody({ site, scope, poll }) {
       <span class="r"><span class="cr">${fmtShort(r.visitors)}</span><span class="cr">${fmtShort(r.events)}</span><small class="cr2">${r.conversion_rate}%</small></span></button>`)}</div>`;
 }
 
-function PropsBody({ site, scope, poll }) {
-  const keys = useApi(`/sites/${site.domain}/stats/props`, scope.params, [], { poll });
-  const list = (keys.data && keys.data.results) || [];
+function PropsBody({ site, scope, poll, fixed, linkOut }) {
+  const keys = useApi(`/sites/${site.domain}/stats/props`, scope.params, [], { poll, enabled: !fixed });
+  const list = fixed ? [{ name: fixed }] : (keys.data && keys.data.results) || [];
   const [key, setKey] = useState(null);
   const [more, setMore] = useState(false);
   const active = list.find((k) => k.name === key) ? key : list[0] && list[0].name;
   const res = useApi(`/sites/${site.domain}/stats/props/${encodeURIComponent(active || '')}`, { ...scope.params, limit: 8 }, [], { enabled: !!active, poll });
-  if (!keys.data) return html`<${RankedList} rows=${null} />`;
+  if (!fixed && !keys.data) return html`<${RankedList} rows=${null} />`;
   if (!list.length) return html`<div class="panel-empty"><b>Custom properties</b><p class="muted">Send extra details with your events, like plan or button label, and break results down by them.</p></div>`;
   const rows = res.data && res.data.results;
   const dim = 'prop:' + active;
   const source = { path: `/sites/${site.domain}/stats/props/${encodeURIComponent(active)}`, columns: COLUMNS._goal, pick: (d, row) => addFilter(d, row.name) };
-  return html`<div class="subselect"><label class="sr-only" for="prop-key">Property</label><select id="prop-key" value=${active} onChange=${(e) => setKey(e.target.value)}>${list.map((k) => html`<option value=${k.name}>${k.name}</option>`)}</select></div>
-    <${RankedList} rows=${rows} dim=${dim} goalMode=${true} head=${active} loading=${res.loading} />
+  return html`${!fixed && html`<div class="subselect"><label class="sr-only" for="prop-key">Property</label><select id="prop-key" value=${active} onChange=${(e) => setKey(e.target.value)}>${list.map((k) => html`<option value=${k.name}>${k.name}</option>`)}</select></div>`}
+    <${RankedList} rows=${rows} dim=${dim} goalMode=${true} head=${active} loading=${res.loading} linkOut=${linkOut} error=${res.error} onRetry=${res.reload} empty="No data for this goal yet" />
     ${rows && rows.length > 0 && html`<div class="panel-foot"><button class="more" onClick=${() => setMore(true)}><${Icon} name="search" size=${13} /> Details</button></div>`}
     ${more && html`<${DetailsModal} title=${active} dim=${dim} site=${site} scope=${scope} source=${source} onClose=${() => setMore(false)} />`}`;
 }
 
+/** Goals that carry one obvious detail: filtering by them drills down to a list of it (like clicking "Outbound Link: Click"). */
+const GOAL_DETAIL = {
+  'Outbound Link: Click': { prop: 'url', label: 'Outbound links', linkOut: true },
+  'File Download': { prop: 'url', label: 'File downloads', linkOut: true },
+  'Form: Submission': { prop: 'path', label: 'Form submissions' },
+};
+
 export function Behaviors({ site, scope, poll }) {
-  return html`<${Panel} id="behaviors" wide title="Behaviors" tabs=${[{ key: 'goals', label: 'Goals' }, { key: 'props', label: 'Properties' }]}>
-    ${(t) => t.key === 'goals' ? html`<${GoalsBody} site=${site} scope=${scope} poll=${poll} />` : html`<${PropsBody} site=${site} scope=${scope} poll=${poll} />`}<//>`;
+  const detail = scope.goal ? GOAL_DETAIL[scope.goal] : null;
+  const tabs = [...(detail ? [{ key: 'detail', label: detail.label }] : []), { key: 'goals', label: 'Goals' }, { key: 'props', label: 'Properties' }];
+  return html`<${Panel} id="behaviors" wide title="Behaviors" tabs=${tabs} prefer=${detail ? 'detail' : undefined}>
+    ${(t) => t.key === 'detail' ? html`<${PropsBody} key=${detail.prop} site=${site} scope=${scope} poll=${poll} fixed=${detail.prop} linkOut=${detail.linkOut} />`
+      : t.key === 'goals' ? html`<${GoalsBody} site=${site} scope=${scope} poll=${poll} />` : html`<${PropsBody} site=${site} scope=${scope} poll=${poll} />`}<//>`;
 }
