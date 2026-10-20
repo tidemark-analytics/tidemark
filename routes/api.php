@@ -8,10 +8,14 @@ use App\Http\Controllers\Api\StatsApiController;
 use App\Http\Controllers\Api\StatsController;
 use App\Http\Controllers\Api\UpdateController;
 use App\Http\Controllers\EventController;
+use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
+use Illuminate\Cookie\Middleware\EncryptCookies;
+use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Route;
 
 // ---- public event collection (cross-origin, no session) — Plausible-compatible -------------------------------
-Route::withoutMiddleware(['throttle:api'])->middleware('cors.collect')->group(function () {
+// The endpoint must never start a session or set a cookie: that is what makes the tracker cookie-free.
+Route::withoutMiddleware(['throttle:api', StartSession::class, EncryptCookies::class, AddQueuedCookiesToResponse::class])->middleware('cors.collect')->group(function () {
     Route::match(['post', 'options'], '/event', [EventController::class, 'store'])->name('event');
 });
 

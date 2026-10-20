@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.9.2] - 2026-10-20
+
+### Fixed
+- The event endpoint (`POST /api/event`) answered with a `tidemark-session` cookie. It no longer starts a session or sets any cookie, so tracking is cookie-free as documented. **Upgrade promptly if you rely on that claim.**
+
 ## [0.9.1] - 2026-10-20
 
 ### Fixed

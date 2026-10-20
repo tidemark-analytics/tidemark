@@ -169,4 +169,13 @@ class CollectTest extends TestCase
         \Queue::pushed(IngestJob::class)->first()->handle(app(DatabaseSink::class));
         $this->assertSame(1, DB::table('events')->count());
     }
+
+    public function test_collection_never_sets_a_cookie_or_starts_a_session(): void
+    {
+        $this->site();
+        $res = $this->hit()->assertStatus(202);
+        $this->assertEmpty($res->headers->getCookies());
+        $this->assertFalse($res->headers->has('Set-Cookie'));
+        $this->call('OPTIONS', '/api/event')->assertHeaderMissing('Set-Cookie');
+    }
 }
