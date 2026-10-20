@@ -117,5 +117,5 @@ export function useDebounced(value, ms = 300) {
   return v;
 }
 
-/** Switch row: a labelled toggle with help text. */
+/** Switch row: a labeled toggle with help text. */
 export const Toggle = ({ label, help, checked, onChange, disabled }) => html`<label class="toggle"><input type="checkbox" role="switch" checked=${checked} disabled=${disabled} onChange=${(e) => onChange(e.target.checked)} /><span class="track" aria-hidden="true"></span><span class="grow"><b>${label}</b>${help && html`<span class="help">${help}</span>`}</span></label>`;

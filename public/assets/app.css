@@ -11,8 +11,8 @@
 }
 
 /* ---- Tidemark brand tokens --------------------------------------------------------------------------------
-   Deep-water neutrals + Tide teal as the interface colour; Buoy amber is the "signal" (caution, highlights, the logo's ping).
-   Chart series are validated for lightness, chroma, colour-blind separation and contrast on both surfaces. */
+   Deep-water neutrals + Tide teal as the interface color; Buoy amber is the "signal" (caution, highlights, the logo's ping).
+   Chart series are validated for lightness, chroma, color-blind separation and contrast on both surfaces. */
 :root {
   /* surfaces & ink — cool, faintly green-tinted neutrals */
   --bg: #f4f7f7;

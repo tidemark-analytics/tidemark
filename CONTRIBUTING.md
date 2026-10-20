@@ -16,7 +16,7 @@ The dashboard is a no-build Preact app in `public/assets/js` (ES modules, no Nod
 
 ## Before you open a pull request
 
-- `php artisan test` passes and new behaviour has a test.
+- `php artisan test` passes and new behavior has a test.
 - `vendor/bin/pint` leaves nothing to fix.
 - The change works on SQLite, MySQL/MariaDB and PostgreSQL (use the helpers in `App\Analytics\Support\Sql` instead of vendor-specific SQL).
 - User-facing changes are noted in `CHANGELOG.md`.

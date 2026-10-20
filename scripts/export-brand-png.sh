@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Rasterises the brand SVGs with headless Chrome (macOS). Usage: scripts/export-brand-png.sh
+# Rasterizes the brand SVGs with headless Chrome (macOS). Usage: scripts/export-brand-png.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
 CHROME="${CHROME:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}"

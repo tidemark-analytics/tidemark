@@ -4,7 +4,7 @@
 
 ## Checklist
 
-- [ ] `php artisan test` passes and new behaviour has a test
+- [ ] `php artisan test` passes and new behavior has a test
 - [ ] `vendor/bin/pint` is clean
 - [ ] Works on SQLite, MySQL/MariaDB and PostgreSQL
 - [ ] No IP addresses or other personal data are stored

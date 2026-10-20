@@ -2,7 +2,7 @@
 import { html, useState, useEffect, useMemo, useRef, useApi, api, useLocation, setQuery, setFilters, parseFilters, navigate, Link, Icon, toast, PERIODS, FILTER_OPS, FILTER_DIMS, dimLabel, todayStr, shiftDate, fmt, fmtShort, dur, countryName, shareAuth, share, useDocTitle, useScope, BASE, UserCtx, useContext } from './lib.js';
 import { Pop, Modal, Loading, Empty, Field, CodeBlock, useDebounced } from './ui.js';
 import { LineChart, ChartTable, bucketText } from './chart.js';
-import { Sources, Pages, Locations, Devices, Behaviours } from './reports.js';
+import { Sources, Pages, Locations, Devices, Behaviors } from './reports.js';
 
 // ------------------------------------------------------------------------------------------ metrics
 const METRICS = {
@@ -293,6 +293,6 @@ export function Dashboard({ domain, shared }) {
       <${Sources} site=${s} scope=${scope} poll=${poll} /><${Pages} site=${s} scope=${scope} poll=${poll} />
       <${Locations} site=${s} scope=${scope} poll=${poll} /><${Devices} site=${s} scope=${scope} poll=${poll} />
     </div>
-    <${Behaviours} site=${s} scope=${scope} poll=${poll} />
+    <${Behaviors} site=${s} scope=${scope} poll=${poll} />
   </main>`;
 }

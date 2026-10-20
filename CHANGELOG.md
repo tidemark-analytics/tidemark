@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.9.6] - 2026-10-20
+
+### Changed
+- American English throughout: the report panel is now "Behaviors", and docs, brand guide and code comments use US spellings.
+
 ## [0.9.5] - 2026-10-20
 
 ### Changed
@@ -36,7 +41,7 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 First public release.
 
 ### Added
-- Plausible-style dashboard: visitors, visits, pageviews, views per visit, bounce rate and visit duration with period comparison, plus Sources, Pages, Locations, Devices and Behaviours reports.
+- Plausible-style dashboard: visitors, visits, pageviews, views per visit, bounce rate and visit duration with period comparison, plus Sources, Pages, Locations, Devices and Behaviors reports.
 - Filters (is, is not, contains, does not contain, wildcards), goal-based conversion mode, custom properties, realtime view, CSV export.
 - Plausible-compatible tracking script (`script.<variants>.js`) and Events API (`POST /api/event`).
 - Cookie-free visitor ids from a daily-rotating salted hash; IP addresses are never stored.

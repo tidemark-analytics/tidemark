@@ -174,7 +174,7 @@ export const FILTER_DIMS = [
   ['Sources', [['channel', 'Channel'], ['source', 'Source'], ['referrer', 'Referrer URL'], ['utm_medium', 'UTM medium'], ['utm_source', 'UTM source'], ['utm_campaign', 'UTM campaign'], ['utm_content', 'UTM content'], ['utm_term', 'UTM term']]],
   ['Location', [['country', 'Country'], ['region', 'Region'], ['city', 'City']]],
   ['Devices', [['browser', 'Browser'], ['os', 'Operating system'], ['device', 'Device']]],
-  ['Behaviour', [['goal', 'Goal']]],
+  ['Behavior', [['goal', 'Goal']]],
 ];
 export const DIM_LABEL = Object.fromEntries(FILTER_DIMS.flatMap(([, l]) => l));
 export const dimLabel = (d) => (d.startsWith('prop:') ? d.slice(5) : DIM_LABEL[d] || d);

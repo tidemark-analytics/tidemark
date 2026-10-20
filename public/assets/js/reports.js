@@ -1,4 +1,4 @@
-// The report panels on the dashboard: Sources, Pages, Locations, Devices and Behaviours.
+// The report panels on the dashboard: Sources, Pages, Locations, Devices and Behaviors.
 import { html, useState, setFilters, useEffect, useRef, useMemo, useApi, api, addFilter, fmt, fmtShort, dur, flag, countryName, Icon, Link } from './lib.js';
 import { Modal, useDebounced, Empty } from './ui.js';
 import { WorldMap } from './chart.js';
@@ -149,7 +149,7 @@ function PropsBody({ site, scope, poll }) {
     ${more && html`<${DetailsModal} title=${active} dim=${dim} site=${site} scope=${scope} source=${source} onClose=${() => setMore(false)} />`}`;
 }
 
-export function Behaviours({ site, scope, poll }) {
-  return html`<${Panel} id="behaviours" wide title="Behaviours" tabs=${[{ key: 'goals', label: 'Goals' }, { key: 'props', label: 'Properties' }]}>
+export function Behaviors({ site, scope, poll }) {
+  return html`<${Panel} id="behaviors" wide title="Behaviors" tabs=${[{ key: 'goals', label: 'Goals' }, { key: 'props', label: 'Properties' }]}>
     ${(t) => t.key === 'goals' ? html`<${GoalsBody} site=${site} scope=${scope} poll=${poll} />` : html`<${PropsBody} site=${site} scope=${scope} poll=${poll} />`}<//>`;
 }
