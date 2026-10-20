@@ -2,6 +2,12 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.9.1] - 2026-10-20
+
+### Fixed
+- Replacing the files by hand (FTP) now runs the pending database migrations on the first request, the same as an in-app update. Previously nothing triggered them.
+- `.env.example` described the visitor-id salt as monthly; it changes daily.
+
 ## [0.9.0] - 2026-10-20
 
 ### Added

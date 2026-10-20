@@ -218,4 +218,19 @@ class UpdaterTest extends TestCase
         $member->forceFill(['is_admin' => true])->save();
         $this->getJson('/api/admin/update/check?fresh=1')->assertOk()->assertJsonPath('latest.version', '1.5.0');
     }
+
+    public function test_files_replaced_by_hand_are_detected_and_migrated_once(): void
+    {
+        $updater = new Updater($this->base);
+        $this->assertFalse($updater->hasPendingWork()); // not installed yet
+        touch($this->base.'/storage/app/installed');
+        $this->assertTrue($updater->hasPendingWork()); // no marker yet
+        $this->assertTrue($updater->finishIfPending()['ok']);
+        $this->assertFalse($updater->hasPendingWork());
+        file_put_contents($this->base.'/VERSION', '1.1.0'); // as if new files were uploaded over FTP
+        $this->assertTrue($updater->hasPendingWork());
+        $meta = $updater->finishIfPending();
+        $this->assertSame(['1.0.0', '1.1.0'], [$meta['from'], $meta['to']]);
+        $this->assertFalse($updater->hasPendingWork());
+    }
 }

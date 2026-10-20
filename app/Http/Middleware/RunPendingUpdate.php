@@ -7,13 +7,14 @@ use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
-/** After a self-update the first request runs the migrations with the freshly installed code. */
+/** After an update (in-app or by FTP) the first request runs the migrations with the freshly installed code. */
 class RunPendingUpdate
 {
     public function handle(Request $request, Closure $next): Response
     {
-        if (is_file(storage_path('framework/update-pending'))) {
-            app(Updater::class)->finishIfPending();
+        $updater = app(Updater::class);
+        if ($updater->hasPendingWork()) {
+            $updater->finishIfPending();
         }
 
         return $next($request);

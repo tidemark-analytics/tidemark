@@ -55,6 +55,28 @@ class Updater
         return $this->base.'/storage/framework/update-pending';
     }
 
+    public function migratedMarkerPath(): string
+    {
+        return $this->base.'/storage/framework/migrated-version';
+    }
+
+    /**
+     * True after an in-app update, or after the files were replaced by hand (FTP): the release's VERSION file
+     * differs from the version whose migrations last ran here.
+     */
+    public function hasPendingWork(): bool
+    {
+        if (is_file($this->pendingPath())) {
+            return true;
+        }
+        if (! is_file($this->base.'/storage/app/installed')) {
+            return false; // not installed yet — the web installer runs the migrations
+        }
+        $marker = is_file($this->migratedMarkerPath()) ? trim((string) file_get_contents($this->migratedMarkerPath())) : null;
+
+        return $marker !== $this->version();
+    }
+
     /** @return array{upload:int,post:int,chunk:int} */
     public function limits(): array
     {
@@ -417,7 +439,12 @@ class Updater
     {
         $flag = $this->pendingPath();
         if (! is_file($flag)) {
-            return null;
+            if (! $this->hasPendingWork()) {
+                return null;
+            }
+            // files were replaced outside the updater: record the change so the same path handles it
+            $from = is_file($this->migratedMarkerPath()) ? trim((string) file_get_contents($this->migratedMarkerPath())) : 'unknown';
+            file_put_contents($flag, json_encode(['from' => $from, 'to' => $this->version(), 'at' => time(), 'backup' => null]));
         }
         $lock = fopen($flag, 'r');
         if (! $lock || ! flock($lock, LOCK_EX | LOCK_NB)) {
@@ -440,6 +467,9 @@ class Updater
             }
             $meta['finished_at'] = time();
             file_put_contents($this->dir().'/last.json', json_encode($meta));
+            if ($meta['ok']) {
+                file_put_contents($this->migratedMarkerPath(), $this->version());
+            }
             @unlink($flag);
 
             return $meta;
