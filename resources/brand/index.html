@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tidemark — Brand guide</title>
+<link rel="icon" href="logo/tidemark-mark.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../public/assets/app.css">
+<style>
+  /* guide-only styles; the product's own tokens come from app.css above */
+  html, body { overflow-x: hidden; }
+  body { background: var(--bg); }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 28px 120px; }
+  .topnav { position: sticky; top: 0; z-index: 20; backdrop-filter: blur(10px); background: color-mix(in srgb, var(--bg) 85%, transparent); border-bottom: 1px solid var(--line); }
+  .topnav .in { max-width: 1080px; margin: 0 auto; padding: 10px 28px; display: flex; align-items: center; gap: 18px; overflow-x: auto; scrollbar-width: none; }
+  .topnav a { color: var(--ink-2); font-size: 13px; white-space: nowrap; padding: 4px 2px; }
+  .topnav a:hover { color: var(--ink); }
+  .topnav .sp { flex: 1; }
+  .hero { padding: 72px 0 40px; position: relative; }
+  .hero::before { content: ""; position: absolute; top: -60px; bottom: 0; left: 50%; width: 100vw; transform: translateX(-50%); background: url("pattern/contours-light.svg") center top / 1500px auto no-repeat; opacity: .9; z-index: -1; -webkit-mask-image: linear-gradient(#000 40%, transparent); mask-image: linear-gradient(#000 40%, transparent); }
+  :root[data-theme="dark"] .hero::before { background-image: url("pattern/contours-dark.svg"); }
+  .hero h1 { font-size: clamp(40px, 7vw, 76px); letter-spacing: -0.04em; line-height: 1.02; margin: 28px 0 16px; font-weight: 650; }
+  .hero h1 em { font-style: normal; color: var(--signal); }
+  .hero p.lead { font-size: 20px; color: var(--ink-2); max-width: 640px; line-height: 1.5; }
+  section { padding-top: 72px; }
+  section > h2 { font-size: 28px; letter-spacing: -0.03em; font-weight: 650; margin-bottom: 6px; }
+  section > .sub { color: var(--ink-3); max-width: 640px; margin-bottom: 26px; font-size: 15px; line-height: 1.55; }
+  h3.k { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); margin: 28px 0 10px; font-weight: 600; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+  .pane { border: 1px solid var(--line); border-radius: 14px; padding: 28px; display: grid; place-items: center; min-height: 150px; background: var(--surface); }
+  .pane.light { background: #ffffff; border-color: #e0e8e8; }
+  .pane.dark { background: #081418; border-color: #1d313a; }
+  .pane.teal { background: #0e7c86; border-color: transparent; }
+  .pane.foam { background: #e6f3f2; border-color: transparent; }
+  .pane img { max-width: 100%; }
+  .cap { font-size: 12.5px; color: var(--ink-3); margin-top: 8px; }
+  .sw { border-radius: 14px; overflow: hidden; border: 1px solid var(--line); background: var(--surface); }
+  .sw .chip2 { height: 96px; display: flex; align-items: flex-end; padding: 10px 12px; font-size: 12px; font-weight: 600; }
+  .sw .meta { padding: 10px 12px 12px; font-size: 12.5px; display: grid; gap: 2px; }
+  .sw .meta b { font-size: 14px; }
+  .sw .meta code { background: none; padding: 0; color: var(--ink-3); }
+  .ratio { display: inline-flex; gap: 6px; align-items: center; font-size: 12px; margin-top: 4px; }
+  .aa { border-radius: 999px; padding: 0 7px; font-weight: 600; font-size: 11px; }
+  .aa.ok { background: var(--good-soft); color: var(--good); } .aa.no { background: var(--bad-soft); color: var(--bad); }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 760px) { .two { grid-template-columns: 1fr; } }
+  .list { margin: 0; padding-left: 18px; display: grid; gap: 7px; line-height: 1.55; }
+  .do, .dont { border-radius: 12px; padding: 14px 16px; font-size: 14px; line-height: 1.5; }
+  .do { background: var(--good-soft); } .dont { background: var(--bad-soft); }
+  .do b, .dont b { display: block; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; margin-bottom: 4px; }
+  .do b { color: var(--good); } .dont b { color: var(--bad); }
+  .type-row { display: grid; grid-template-columns: 150px 1fr; gap: 18px; align-items: baseline; padding: 14px 0; border-bottom: 1px solid var(--line); }
+  .type-row small { color: var(--ink-3); }
+  .pillar { padding: 20px; }
+  .pillar h3 { font-size: 16px; margin-bottom: 6px; letter-spacing: -0.015em; }
+  .pillar .ico { width: 36px; height: 36px; border-radius: 10px; background: var(--accent-soft); color: var(--accent-ink); display: grid; place-items: center; margin-bottom: 12px; }
+  blockquote { margin: 0; padding: 16px 20px; border-left: 3px solid var(--signal); background: var(--surface); border-radius: 0 12px 12px 0; font-size: 17px; line-height: 1.55; }
+  .tag { font-size: 20px; letter-spacing: -0.02em; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .tag small { font-size: 12px; color: var(--ink-3); letter-spacing: 0; margin-left: 8px; }
+  pre.code2 { background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; font: 12.5px/1.65 var(--mono); overflow-x: auto; margin: 0; }
+  table.t td, table.t th { padding: 9px 12px; }
+  .misuse { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
+  .misuse .pane { min-height: 110px; position: relative; }
+  .clear-wrap { background: #fff; }
+  .misuse .x { position: absolute; top: 8px; right: 8px; width: 22px; height: 22px; border-radius: 50%; background: var(--bad); color: #fff; display: grid; place-items: center; font-size: 13px; font-weight: 700; }
+  .clear { position: relative; display: inline-block; padding: 24px; border: 1px dashed #0e7c86; border-radius: 6px; }
+  .clear-wrap .cap { color: #5c6f75; }
+</style>
+</head>
+<body>
+<nav class="topnav"><div class="in">
+  <img src="logo/tidemark-mark.svg" width="24" height="24" alt="">
+  <a href="#strategy">Strategy</a><a href="#voice">Voice</a><a href="#logo">Logo</a><a href="#color">Color</a><a href="#type">Type</a><a href="#motif">Motif</a><a href="#ui">In product</a><a href="#assets">Assets</a>
+  <span class="sp"></span>
+  <button class="btn sm" id="theme">Toggle theme</button>
+</div></nav>
+
+<div class="wrap">
+<header class="hero">
+  <picture><source srcset="logo/tidemark-horizontal-white.svg" media="(prefers-color-scheme: dark)"><img id="herologo" src="logo/tidemark-horizontal-ink.svg" height="46" alt="tidemark"></picture>
+  <h1>Measure the <em>tide</em>,<br>not the footprints.</h1>
+  <p class="lead">Brand guide for Tidemark: privacy-first web analytics that runs on any PHP host — or on ours. Everything on this page is built from the same tokens and components as the product.</p>
+</header>
+
+<!-- ============================================================================================ STRATEGY -->
+<section id="strategy">
+  <h2>Strategy</h2>
+  <p class="sub">What the category looks like, where Tidemark sits in it, and what we say.</p>
+
+  <h3 class="k">What the research found</h3>
+  <div class="two">
+    <div class="card pad"><ul class="list">
+      <li><b>The category is blue and purple.</b> Plausible's palette centres on an indigo (<code>#4B38D8</code>) over dark navy; Fathom, Pirsch and Matomo sit in the same blue family. A warm teal with an amber signal is unclaimed.</li>
+      <li><b>Positioning clusters on one idea.</b> Nearly everyone is a “simple, privacy-friendly Google Analytics alternative”. Differentiation comes from <i>how you get it</i>: Plausible and Fathom lead as hosted services; Umami leads on self-hosting.</li>
+      <li><b>Tidemark' opening.</b> It is the one that installs on <i>ordinary PHP shared hosting</i> — no Docker, Node or ClickHouse — and is built to run as a hosted cloud later from the same code.</li>
+    </ul></div>
+    <div class="card pad"><ul class="list">
+      <li><b>Consistency beats cleverness.</b> A plain system applied everywhere outperforms a brilliant one-off. Hence one palette, one typeface, one icon set, one motif.</li>
+      <li><b>Design for the smallest size first.</b> The mark must survive a 16 px favicon, an app icon, a social preview and a full dashboard. That is why the mark is a monogram.</li>
+      <li><b>Publish naming rules.</b> Fathom's brand page insists on “Fathom Analytics” and forbids “UseFathom”. We do the same (below).</li>
+    </ul></div>
+  </div>
+  <p class="cap" style="margin-top:12px">Sources: <a href="https://brandfetch.com/plausible.io" style="text-decoration:underline">Brandfetch — Plausible</a> (unofficial palette), <a href="https://usefathom.com/about/brand" style="text-decoration:underline">Fathom brand page</a>, <a href="https://www.mida.so/blog/simple-analytics-vs-plausible-vs-umami-vs-piwik-pro-vs-fathom-analytics" style="text-decoration:underline">comparison of Simple Analytics, Plausible, Umami and Fathom</a>. Third-party sources are commentary, not official brand data.</p>
+
+  <h3 class="k">Name &amp; idea</h3>
+  <blockquote><b>Tidemark</b> — a tidemark is the line a tide leaves on a shore or a harbour wall: a record of how high the water reached, kept without keeping the water. That is what the product does for a website. It keeps the line — aggregate traffic — and never the footprints: no individual visitor is followed, profiled or stored.</blockquote>
+
+  <h3 class="k">Positioning statement</h3>
+  <blockquote>For website owners who want to understand their audience without surveilling it, Tidemark is privacy-first web analytics that installs on any PHP host in minutes — or runs hosted. Unlike hosted-only alternatives, you can own your data and your server from day one.</blockquote>
+
+  <h3 class="k">Three pillars</h3>
+  <div class="tiles">
+    <div class="card pillar"><div class="ico"><svg class="icon" width="18" height="18"><use href="../../public/assets/icons.svg#sunrise"/></svg></div><h3>Clear</h3><p class="muted">Readable numbers, quiet design. You should reach the bottom of your data in one screen, not one afternoon.</p></div>
+    <div class="card pillar"><div class="ico"><svg class="icon" width="18" height="18"><use href="../../public/assets/icons.svg#shield"/></svg></div><h3>Private</h3><p class="muted">No cookies, no stored IP addresses, a visitor hash that rotates monthly. Nothing to disclose because nothing is kept.</p></div>
+    <div class="card pillar"><div class="ico"><svg class="icon" width="18" height="18"><use href="../../public/assets/icons.svg#globe"/></svg></div><h3>Portable</h3><p class="muted">Upload a zip to a $3 shared host, or use ours. Same product, same data model, your choice of where it lives.</p></div>
+  </div>
+
+  <h3 class="k">Taglines</h3>
+  <div class="tag">Measure the tide, not the footprints.<small>primary · headlines, social card</small></div>
+  <div class="tag">Privacy-first web analytics that runs on any PHP host — or on ours.<small>descriptor · under the logo, meta description</small></div>
+  <div class="tag">Clear, private web analytics.<small>short form · ads, app stores</small></div>
+  <div class="tag">Read the tide of your traffic.<small>alternate · long-form pages</small></div>
+  <div class="tag">Clear water. Honest numbers.<small>alternate · brand moments</small></div>
+  <h3 class="k">Boilerplate (50 words)</h3>
+  <blockquote>Tidemark is privacy-first web analytics for people who would rather understand their audience than track it. No cookies, no stored IP addresses. Upload it to ordinary shared hosting in minutes, or let us host it. Fast, readable, and calm to use.</blockquote>
+</section>
+
+<!-- ============================================================================================ VOICE -->
+<section id="voice">
+  <h2>Voice &amp; tone</h2>
+  <p class="sub">Calm, plain-spoken, precise. We sound like a good harbour pilot: unhurried, exact, and never selling.</p>
+  <div class="tiles">
+    <div class="card pillar"><h3>Plain</h3><p class="muted">Short sentences, common words. Say what it does, then stop.</p></div>
+    <div class="card pillar"><h3>Precise</h3><p class="muted">Real numbers and real limits. If something isn't done, say so.</p></div>
+    <div class="card pillar"><h3>Quietly confident</h3><p class="muted">No hype, no exclamation marks, no “revolutionary”. The product speaks for itself.</p></div>
+    <div class="card pillar"><h3>Lightly nautical</h3><p class="muted">The sea metaphor lives in brand moments (taglines, empty states) — never in UI labels or error messages.</p></div>
+  </div>
+  <h3 class="k">Examples</h3>
+  <div class="two">
+    <div class="do"><b>Do</b>“Waiting for your first visitor… Add this snippet to your site's &lt;head&gt;.”</div>
+    <div class="dont"><b>Don't</b>“🎉 Woohoo! Your analytics adventure begins now!”</div>
+    <div class="do"><b>Do</b>“We couldn't reach the database. Check the host and credentials, then try again.”</div>
+    <div class="dont"><b>Don't</b>“Oops! Something went wrong.”</div>
+    <div class="do"><b>Do</b>“No cookies. No stored IP addresses.”</div>
+    <div class="dont"><b>Don't</b>“100% GDPR compliant, guaranteed.” <span class="muted">(We never make legal promises on a visitor's behalf.)</span></div>
+  </div>
+  <h3 class="k">Naming rules</h3>
+  <table class="t card" style="display:table"><tbody>
+    <tr><td><span class="aa ok">Use</span></td><td><b>Tidemark</b> — capitalised in sentences and UI. “Tidemark Cloud” for the hosted product.</td></tr>
+    <tr><td><span class="aa no">Avoid</span></td><td>“TidemarkAnalytics”, “Tidemark Analytics™”, “UseTidemark”, “tidemark” (lowercase appears only in the logo).</td></tr>
+    <tr><td><span class="aa ok">Say</span></td><td>“visitors”, “visits”, “pageviews”, “events”. Don't rename standard metrics with nautical terms.</td></tr>
+    <tr><td><span class="aa ok">Domain</span></td><td>When registered, prefer <code>tidemarkanalytics.com</code>, <code>tidemarkstats.com</code> or <code>withtidemark.com</code>. The bare <code>.com</code> and the use/try/get variants were taken when checked; re-check before buying.</td></tr>
+  </tbody></table>
+</section>
+
+<!-- ============================================================================================ LOGO -->
+<section id="logo">
+  <h2>Logo</h2>
+  <p class="sub">Three pier pilings standing in a tide, with the tide line — the high-water mark — cut across all of them at one height. That is what a <i>tidemark</i> actually is, and the pilings double as the bars of a chart, which is what the product does. Pictorial, no letters, no box. It is <b>single-colour by design</b>: the tide line is negative space, so the same logo works in ink or white on any surface, from a favicon to a stamp.</p>
+
+  <div class="tiles" style="grid-template-columns: repeat(auto-fill, minmax(320px, 1fr))">
+    <div><div class="pane light"><img src="logo/tidemark-horizontal-ink.svg" height="46" alt="Primary lockup"></div><div class="cap">Primary lockup · ink on light</div></div>
+    <div><div class="pane dark"><img src="logo/tidemark-horizontal-white.svg" height="46" alt="Primary lockup on dark"></div><div class="cap">Primary lockup · white on dark</div></div>
+    <div><div class="pane light"><img src="logo/tidemark-stacked-ink.svg" height="150" alt="Stacked lockup"></div><div class="cap">Stacked lockup · for square spaces</div></div>
+    <div><div class="pane light"><div style="display:flex;gap:14px;align-items:end;flex-wrap:wrap;justify-content:center"><img src="logo/tidemark-mark-ink.svg" height="72" alt="Bare mark"><img src="logo/tidemark-mark-ink.svg" height="36" alt=""><img src="logo/tidemark-mark-ink.svg" height="18" alt=""><img src="logo/tidemark-mark.svg" height="48" alt="Tile"><img src="logo/tidemark-mark.svg" height="28" alt=""><img src="logo/tidemark-mark.svg" height="16" alt=""></div></div><div class="cap">Mark · bare (no box) and as a tile</div></div>
+    <div><div class="pane teal"><img src="logo/tidemark-horizontal-white.svg" height="46" alt="White lockup"></div><div class="cap">White · on brand colour or photography</div></div>
+    <div><div class="pane foam"><img src="logo/tidemark-horizontal-ink.svg" height="46" alt="Ink lockup"></div><div class="cap">Ink · on tints, print, stamps</div></div>
+  </div>
+
+  <h3 class="k">Construction &amp; spacing</h3>
+  <div class="two">
+    <div class="card pad"><ul class="list">
+      <li><b>Mark:</b> 48-unit grid. Three pilings 12.5 wide with fully rounded ends, tops at y = 15 / 5 / 19 and a common base at y = 43. One wavy tide line (14-unit half-waves, a 4-unit negative-space gap) crosses all three at y = 31. Heights are deliberately uneven so it reads as pilings, never as a signal meter.</li><li><b>Proportion:</b> the tallest piling equals the wordmark's <i>ascender height</i> (the top of the d and k) and the pilings sit on the text baseline. The gap between mark and wordmark is 0.34 × the font size. Never scale the two independently.</li>
+      <li><b>Box is optional.</b> Use the mark bare wherever there is a calm background (app, docs, print). Use the tile (Trench, 11-unit radius) only where the mark needs its own ground: favicon, app icon, avatars.</li><li><b>Colour:</b> ink <code>#0B1B22</code> on light surfaces, white on dark or brand colours — nothing else. In the app the logo inherits the text colour.</li>
+      <li><b>Wordmark:</b> Inter SemiBold outlines, −2% tracking. It is artwork — don't retype it.</li>
+      <li><b>Clear space:</b> keep at least ½ the tile's height free on all sides.</li>
+      <li><b>Minimum size:</b> mark 24 px (so the tide-line gap stays visible) · horizontal lockup 120 px wide · stacked 80 px wide. The tile may go down to 16 px for favicons.</li>
+    </ul></div>
+    <div class="card pad clear-wrap" style="display:grid;place-items:center;background:#fff"><div class="clear"><img src="logo/tidemark-horizontal-ink.svg" height="40" alt=""></div><div class="cap">Dashed line = minimum clear space</div></div>
+  </div>
+
+  <h3 class="k">Don't</h3>
+  <div class="misuse">
+    <div class="pane light"><span class="x">×</span><img src="logo/tidemark-horizontal-ink.svg" height="34" style="transform:scaleX(1.5)" alt=""></div>
+    <div class="pane light"><span class="x">×</span><img src="logo/tidemark-horizontal-ink.svg" height="34" style="filter:invert(.3) sepia(1) saturate(7) hue-rotate(300deg)" alt=""></div>
+    <div class="pane light"><span class="x">×</span><img src="logo/tidemark-horizontal-ink.svg" height="34" style="filter:drop-shadow(4px 6px 3px rgba(0,0,0,.55))" alt=""></div>
+    <div class="pane" style="background:#e9ecec"><span class="x">×</span><img src="logo/tidemark-horizontal-white.svg" height="34" alt=""></div>
+    <div class="pane light"><span class="x">×</span><img src="logo/tidemark-horizontal-ink.svg" height="34" style="transform:rotate(-8deg)" alt=""></div>
+  </div>
+  <p class="cap">Stretching · recolouring · effects · low-contrast backgrounds · rotating. Use the supplied variants instead.</p>
+</section>
+
+<!-- ============================================================================================ COLOR -->
+<section id="color">
+  <h2>Color</h2>
+  <p class="sub">Deep-water neutrals carry the interface. <b>Tide</b> teal is the voice; <b>Buoy</b> amber is the signal — used for cautions, the second chart series and the odd highlight (the “tide” in headlines) — never as a second brand colour. The logo itself is single-colour.</p>
+
+  <h3 class="k">Brand</h3>
+  <div class="tiles" id="brand-sw"></div>
+  <h3 class="k">Neutrals · light</h3>
+  <div class="tiles" id="light-sw"></div>
+  <h3 class="k">Neutrals · dark</h3>
+  <div class="tiles" id="dark-sw"></div>
+
+  <h3 class="k">Proportion</h3>
+  <div style="display:flex;height:44px;border-radius:12px;overflow:hidden;border:1px solid var(--line)">
+    <div style="flex:70;background:var(--surface)"></div><div style="flex:12;background:#e1e8e8"></div><div style="flex:12;background:var(--accent)"></div><div style="flex:4;background:#0e3a47"></div><div style="flex:2;background:#f5a524"></div>
+  </div>
+  <p class="cap">≈ 70% neutral surfaces · 12% lines/secondary · 12% Tide · 4% Trench · 2% Buoy</p>
+
+  <h3 class="k">Charts</h3>
+  <div class="two">
+    <div class="card pad"><div class="row" style="gap:16px"><span style="width:44px;height:44px;border-radius:10px;background:#0891a0"></span><span style="width:44px;height:44px;border-radius:10px;background:#d97706"></span><div><b>Lagoon + Buoy (light)</b><div class="muted">#0891A0 · #D97706</div></div></div>
+      <div class="row" style="gap:16px;margin-top:14px"><span style="width:44px;height:44px;border-radius:10px;background:#1fa3a8"></span><span style="width:44px;height:44px;border-radius:10px;background:#cf7f0c"></span><div><b>Lagoon + Buoy (dark)</b><div class="muted">#1FA3A8 · #CF7F0C</div></div></div></div>
+    <div class="card pad"><ul class="list"><li>Both pairs pass the palette validator: lightness band, chroma floor, colour-blind separation (worst ΔE ≈ 15–16 protan) and ≥ 3:1 against the surface.</li><li>Series colour follows the <i>entity</i>, never its rank. Text never wears a series colour.</li><li>Status colours (green / red) are reserved and always paired with an icon or label.</li></ul></div>
+  </div>
+
+  <h3 class="k">Accessible pairs (WCAG, computed live)</h3>
+  <table class="t card" style="display:table"><thead><tr><th>Foreground</th><th>Background</th><th class="right">Ratio</th><th>Result</th></tr></thead><tbody id="pairs"></tbody></table>
+
+  <h3 class="k">Tokens</h3>
+<pre class="code2">--accent: #0e7c86;   /* Tide — buttons, links, focus       (dark: #4fc3be Shoal) */
+--signal: #f5a524;   /* Buoy — logo tide line, caution, highlights                */
+--series-1: #0891a0; /* Lagoon — primary data series        (dark: #1fa3a8)       */
+--series-2: #d97706; /* Buoy deep — secondary series        (dark: #cf7f0c)       */
+--bg: #f4f7f7; --surface: #fff; --ink: #0b1b22;   /* dark: #081418 / #0e1e24 / #eaf2f2 */
+/* Source of truth: public/assets/app.css  ·  logo set: scripts/build-brand.py */</pre>
+</section>
+
+<!-- ============================================================================================ TYPE -->
+<section id="type">
+  <h2>Typography</h2>
+  <p class="sub"><b>Inter</b> (variable, SIL OFL), self-hosted — no third-party font requests. One family keeps the product quiet; hierarchy comes from size, weight and spacing.</p>
+  <div class="card pad">
+    <div class="type-row"><small>Display<br>48/52 · 650 · −3.5%</small><div style="font-size:48px;line-height:1.08;font-weight:650;letter-spacing:-0.035em">Clear water. Honest numbers.</div></div>
+    <div class="type-row"><small>H1<br>24/29 · 650 · −2.2%</small><div style="font-size:24px;font-weight:650;letter-spacing:-0.022em">Traffic, sources and audience at a glance</div></div>
+    <div class="type-row"><small>H2 / card title<br>16 · 620 / 13.5 · 600</small><div style="font-size:16px;font-weight:620">Pages, sources and environment</div></div>
+    <div class="type-row"><small>Body<br>14/21 · 400</small><div>Tidemark counts visitors without cookies and without storing IP addresses. A visitor is a monthly-rotating hash, so nobody can be followed for long.</div></div>
+    <div class="type-row"><small>Figure (hero / stat)<br>30 · 600 · proportional</small><div style="font-size:30px;font-weight:600;letter-spacing:-0.03em">1,284 <span style="font-size:14px;font-weight:500;color:var(--ink-3)">visitors</span></div></div>
+    <div class="type-row"><small>Table numerals<br>tabular-nums</small><div class="num" style="font-variant-numeric:tabular-nums;line-height:1.7">12,480<br>&nbsp;&nbsp;1,102<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;96</div></div>
+    <div class="type-row"><small>Mono<br>12.5 · system mono</small><div class="mono">&lt;script defer src="/s.js" data-website-id="…"&gt;&lt;/script&gt;</div></div>
+  </div>
+  <p class="cap">Rule: proportional figures for big standalone numbers; tabular only where numbers align in columns.</p>
+</section>
+
+<!-- ============================================================================================ MOTIF -->
+<section id="motif">
+  <h2>Motif &amp; imagery</h2>
+  <p class="sub"><b>Depth contours</b> with scattered depth numbers — the texture of a nautical chart. Use it as a quiet background (login, hero, social, empty states), always at low contrast and never behind body text.</p>
+  <div class="tiles" style="grid-template-columns: repeat(auto-fill, minmax(320px, 1fr))">
+    <div><div class="pane light" style="min-height:190px;background:#fff url('pattern/contours-light.svg') center/cover"><img src="logo/tidemark-mark-ink.svg" width="72" alt=""></div><div class="cap">On light</div></div>
+    <div><div class="pane dark" style="min-height:190px;background:#0e3a47 url('pattern/contours-dark.svg') center/cover"><img src="logo/tidemark-mark-white.svg" width="72" alt=""></div><div class="cap">On Trench</div></div>
+  </div>
+  <h3 class="k">Iconography</h3>
+  <p class="sub" style="margin-bottom:12px"><a href="https://lucide.dev" style="text-decoration:underline">Lucide</a> only — 24-px grid, 2-px round-cap strokes, sized 14–20 px, inheriting text colour. No filled icons, no emoji as UI.</p>
+  <div class="row wrap" style="gap:18px;color:var(--ink-2)" id="icons"></div>
+  <h3 class="k">Photography &amp; illustration</h3>
+  <p class="sub">Prefer none. If needed: calm water, horizons and charts in desaturated teal; no stock people, no “growth arrow” clichés, no dashboards-on-laptops mockups with fake data.</p>
+</section>
+
+<!-- ============================================================================================ UI -->
+<section id="ui">
+  <h2>In the product</h2>
+  <p class="sub">Live components from <code>app.css</code> — the guide and the product can't drift apart.</p>
+  <div class="card pad stack">
+    <div class="row wrap"><button class="btn primary">Add website</button><button class="btn">Cancel</button><button class="btn ghost">Ghost</button><button class="btn danger">Delete</button>
+      <span class="pill brand">purchase</span><span class="pill good">Good</span><span class="pill warn">Needs work</span><span class="pill bad">Poor</span><span class="pill"><span class="dot"></span> 12 online</span></div>
+    <div class="stats"><div class="card stat"><div class="k"><span>Visitors</span><span class="delta up">↑ 12%</span></div><div class="v">12,480</div><div class="prev">vs 11,140</div></div>
+      <div class="card stat"><div class="k"><span>Pageviews</span><span class="delta down">↓ 3%</span></div><div class="v">34,902</div><div class="prev">vs 35,960</div></div>
+      <div class="card stat"><div class="k"><span>Bounce rate</span></div><div class="v">36%</div><div class="prev">&nbsp;</div></div></div>
+    <div class="notice"><svg class="icon" width="16" height="16"><use href="../../public/assets/icons.svg#info"/></svg><div>Add <code>data-perf="true"</code> to the tracking script to collect Core Web Vitals.</div></div>
+  </div>
+</section>
+
+<!-- ============================================================================================ ASSETS -->
+<section id="assets">
+  <h2>Assets</h2>
+  <p class="sub">Everything is generated from <code>scripts/build-brand.py</code> (logos, motif) and <code>scripts/export-brand-png.sh</code> (PNGs). Edit the script, re-run, commit.</p>
+  <table class="t card" style="display:table"><thead><tr><th>File</th><th>Use</th></tr></thead><tbody>
+    <tr><td class="mono">resources/brand/logo/tidemark-horizontal-{ink,white}.svg</td><td>Primary lockups, single colour</td></tr>
+    <tr><td class="mono">resources/brand/logo/tidemark-stacked-{ink,white}.svg</td><td>Square-format lockups</td></tr>
+    <tr><td class="mono">resources/brand/logo/tidemark-mark-{ink,white}.svg</td><td>Bare mark, single colour</td></tr>
+    <tr><td class="mono">resources/brand/logo/tidemark-mark.svg</td><td>Tile mark — favicon, avatars</td></tr>
+    <tr><td class="mono">resources/brand/logo/tidemark-wordmark-{ink,white}.svg</td><td>Wordmark alone</td></tr>
+    <tr><td class="mono">resources/brand/logo/tidemark-app-icon.svg</td><td>Full-bleed square for iOS / Android icons</td></tr>
+    <tr><td class="mono">resources/brand/png/mark-{16…512}.png</td><td>Raster marks, transparent</td></tr>
+    <tr><td class="mono">resources/brand/png/social-card.png</td><td>1200×630 Open Graph / social preview (source: <code>social-card.html</code>)</td></tr>
+    <tr><td class="mono">resources/brand/pattern/contours-*.svg</td><td>Depth-contour background, light and dark</td></tr>
+    <tr><td class="mono">public/favicon.ico · assets/favicon.svg · assets/apple-touch-icon.png · assets/icon-192/512.png</td><td>Shipped with the app</td></tr>
+  </tbody></table>
+  <h3 class="k">Social card</h3>
+  <img src="png/social-card.png" alt="Tidemark social card" style="width:100%;max-width:760px;border-radius:14px;border:1px solid var(--line)">
+</section>
+</div>
+
+<script>
+const hex2rgb = h => [1,3,5].map(i => parseInt(h.slice(i, i+2), 16) / 255);
+const lum = h => { const [r,g,b] = hex2rgb(h).map(c => c <= .03928 ? c/12.92 : ((c+.055)/1.055)**2.4); return .2126*r + .7152*g + .0722*b; };
+const ratio = (a,b) => { const [x,y] = [lum(a), lum(b)].sort((p,q) => q-p); return (x+.05)/(y+.05); };
+const brand = [
+  ['Abyss','#07161B','Darkest — dark-mode base, deep backgrounds'], ['Trench','#0E3A47','Brand dark — logo tile, social card'],
+  ['Tide','#0E7C86','Interface teal — buttons, links, focus'], ['Lagoon','#0891A0','Data teal — chart series 1'],
+  ['Shoal','#4FC3BE','Tide on dark surfaces'], ['Foam','#E6F3F2','Tints, soft fills, logo S'],
+  ['Buoy','#F5A524','Signal amber — logo tide line, caution'], ['Buoy deep','#D97706','Chart series 2 (light)'],
+];
+const light = [['Bg','#F4F7F7'],['Surface','#FFFFFF'],['Surface 2','#ECF1F1'],['Line','#E0E8E8'],['Ink','#0B1B22'],['Ink 2','#44575D'],['Ink 3','#5C6F75']];
+const dark = [['Bg','#081418'],['Surface','#0E1E24'],['Surface 2','#152A31'],['Line','#1D313A'],['Ink','#EAF2F2'],['Ink 2','#B3C4C8'],['Ink 3','#86999F']];
+const sw = (n,h,d) => { const t = ratio(h,'#FFFFFF') > ratio(h,'#0B1B22') ? '#FFFFFF' : '#0B1B22'; return `<div class="sw"><div class="chip2" style="background:${h};color:${t}">${n}</div><div class="meta"><b>${n}</b><code>${h}</code>${d ? `<span class="muted">${d}</span>` : ''}</div></div>`; };
+document.getElementById('brand-sw').innerHTML = brand.map(b => sw(...b)).join('');
+document.getElementById('light-sw').innerHTML = light.map(b => sw(...b)).join('');
+document.getElementById('dark-sw').innerHTML = dark.map(b => sw(...b)).join('');
+const pairs = [['#FFFFFF','#0E7C86','White on Tide (primary button)',4.5],['#0E7C86','#FFFFFF','Tide text on surface',4.5],['#0B5F67','#E6F3F2','Accent ink on Foam',4.5],
+ ['#0B1B22','#F4F7F7','Ink on background',4.5],['#44575D','#FFFFFF','Ink 2 on surface',4.5],['#5C6F75','#F4F7F7','Ink 3 on background (secondary text)',4.5],
+ ['#8A5300','#FCEFD6','Warning ink on warning fill',4.5],['#04181B','#4FC3BE','Dark on Shoal (dark-mode button)',4.5],['#EAF2F2','#081418','Ink on dark background',4.5],
+ ['#86999F','#0E1E24','Ink 3 on dark surface',4.5],['#EAF6F5','#0E3A47','Logo pilings on tile',3],['#0891A0','#FFFFFF','Chart series 1 on surface (graphics)',3],['#D97706','#FFFFFF','Chart series 2 on surface (graphics)',3]];
+document.getElementById('pairs').innerHTML = pairs.map(([f,b,n,min]) => { const r = ratio(f,b); return `<tr><td><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:${f};border:1px solid var(--line-2);vertical-align:-1px"></span> ${n}<div class="muted mono">${f} on ${b}</div></td><td><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:${b};border:1px solid var(--line-2);vertical-align:-1px"></span></td><td class="right">${r.toFixed(2)}:1</td><td><span class="aa ${r >= min ? 'ok' : 'no'}">${r >= min ? (min === 3 ? 'AA graphics' : r >= 7 ? 'AAA' : 'AA') : 'Fail'}</span></td></tr>`; }).join('');
+const names = ['house','chart-column','users','funnel','target','route','repeat','tag','circle-dollar-sign','gauge','layers','globe','shield','search','settings','activity','zap'];
+document.getElementById('icons').innerHTML = names.map(n => `<svg class="icon" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><title>${n}</title><use href="../../public/assets/icons.svg#${n}"/></svg>`).join('');
+document.getElementById('theme').onclick = () => { const r = document.documentElement; const cur = r.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); r.dataset.theme = cur === 'dark' ? 'light' : 'dark';
+  document.getElementById('herologo').src = r.dataset.theme === 'dark' ? 'logo/tidemark-horizontal-white.svg' : 'logo/tidemark-horizontal-ink.svg'; };
+if (matchMedia('(prefers-color-scheme: dark)').matches) document.getElementById('herologo').src = 'logo/tidemark-horizontal-white.svg';
+</script>
+</body>
+</html>
