@@ -76,7 +76,7 @@ class AuthController extends Controller
             $updater = app(Updater::class);
             $user['update'] = $updater->availableUpdate();
             // refresh the daily check after the response has been sent, so it never slows the page down
-            app()->terminating(fn () => $updater->refreshIfStale());
+            app()->terminating(fn () => $updater->refreshIfStale(6));
         }
 
         return ['user' => $user, 'config' => [

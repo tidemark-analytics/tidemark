@@ -2,6 +2,12 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.10.3] - 2026-10-20
+
+### Fixed
+- Update detection no longer depends on GitHub's API, whose anonymous rate limit shared hosts often exhaust. The newest version is read from github.com's release redirect; the API is only used for release notes. This could leave the update dot and the Updates page empty on shared hosting.
+- Installed copies re-check every 6 hours while an administrator is using the app (they used to wait 24), so a new release shows its dot the same day.
+
 ## [0.10.2] - 2026-10-20
 
 ### Fixed

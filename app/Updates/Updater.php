@@ -121,37 +121,81 @@ class Updater
         if ($fresh) {
             Cache::forget('tdm:latest-release');
         }
-        $release = Cache::remember('tdm:latest-release', 6 * 3600, function () use ($repo) {
-            try {
-                $res = Http::timeout(15)->withHeaders(['Accept' => 'application/vnd.github+json', 'User-Agent' => 'Tidemark/'.$this->version()])->get("https://api.github.com/repos/{$repo}/releases/latest");
-            } catch (\Throwable) {
-                throw new UpdateException('Could not reach GitHub. Check the server\'s internet access, or upload the release zip manually.');
-            }
-            if ($res->status() === 404) {
-                throw new UpdateException('No published release was found.');
-            }
-            if ($res->failed()) {
-                throw new UpdateException('GitHub answered with an error ('.$res->status().'). Try again later.');
-            }
+        $release = Cache::remember('tdm:latest-release', 3600, fn () => $this->fetchLatestRelease($repo));
+        $version = (string) $release['version'];
+        $tag = (string) $release['tag'];
+        $current = $this->version();
 
-            return $res->json();
-        });
-
+        // Asset links: use GitHub's own list when we have it, otherwise the release naming convention.
+        $base = "https://github.com/{$repo}/releases/download/{$tag}/";
         $assets = collect($release['assets'] ?? []);
         $zip = $assets->first(fn ($a) => preg_match('/^tidemark-.+\.zip$/', $a['name'] ?? ''));
+        $zipUrl = $zip['browser_download_url'] ?? "{$base}tidemark-{$version}.zip";
         $sha = $zip ? $assets->first(fn ($a) => ($a['name'] ?? '') === $zip['name'].'.sha256') : null;
-        $version = ltrim((string) ($release['tag_name'] ?? ''), 'v');
-        $current = $this->version();
+        $shaUrl = $sha['browser_download_url'] ?? ($zip ? null : "{$base}tidemark-{$version}.zip.sha256");
 
         $latest = [
             'version' => $version, 'current' => $current,
             'newer' => $version !== '' && ($current === 'dev' || version_compare($version, $current, '>')),
-            'notes' => (string) ($release['body'] ?? ''), 'url' => (string) ($release['html_url'] ?? ''), 'published_at' => $release['published_at'] ?? null,
-            'zip_url' => $zip['browser_download_url'] ?? null, 'sha_url' => $sha['browser_download_url'] ?? null, 'size' => $zip['size'] ?? null,
+            'notes' => (string) ($release['body'] ?? ''), 'url' => "https://github.com/{$repo}/releases/tag/{$tag}", 'published_at' => $release['published_at'] ?? null,
+            'zip_url' => $zipUrl, 'sha_url' => $shaUrl, 'size' => $zip['size'] ?? null,
         ];
         $this->rememberLatest($latest['version'], $latest['url']);
 
         return $latest;
+    }
+
+    /**
+     * The newest release. The version comes from github.com/<repo>/releases/latest, which answers with a redirect to the tag and
+     * isn't subject to the API's low anonymous rate limit (shared hosts often exhaust it). The API is then asked, best effort,
+     * for the release notes and the exact asset list.
+     *
+     * @return array<string,mixed>
+     *
+     * @throws UpdateException
+     */
+    private function fetchLatestRelease(string $repo): array
+    {
+        $headers = ['User-Agent' => 'Tidemark/'.$this->version()];
+        $tag = null;
+        try {
+            $res = Http::timeout(15)->withOptions(['allow_redirects' => false])->withHeaders($headers)->get("https://github.com/{$repo}/releases/latest");
+            if (preg_match('#/releases/tag/(v?\d+\.\d+\.\d+[^/?\s]*)$#', (string) $res->header('Location'), $m)) {
+                $tag = rawurldecode($m[1]);
+            }
+        } catch (\Throwable) {
+            // fall through to the API
+        }
+
+        $api = null;
+        try {
+            $res = Http::timeout(15)->withHeaders($headers + ['Accept' => 'application/vnd.github+json'])->get("https://api.github.com/repos/{$repo}/releases/latest");
+            if ($res->ok() && is_array($res->json())) {
+                $api = $res->json();
+            } elseif (! $tag && $res->status() === 404) {
+                throw new UpdateException('No published release was found.');
+            } elseif (! $tag) {
+                throw new UpdateException('GitHub answered with an error ('.$res->status().'). Try again later.');
+            }
+        } catch (UpdateException $e) {
+            throw $e;
+        } catch (\Throwable) {
+            if (! $tag) {
+                throw new UpdateException('Could not reach GitHub. Check the server\'s internet access, or upload the release zip manually.');
+            }
+        }
+
+        $tag ??= (string) ($api['tag_name'] ?? '');
+        if (! preg_match('/^v?\d+\.\d+\.\d+([\-+][\w.\-]+)?$/', $tag)) {
+            throw new UpdateException('GitHub did not report a usable release version.');
+        }
+        $apiMatches = $api && (string) ($api['tag_name'] ?? '') === $tag;
+
+        return [
+            'tag' => $tag, 'version' => ltrim($tag, 'v'),
+            'body' => $apiMatches ? (string) ($api['body'] ?? '') : '', 'published_at' => $apiMatches ? ($api['published_at'] ?? null) : null,
+            'assets' => $apiMatches ? ($api['assets'] ?? []) : [],
+        ];
     }
 
     public function latestPath(): string

@@ -3,7 +3,7 @@
 return [
 
     // GitHub repository checked for new releases when an administrator opens Account settings → Updates.
-    // Look for new releases about once a day (a cron task, and when an administrator is using the app) so the dashboard can
+    // Look for new releases daily (a cron task) and every few hours while an administrator is using the app so the dashboard can
     // show an "update available" dot. Only the latest version number is requested; nothing about your sites or visitors is sent.
     'update_check' => (bool) env('TIDEMARK_UPDATE_CHECK', true),
 
