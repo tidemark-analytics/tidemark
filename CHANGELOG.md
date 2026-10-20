@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.10.2] - 2026-10-20
+
+### Fixed
+- In code boxes with a Copy button (for example the public dashboard link), the text and the button now sit on the same center line.
+
 ## [0.10.1] - 2026-10-20
 
 ### Added

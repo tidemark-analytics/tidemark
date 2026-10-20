@@ -582,3 +582,6 @@ td > .pill { vertical-align: middle; }
 .mrow:hover .ext, .mrow .ext:focus-visible { opacity: 1; }
 .mrow .ext:hover { color: var(--accent-ink); background: var(--surface-3); }
 @media (pointer: coarse) { .mrow .ext { opacity: 1; } }
+/* code boxes: keep the text and the Copy button on the same center line, also for one-liners */
+.code { align-items: center; padding: 10px 10px 10px 14px; min-height: 52px; }
+.code .code-t { align-self: center; }
