@@ -2,11 +2,6 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/), and versions follow [Semantic Versioning](https://semver.org/).
 
-## [0.9.4] - 2026-10-20
-
-### Changed
-- The release zip no longer wraps everything in a `tidemark-x.y.z/` folder. Unzipping inside a directory fills that directory directly. The in-app updater accepts both layouts.
-
 ## [0.9.3] - 2026-10-20
 
 ### Fixed

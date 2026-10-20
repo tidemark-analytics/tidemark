@@ -3,7 +3,6 @@
 # Usage: scripts/build-release.sh [version]
 set -euo pipefail
 cd "$(dirname "$0")/.."
-ROOT="$(pwd)"
 
 VERSION="${1:-$(date +%Y.%m.%d)}"
 NAME="tidemark-${VERSION}"
@@ -31,7 +30,5 @@ mkdir -p "$STAGE"/storage/{app/public,framework/{cache/data,sessions,views},logs
 touch "$STAGE"/storage/logs/.gitkeep
 
 echo "→ Zipping"
-# Files sit at the top of the archive, so unzipping inside a folder fills that folder (no wrapper directory).
-rm -f "${ROOT}/${OUT}/${NAME}.zip"
-( cd "$STAGE" && zip -qr "${ROOT}/${OUT}/${NAME}.zip" . -x '.DS_Store' )
+( cd "$(dirname "$STAGE")" && zip -qr "$OLDPWD/${OUT}/${NAME}.zip" "${NAME}" )
 echo "✓ ${OUT}/${NAME}.zip ($(du -h "${OUT}/${NAME}.zip" | cut -f1))"
