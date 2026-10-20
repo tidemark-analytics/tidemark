@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Updates\UpdateException;
 use App\Updates\Updater;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Factory;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
@@ -232,5 +233,68 @@ class UpdaterTest extends TestCase
         $meta = $updater->finishIfPending();
         $this->assertSame(['1.0.0', '1.1.0'], [$meta['from'], $meta['to']]);
         $this->assertFalse($updater->hasPendingWork());
+    }
+
+    public function test_the_daily_check_records_the_latest_release_and_flags_newer_ones(): void
+    {
+        config(['tidemark.update_check' => true]);
+        $this->fakeGithub('1.5.0');
+        $updater = new Updater($this->base);
+        $this->assertNull($updater->availableUpdate());
+        $updater->refreshIfStale();
+        $this->assertSame(['version' => '1.5.0'], ['version' => $updater->availableUpdate()['version']]);
+
+        file_put_contents($this->base.'/VERSION', '1.5.0'); // installed the update: the flag clears
+        $this->assertNull($updater->availableUpdate());
+    }
+
+    public function test_checks_are_throttled_failures_are_remembered_and_the_switch_turns_them_off(): void
+    {
+        config(['tidemark.update_check' => true]);
+        $this->fakeGithub('1.5.0');
+        $updater = new Updater($this->base);
+        $updater->refreshIfStale();
+        $updater->refreshIfStale();
+        Http::assertSentCount(1); // the second call found a fresh result
+
+        Http::swap(new Factory);
+        Http::fake(['api.github.com/*' => Http::response('nope', 500)]);
+        $updater->refreshIfStale(0);
+        $last = $updater->lastCheck();
+        $this->assertNotNull($last['error']);
+        $this->assertSame('1.5.0', $last['version']); // the last good answer is kept
+        $this->assertNotNull($updater->availableUpdate());
+
+        config(['tidemark.update_check' => false]);
+        $other = new Updater($this->base.'/off');
+        @mkdir($this->base.'/off/storage/app', 0775, true);
+        Http::fake();
+        $other->refreshIfStale(0);
+        Http::assertNothingSent();
+    }
+
+    public function test_me_reports_an_available_update_to_administrators_only(): void
+    {
+        config(['tidemark.update_check' => true]);
+        $this->fakeGithub('9.0.0');
+        $updater = new Updater($this->base);
+        $updater->refreshIfStale();
+        $this->app->instance(Updater::class, $updater);
+        $admin = User::create(['name' => 'A', 'email' => 'adm@example.com', 'password' => 'password']);
+        $admin->forceFill(['is_admin' => true])->save();
+        $member = User::create(['name' => 'M', 'email' => 'mem@example.com', 'password' => 'password']);
+
+        $this->actingAs($admin)->getJson('/api/me')->assertOk()->assertJsonPath('user.update.version', '9.0.0');
+        $this->actingAs($member)->getJson('/api/me')->assertOk()->assertJsonMissingPath('user.update');
+    }
+
+    public function test_the_check_command_reports_the_result(): void
+    {
+        config(['tidemark.update_check' => true]);
+        $this->fakeGithub('1.5.0');
+        $this->app->instance(Updater::class, new Updater($this->base));
+        $this->artisan('tidemark:check-updates')->expectsOutputToContain('Update available: 1.5.0')->assertSuccessful();
+        config(['tidemark.update_check' => false]);
+        $this->artisan('tidemark:check-updates')->expectsOutputToContain('turned off')->assertSuccessful();
     }
 }

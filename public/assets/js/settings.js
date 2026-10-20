@@ -8,7 +8,7 @@ const firstError = (x) => (x.errors && Object.values(x.errors)[0][0]) || x.messa
 
 function SettingsShell({ title, back, tabs, tab, base, children }) {
   return html`<main class="main"><header class="page-head"><div class="grow"><div class="crumb"><${Link} to=${back[0]}><${Icon} name="chevron-left" size=${14} /> ${back[1]}<//></div><h1>${title}</h1></div></header>
-    <div class="settings"><nav class="subnav" aria-label="Settings sections">${tabs.map(([k, l]) => html`<${Link} to=${base + (k === tabs[0][0] ? '' : '/' + k)} class=${k === tab ? 'active' : ''} aria-current=${k === tab ? 'page' : undefined}>${l}<//>`)}</nav>
+    <div class="settings"><nav class="subnav" aria-label="Settings sections">${tabs.map(([k, l, dot]) => html`<${Link} to=${base + (k === tabs[0][0] ? '' : '/' + k)} class=${k === tab ? 'active' : ''} aria-current=${k === tab ? 'page' : undefined}>${l}${dot && html`<span class="notif inline" aria-hidden="true"></span><span class="sr-only"> (update available)</span>`}<//>`)}</nav>
       <div class="stack">${children}</div></div></main>`;
 }
 const Section = ({ title, help, children, danger }) => html`<section class=${'card pad stack ' + (danger ? 'danger-zone' : '')}><div><h2>${title}</h2>${help && html`<p class="muted" style="margin-top:3px">${help}</p>`}</div>${children}</section>`;
@@ -190,6 +190,8 @@ const mb = (n) => (n / 1048576).toFixed(n < 10485760 ? 1 : 0) + ' MB';
 const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => { const r = (Math.random() * 16) | 0; return (c === 'x' ? r : (r & 3) | 8).toString(16); }));
 
 function Updates() {
+  const { setUser } = useContext(UserCtx);
+  const refreshUser = async () => { try { setUser((await api('/me')).user); } catch (e) { /* keep the current state */ } };
   const res = useApi('/admin/update', null, []);
   const info = res.data;
   const [progress, setProgress] = useState(null);
@@ -226,6 +228,7 @@ function Updates() {
       setDone({ ...r.result, last: after.last });
       setStaged(null);
       res.reload();
+      refreshUser();
     } catch (x) { setErr(x.body && x.body.error ? x.body.error : firstError(x)); }
     setBusy(false);
   };
@@ -236,6 +239,7 @@ function Updates() {
       const after = await api('/admin/update');
       setDone({ ...r.result, last: after.last });
       res.reload();
+      refreshUser();
     } catch (x) { setErr(x.body && x.body.error ? x.body.error : firstError(x)); }
     setFetching(false);
   };
@@ -260,6 +264,7 @@ function Updates() {
           <div class="row"><button class="btn" disabled=${busy} onClick=${discard}>Discard</button><button class="btn primary" disabled=${busy} onClick=${() => install(!pending.newer)}>${busy ? 'Installing…' : pending.newer ? 'Install update' : 'Install anyway'}</button></div></div>`
         : html`<label class="dropzone ${progress !== null ? 'busy' : ''}"><${Icon} name="download" size=${20} /><b>${progress !== null ? `Uploading… ${progress}%` : 'Or upload a release zip yourself'}</b><span class="muted">tidemark-x.y.z.zip · sent in ${mb(info.limits.chunk)} pieces, so your host's ${mb(info.limits.upload || info.limits.chunk)} upload limit is fine</span>
           <input type="file" accept=".zip,application/zip" disabled=${progress !== null} onChange=${(e) => upload(e.target.files[0])} />${progress !== null && html`<span class="bar"><i style=${`width:${progress}%`}></i></span>`}</label>`)}
+      ${info.auto_check && html`<p class="muted small">Tidemark looks for new releases about once a day${info.last_check && !info.last_check.error ? `, last on ${new Date(info.last_check.checked_at * 1000).toLocaleDateString()}` : ''}, and shows a dot next to your profile when one is available. Only the latest version number is requested from GitHub. Turn this off with <code>TIDEMARK_UPDATE_CHECK=false</code>.</p>`}
       ${info.last && !done && html`<p class="muted">Last update: ${info.last.from} → ${info.last.to}, ${new Date(info.last.finished_at * 1000).toLocaleString()}.</p>`}
     <//>`;
 }
@@ -267,7 +272,7 @@ function Updates() {
 export function AccountSettings({ tab }) {
   useDocTitle('Settings');
   const { user } = useContext(UserCtx);
-  const tabs = [['preferences', 'Preferences'], ['security', 'Security'], ['keys', 'API keys'], ...(user.is_admin ? [['users', 'Users'], ['updates', 'Updates']] : [])];
+  const tabs = [['preferences', 'Preferences'], ['security', 'Security'], ['keys', 'API keys'], ...(user.is_admin ? [['users', 'Users'], ['updates', 'Updates', !!user.update]] : [])];
   const t = tabs.find((x) => x[0] === tab) ? tab : 'preferences';
   const Body = { preferences: Preferences, security: Security, keys: ApiKeys, users: Users, updates: Updates }[t];
   return html`<${SettingsShell} title="Account settings" back=${['/sites', 'Your sites']} tabs=${tabs} tab=${t} base="/settings"><${Body} /><//>`;

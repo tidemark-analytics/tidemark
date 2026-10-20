@@ -143,12 +143,69 @@ class Updater
         $version = ltrim((string) ($release['tag_name'] ?? ''), 'v');
         $current = $this->version();
 
-        return [
+        $latest = [
             'version' => $version, 'current' => $current,
             'newer' => $version !== '' && ($current === 'dev' || version_compare($version, $current, '>')),
             'notes' => (string) ($release['body'] ?? ''), 'url' => (string) ($release['html_url'] ?? ''), 'published_at' => $release['published_at'] ?? null,
             'zip_url' => $zip['browser_download_url'] ?? null, 'sha_url' => $sha['browser_download_url'] ?? null, 'size' => $zip['size'] ?? null,
         ];
+        $this->rememberLatest($latest['version'], $latest['url']);
+
+        return $latest;
+    }
+
+    public function latestPath(): string
+    {
+        return $this->dir().'/latest.json';
+    }
+
+    private function rememberLatest(string $version, string $url, ?string $error = null): void
+    {
+        file_put_contents($this->latestPath(), json_encode(['version' => $version, 'url' => $url, 'checked_at' => time(), 'error' => $error]));
+    }
+
+    /** @return array{version:string,url:string,checked_at:int,error:?string}|null */
+    public function lastCheck(): ?array
+    {
+        $d = is_file($this->latestPath()) ? json_decode((string) file_get_contents($this->latestPath()), true) : null;
+
+        return is_array($d) && isset($d['checked_at']) ? $d + ['version' => '', 'url' => '', 'error' => null] : null;
+    }
+
+    /**
+     * A newer release found by the last check, or null. This reads a small file; it never contacts GitHub.
+     *
+     * @return array{version:string,url:string}|null
+     */
+    public function availableUpdate(): ?array
+    {
+        $d = $this->lastCheck();
+        $current = $this->version();
+        if (! $d || $d['version'] === '' || $current === 'dev' || ! version_compare($d['version'], $current, '>')) {
+            return null;
+        }
+
+        return ['version' => $d['version'], 'url' => $d['url']];
+    }
+
+    /**
+     * Ask GitHub for the latest release if the last check is older than $maxAgeHours. Failures are remembered so an offline
+     * host doesn't retry on every request. Does nothing when TIDEMARK_UPDATE_CHECK is off.
+     */
+    public function refreshIfStale(int $maxAgeHours = 24): void
+    {
+        if (! config('tidemark.update_check')) {
+            return;
+        }
+        $last = $this->lastCheck();
+        if ($last && time() - $last['checked_at'] < $maxAgeHours * 3600) {
+            return;
+        }
+        try {
+            $this->latest(true);
+        } catch (UpdateException $e) {
+            $this->rememberLatest($last['version'] ?? '', $last['url'] ?? '', $e->getMessage());
+        }
     }
 
     /**

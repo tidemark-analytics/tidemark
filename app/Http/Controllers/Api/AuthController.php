@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ApiKey;
 use App\Models\User;
 use App\Support\Totp;
+use App\Updates\Updater;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -70,7 +71,15 @@ class AuthController extends Controller
 
     public function me(Request $request)
     {
-        return ['user' => $this->present($request->user()), 'config' => [
+        $user = $this->present($request->user());
+        if ($user['is_admin']) {
+            $updater = app(Updater::class);
+            $user['update'] = $updater->availableUpdate();
+            // refresh the daily check after the response has been sent, so it never slows the page down
+            app()->terminating(fn () => $updater->refreshIfStale());
+        }
+
+        return ['user' => $user, 'config' => [
             'mode' => config('tidemark.mode'),
             'script_base' => url('/js'),
             'event_url' => url('/api/event'),

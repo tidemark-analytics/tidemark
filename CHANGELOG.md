@@ -2,6 +2,14 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.10.0] - 2026-10-20
+
+### Added
+- Automatic update checks: once a day (a scheduled task, and also when an administrator is using the app, so no cron is needed) Tidemark asks GitHub for the latest release version. When a newer one exists, a dot appears on the profile menu, next to **Account settings**, and next to **Updates** inside it. Only the version number is requested; nothing about your sites or visitors is sent. Turn it off with `TIDEMARK_UPDATE_CHECK=false`. New command: `php artisan tidemark:check-updates`.
+
+### Changed
+- Version 0.9.x only contacted GitHub when an administrator opened Account settings → Updates. The daily check is on by default; set `TIDEMARK_UPDATE_CHECK=false` to keep the old behavior.
+
 ## [0.9.6] - 2026-10-20
 
 ### Changed

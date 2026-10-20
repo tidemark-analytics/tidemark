@@ -1,5 +1,6 @@
 <?php
 
+use App\Console\Commands\CheckUpdates;
 use App\Console\Commands\PruneEvents;
 use Illuminate\Support\Facades\Schedule;
 
@@ -8,3 +9,5 @@ Schedule::command('queue:work --stop-when-empty --max-time=50 --queue='.config('
     ->everyMinute()->withoutOverlapping()->when(fn () => config('tidemark.ingest') === 'queue');
 Schedule::command(PruneEvents::class)->dailyAt('03:15')->when(fn () => config('tidemark.retention_days') > 0);
 Schedule::command('cache:prune-stale-tags')->hourly()->when(fn () => config('cache.default') === 'redis');
+// Looks for a new release once a day, at a minute derived from the install's key so installs don't all call GitHub together.
+Schedule::command(CheckUpdates::class)->dailyAt('04:'.str_pad((string) (crc32((string) config('app.key')) % 60), 2, '0', STR_PAD_LEFT))->when(fn () => config('tidemark.update_check'));

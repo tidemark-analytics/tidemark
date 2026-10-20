@@ -569,3 +569,11 @@ td > .pill { vertical-align: middle; }
 
 .autoupdate { padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface-2); }
 .notes { white-space: pre-wrap; font: inherit; font-size: 13px; color: var(--ink-2); margin: 8px 0; max-height: 160px; overflow: auto; }
+
+.notif { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--signal); flex: none; }
+.notif.inline { margin-left: 8px; vertical-align: 1px; }
+.btn.avatar-btn { position: relative; }
+.notif.on-avatar { position: absolute; top: 3px; right: 3px; width: 10px; height: 10px; box-shadow: 0 0 0 2px var(--bg); }
+.subnav a .notif { margin-left: auto; }
+.subnav a { display: flex; align-items: center; }
+.muted.small { font-size: 12.5px; }

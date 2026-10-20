@@ -27,6 +27,8 @@ class UpdateController extends Controller
             'zip' => class_exists(\ZipArchive::class),
             'writable' => $this->updater->canWrite(),
             'last' => $this->updater->lastUpdate(),
+            'auto_check' => (bool) config('tidemark.update_check'),
+            'last_check' => $this->updater->lastCheck(),
             'staged' => $staged,
         ];
     }
