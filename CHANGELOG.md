@@ -2,6 +2,16 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.12.1] - 2026-10-21
+
+### Fixed
+- Report lists: the column headers (Visitors, Conversions, CR, Uniques, Total) now line up exactly with their values.
+- The Locations panel now has a Details link like the other reports.
+- Phones: the dashboard toolbar keeps the site and live count on one row and Filter, date and menu on the next, with popovers that fit the screen; the Settings sections scroll to the one you are on.
+- Code snippets wrap at spaces instead of mid-word, and keep the Copy button on its own line on narrow screens; the first-pageview card stacks on phones.
+- Metric tiles no longer show a meaningless 0% badge when there is nothing to compare, and the filter menu's heading lines up with its items.
+- The Import a file button now matches the other buttons.
+
 ## [0.12.0] - 2026-10-21
 
 ### Added

@@ -31,7 +31,7 @@ export function RankedList({ rows, dim, goalMode, loading, empty = 'No data yet'
   if (!shown.length) return html`<div class="panel-empty"><span class="muted">${filtered ? 'Nothing matches the current filters' : empty}</span>${filtered && html`<button class="btn sm" onClick=${() => setFilters([])}>Clear filters</button>`}</div>`;
   const max = Math.max(1, ...shown.map((r) => r.visitors));
   return html`<div class=${'mlist ' + (loading ? 'stale' : '')}>
-    <div class="mhead"><span>${head}</span><span>${goalMode ? html`<span class="cr w">Conversions</span><span class="cr2">CR</span>` : 'Visitors'}</span></div>
+    <div class="mhead"><span class="l">${head}</span><span class="r">${goalMode ? html`<span class="cr w">Conversions</span><span class="cr2">CR</span>` : 'Visitors'}</span></div>
     ${shown.map((r) => html`<button class="mrow" onClick=${() => onPick(dim, r)} title=${`Filter by ${r.name}`}>
       <span class="bar" style=${`width:${(r.visitors / max) * 100}%`}></span>
       <span class="l"><${Label} dim=${dim} name=${r.name} />${linkOut && /^https?:\/\//i.test(r.name) && html`<span class="ext" role="link" tabindex="0" aria-label="Open in a new tab" title="Open in a new tab" onClick=${(e) => { e.stopPropagation(); window.open(r.name, '_blank', 'noopener,noreferrer'); }} onKeyDown=${(e) => { if (e.key === 'Enter') { e.stopPropagation(); window.open(r.name, '_blank', 'noopener,noreferrer'); } }}><${Icon} name="external-link" size=${12} /></span>`}</span>
@@ -102,10 +102,13 @@ export function Pages({ site, scope, poll }) {
 }
 
 function MapBody({ site, scope, poll }) {
+  const [more, setMore] = useState(false);
   const res = useApi(`/sites/${site.domain}/stats/breakdown/country`, { ...scope.params, limit: 250 }, [], { poll });
   const rows = res.data && res.data.results;
   return html`${rows ? html`<${WorldMap} rows=${rows} valueLabel=${scope.goal ? 'Conversions' : 'Visitors'} onPick=${(c) => addFilter('country', c)} />` : html`<div class="skeleton" style="height:230px"></div>`}
     ${rows && rows.length > 0 && html`<div style="margin-top:10px"><${RankedList} rows=${rows} dim="country" goalMode=${!!scope.goal} head="Country" limit=${4} filtered=${scope.filters.length > 0} /></div>`}
+    ${rows && rows.length > 0 && html`<div class="panel-foot"><button class="more" onClick=${() => setMore(true)}><${Icon} name="search" size=${13} /> Details</button></div>`}
+    ${more && html`<${DetailsModal} title="Countries" label="Country" dim="country" site=${site} scope=${scope} onClose=${() => setMore(false)} />`}
     ${rows && !rows.length && html`<div class="panel-empty"><span class="muted">${scope.filters.length ? 'Nothing matches the current filters' : 'No location data yet'}</span>${scope.filters.length > 0 && html`<button class="btn sm" onClick=${() => setFilters([])}>Clear filters</button>`}</div>`}
     ${res.error && !rows && html`<div class="panel-empty"><b>Couldn't load the map</b><button class="btn sm" onClick=${res.reload}>Try again</button></div>`}`;
 }
@@ -127,7 +130,7 @@ function GoalsBody({ site, scope, poll }) {
   if (!rows.length) return html`<div class="panel-empty"><b>Measure what matters</b><p class="muted">Goals count the conversions that matter — signups, purchases, downloads.</p>${site.can_manage && html`<${Link} to=${`/${site.domain}/settings/goals`} class="btn sm">Set up goals<//>`}</div>`;
   const max = Math.max(1, ...rows.map((r) => r.visitors));
   return html`<div class=${'mlist ' + (res.loading ? 'stale' : '')}>
-    <div class="mhead"><span>Goal</span><span><span class="cr">Uniques</span><span class="cr">Total</span><span class="cr2">CR</span></span></div>
+    <div class="mhead"><span class="l">Goal</span><span class="r"><span class="cr">Uniques</span><span class="cr">Total</span><span class="cr2">CR</span></span></div>
     ${rows.map((r) => html`<button class="mrow" onClick=${() => addFilter('goal', r.name)} title="Filter by this goal"><span class="bar" style=${`width:${(r.visitors / max) * 100}%`}></span><span class="l"><span class="t">${r.name}</span></span>
       <span class="r"><span class="cr">${fmtShort(r.visitors)}</span><span class="cr">${fmtShort(r.events)}</span><small class="cr2">${r.conversion_rate}%</small></span></button>`)}</div>`;
 }

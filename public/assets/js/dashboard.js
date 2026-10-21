@@ -46,7 +46,7 @@ function TopGraph({ site, scope, live, onIntervals }) {
       return html`<button role="tab" aria-selected=${k === current} title=${HELP[k]} class=${'metric ' + (k === current ? 'on' : '')} onClick=${() => setMetric(k)}>
         <span class="k">${label}</span>
         <span class="v">${s ? fmtv(s.value) : html`<span class="skeleton" style="display:inline-block;width:64px;height:26px"></span>`}</span>
-        <span class="d" title=${s && comparing && s.previous !== null && s.previous !== undefined ? 'Previous: ' + fmtv(s.previous) : ''}>${s && comparing ? html`<${Delta} metric=${k} change=${s.change} />` : ''}</span></button>`;
+        <span class="d" title=${s && comparing && s.previous !== null && s.previous !== undefined ? 'Previous: ' + fmtv(s.previous) : ''}>${s && comparing && !(s.value === 0 && !s.previous) ? html`<${Delta} metric=${k} change=${s.change} />` : ''}</span></button>`;
     })}</div>
     <div class=${'graph-b ' + (busy && g ? 'stale' : '')}>
       ${graph.error && !g ? html`<div class="panel-empty" style="min-height:300px"><b>Couldn't load the graph</b><p class="muted">${graph.error.message}</p><button class="btn sm" onClick=${() => { graph.reload(); top.reload(); }}>Try again</button></div>` : !g ? html`<div class="skeleton" style="height:300px"></div>` : asTable

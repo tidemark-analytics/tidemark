@@ -8,6 +8,8 @@ const zones = () => { try { return ['UTC', ...Intl.supportedValuesOf('timeZone')
 const firstError = (x) => (x.errors && Object.values(x.errors)[0][0]) || x.message;
 
 function SettingsShell({ title, back, tabs, tab, base, children }) {
+  // on phones the section list scrolls sideways: bring the active section into view
+  useEffect(() => { const a = document.querySelector('.subnav a.active'); if (a && a.scrollIntoView) a.scrollIntoView({ block: 'nearest', inline: 'center' }); }, [tab]);
   return html`<main class="main"><header class="page-head"><div class="grow"><div class="crumb"><${Link} to=${back[0]}><${Icon} name="chevron-left" size=${14} /> ${back[1]}<//></div><h1>${title}</h1></div></header>
     <div class="settings"><nav class="subnav" aria-label="Settings sections">${tabs.map(([k, l, dot]) => html`<${Link} to=${base + (k === tabs[0][0] ? '' : '/' + k)} class=${k === tab ? 'active' : ''} aria-current=${k === tab ? 'page' : undefined}>${l}${dot && html`<span class="notif inline" aria-hidden="true"></span><span class="sr-only"> (update available)</span>`}<//>`)}</nav>
       <div class="stack">${children}</div></div></main>`;
