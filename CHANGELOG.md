@@ -2,6 +2,12 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.12.0] - 2026-10-21
+
+### Added
+- Move your data: Site settings now has a "Move your data" section. Download a site's raw visits and events as one file, and import that file into any other Tidemark install, for example to move from self-hosted to Tidemark Cloud. Imports run in the browser in small batches, can be repeated safely (visits already there are skipped), and bring over the site's goals.
+- `App\Contracts\LimitsImportedHistory`, an optional companion to `Entitlements` that lets an extension cap how far back an import may reach.
+
 ## [0.11.2] - 2026-10-21
 
 ### Added

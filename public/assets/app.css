@@ -158,6 +158,7 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 14px 0; }
 .btn.sm { height: 28px; padding: 0 10px; font-size: 13px; }
 .btn.icon { width: 34px; padding: 0; }
 .btn.sm.icon { width: 28px; }
+.btn.disabled { opacity: 0.45; cursor: not-allowed; pointer-events: none; }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
 input, select, textarea {
   background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--radius-sm); padding: 0 11px; height: 34px; width: 100%;
@@ -182,6 +183,8 @@ label.check { flex-direction: row; align-items: center; gap: 9px; font-weight: 4
 @keyframes pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--good) 55%, transparent); } 70%, 100% { box-shadow: 0 0 0 7px transparent; } }
 .alert { background: var(--bad-soft); color: var(--bad); padding: 10px 13px; border-radius: var(--radius-sm); font-size: 13px; }
 .notice { display: flex; gap: 10px; background: var(--surface-2); color: var(--ink-2); padding: 11px 14px; border-radius: var(--radius-sm); font-size: 13px; line-height: 1.5; }
+.notice.danger { color: var(--danger, #c0392b); }
+.label-btn { cursor: pointer; }
 .notice svg { flex: none; margin-top: 2px; color: var(--accent-ink); }
 .kbd { font: 500 11px var(--font); background: var(--surface-2); border: 1px solid var(--line-2); border-bottom-width: 2px; border-radius: 5px; padding: 0 5px; color: var(--ink-3); }
 .tabs { display: flex; gap: 2px; padding: 3px; background: var(--surface-2); border-radius: 10px; width: fit-content; max-width: 100%; overflow-x: auto; scrollbar-width: none; }

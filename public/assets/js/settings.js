@@ -15,6 +15,59 @@ function SettingsShell({ title, back, tabs, tab, base, children }) {
 const Section = ({ title, help, children, danger }) => html`<section class=${'card pad stack ' + (danger ? 'danger-zone' : '')}><div><h2>${title}</h2>${help && html`<p class="muted" style="margin-top:3px">${help}</p>`}</div>${children}</section>`;
 
 // ----------------------------------------------------------------------------------------- site settings
+// Reads an export file in the browser (gzip or plain) and sends it in small batches, so file size never hits a server limit.
+async function* exportLines(file) {
+  let stream = file.stream();
+  if (/\.gz$/i.test(file.name)) {
+    if (typeof DecompressionStream === 'undefined') throw new Error('This browser cannot open .gz files. Use a current version of Chrome, Firefox or Safari.');
+    stream = stream.pipeThrough(new DecompressionStream('gzip'));
+  }
+  const reader = stream.pipeThrough(new TextDecoderStream()).getReader();
+  let rest = '';
+  for (;;) {
+    const { done, value } = await reader.read();
+    rest += value || '';
+    const parts = rest.split('\n');
+    rest = done ? '' : parts.pop();
+    for (const p of parts) if (p.trim()) yield p;
+    if (done) { if (rest.trim()) yield rest; return; }
+  }
+}
+
+function MoveData({ site, reload }) {
+  const [state, setState] = useState(null);
+  const run = async (file) => {
+    const total = { imported: 0, events: 0, skipped: 0, outdated: 0, invalid: 0 };
+    setState({ busy: true, ...total });
+    let header = null; let batch = []; let bytes = 0; let first = true;
+    const flush = async () => {
+      if (!batch.length && !header) return;
+      const r = await api(`/sites/${site.domain}/import`, { method: 'POST', body: { ...(first && header ? { header } : {}), visits: batch } });
+      first = false; batch = []; bytes = 0;
+      for (const k of Object.keys(total)) total[k] += r[k] || 0;
+      setState({ busy: true, ...total });
+    };
+    try {
+      let n = 0;
+      for await (const line of exportLines(file)) {
+        const row = JSON.parse(line);
+        if (n++ === 0) { if (row.format !== 'tidemark-export') throw new Error('This is not a Tidemark export file.'); header = row; continue; }
+        batch.push(row); bytes += line.length;
+        if (batch.length >= 500 || bytes > 1.5e6) await flush();
+      }
+      if (n === 0) throw new Error('The file is empty.');
+      await flush();
+      setState({ done: true, ...total });
+      reload();
+    } catch (x) { setState({ error: firstError(x) || x.message, ...total }); }
+  };
+  const s = state || {};
+  return html`<${Section} title="Move your data" help="Export this site's raw visits and events, or import an export from another Tidemark install, such as moving from self-hosted to Tidemark Cloud.">
+    <div class="row wrap"><a class="btn" href=${`${BASE}/api/sites/${site.domain}/export/data`} download>Download export</a>
+      <label class=${'btn ' + (s.busy ? 'disabled' : '')}>Import a file<input type="file" accept=".gz,.ndjson,.json" hidden disabled=${s.busy} onChange=${(e) => { const f = e.target.files[0]; e.target.value = ''; if (f) run(f); }} /></label></div>
+    ${state && html`<div class=${'notice ' + (s.error ? 'danger' : '')} role="status"><div>${s.error ? html`Import stopped: ${s.error}. ` : s.done ? 'Import finished. ' : 'Importing… keep this tab open. '}${s.imported.toLocaleString()} visits and ${s.events.toLocaleString()} events added${s.skipped ? `, ${s.skipped.toLocaleString()} already here` : ''}${s.outdated ? `, ${s.outdated.toLocaleString()} older than your plan keeps` : ''}${s.invalid ? `, ${s.invalid.toLocaleString()} unreadable` : ''}.</div></div>`}<//>`;
+}
+
 function General({ site, reload }) {
   const [tz, setTz] = useState(site.timezone);
   const [confirm, setConfirm] = useState(null);
@@ -25,6 +78,7 @@ function General({ site, reload }) {
       <${Toggle} label="File downloads" checked=${site.track_downloads} onChange=${(v) => patch({ track_downloads: v })} />
       <${Toggle} label="Form submissions" checked=${site.track_forms} onChange=${(v) => patch({ track_forms: v })} /><//>
     <${Section} title="Reporting timezone" help="Days start and end at midnight in this timezone."><div class="row"><select value=${tz} onChange=${(e) => setTz(e.target.value)} style="max-width:320px">${zones().map((z) => html`<option value=${z} selected=${z === tz}>${z}</option>`)}</select><button class="btn" disabled=${tz === site.timezone} onClick=${() => patch({ timezone: tz })}>Save</button></div><//>
+    ${site.can_manage && html`<${MoveData} site=${site} reload=${reload} />`}
     ${site.is_owner && html`<${Section} danger title="Danger zone"><div class="row spread wrap"><div><b>Reset statistics</b><div class="muted">Deletes all collected data but keeps the site.</div></div><button class="btn danger" onClick=${() => setConfirm('reset')}>Reset</button></div>
       <hr /><div class="row spread wrap"><div><b>Delete site</b><div class="muted">Removes the site and all its data permanently.</div></div><button class="btn danger" onClick=${() => setConfirm('delete')}>Delete site</button></div><//>`}
     ${confirm === 'reset' && html`<${Confirm} title="Reset statistics?" message=${`All collected data for ${site.domain} will be deleted. This can't be undone.`} confirmLabel="Reset" onClose=${() => setConfirm(null)} onConfirm=${async () => { await api(`/sites/${site.domain}/reset`, { method: 'POST' }); toast('Statistics reset'); reload(); }} />`}

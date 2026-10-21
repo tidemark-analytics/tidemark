@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\DataController;
 use App\Http\Controllers\Api\SettingsController as S;
 use App\Http\Controllers\Api\SiteController;
 use App\Http\Controllers\Api\StatsApiController;
@@ -62,6 +63,8 @@ Route::middleware('api.auth')->group(function () {
     Route::middleware('site:manage')->prefix('/sites/{site}')->group(function () {
         Route::patch('/', [SiteController::class, 'update']);
         Route::post('/reset', [SiteController::class, 'reset']);
+        Route::get('/export/data', [DataController::class, 'export']);
+        Route::post('/import', [DataController::class, 'import']);
         Route::get('/goals', [S::class, 'goals']);
         Route::post('/goals', [S::class, 'createGoal']);
         Route::delete('/goals/{goal}', [S::class, 'deleteGoal']);
