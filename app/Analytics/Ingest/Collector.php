@@ -3,6 +3,7 @@
 namespace App\Analytics\Ingest;
 
 use App\Analytics\Support\Sources;
+use App\Contracts\Entitlements;
 use App\Models\Site;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -13,7 +14,7 @@ use Illuminate\Support\Facades\Cache;
  */
 class Collector
 {
-    public function __construct(private EventSink $sink) {}
+    public function __construct(private EventSink $sink, private Entitlements $entitlements) {}
 
     /** @return array{status:int, body:string} */
     public function handle(Request $request): array
@@ -53,6 +54,9 @@ class Collector
 
         $geo = Geo::resolve($request, $ip);
         if ($this->shielded($site, $ip, $geo['country'], $pathname, $hostname)) {
+            return ['status' => 202, 'body' => 'ok'];
+        }
+        if (! $this->entitlements->allowsRecording($site)) {
             return ['status' => 202, 'body' => 'ok'];
         }
 
@@ -113,7 +117,7 @@ class Collector
             $found = Cache::remember('tdm:site:'.$candidate, 60, function () use ($candidate) {
                 $site = Site::where('domain', $candidate)->first();
 
-                return $site ? ['id' => $site->id, 'domain' => $site->domain, 'shields' => $site->shields()->get()->groupBy('type')->map(fn ($g) => $g->pluck('value')->all())->all()] : 0;
+                return $site ? ['id' => $site->id, 'domain' => $site->domain, 'owner_id' => $site->members()->wherePivot('role', 'owner')->value('users.id'), 'shields' => $site->shields()->get()->groupBy('type')->map(fn ($g) => $g->pluck('value')->all())->all()] : 0;
             });
             if ($found) {
                 return $found;

@@ -25,6 +25,9 @@ Route::middleware('api.auth:optional')->group(function () {
     Route::post('/auth/login', [AuthController::class, 'login']);
     Route::post('/auth/register', [AuthController::class, 'register']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
+    Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:5,1');
+    Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:10,1');
+    Route::get('/auth/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])->middleware('signed')->name('verification.verify');
 
     // Readable by members, by anyone when the dashboard is public, or via a shared link.
     Route::middleware('site:view')->prefix('/sites/{site}')->group(function () {
@@ -43,6 +46,7 @@ Route::middleware('api.auth:optional')->group(function () {
 // ---- authenticated ---------------------------------------------------------------------------------------------
 Route::middleware('api.auth')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
+    Route::post('/auth/verification-notification', [AuthController::class, 'resendVerification'])->middleware('throttle:3,1');
     Route::post('/me', [AuthController::class, 'update']);
     Route::post('/me/password', [AuthController::class, 'password']);
     Route::post('/me/two-factor', [AuthController::class, 'twoFactorSetup']);

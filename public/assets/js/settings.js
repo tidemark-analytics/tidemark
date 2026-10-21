@@ -2,6 +2,7 @@
 import { html, useState, useEffect, useApi, api, navigate, Link, Icon, toast, copy, toggleTheme, UserCtx, useContext, useDocTitle, ago, countryName, BASE } from './lib.js';
 import { Loading, Empty, ErrorBox, Field, Confirm, Modal, Toggle, CodeBlock } from './ui.js';
 import { Snippet } from './dashboard.js';
+import { registry } from './extensions.js';
 
 const zones = () => { try { return ['UTC', ...Intl.supportedValuesOf('timeZone')]; } catch (e) { return ['UTC']; } };
 const firstError = (x) => (x.errors && Object.values(x.errors)[0][0]) || x.message;
@@ -272,8 +273,9 @@ function Updates() {
 export function AccountSettings({ tab }) {
   useDocTitle('Settings');
   const { user } = useContext(UserCtx);
-  const tabs = [['preferences', 'Preferences'], ['security', 'Security'], ['keys', 'API keys'], ...(user.is_admin ? [['users', 'Users'], ['updates', 'Updates', !!user.update]] : [])];
+  const extra = registry.accountTabs.filter((x) => !x.visible || x.visible(user));
+  const tabs = [['preferences', 'Preferences'], ['security', 'Security'], ['keys', 'API keys'], ...extra.map((x) => [x.key, x.label, !!(x.dot && x.dot(user))]), ...(user.is_admin ? [['users', 'Users'], ['updates', 'Updates', !!user.update]] : [])];
   const t = tabs.find((x) => x[0] === tab) ? tab : 'preferences';
-  const Body = { preferences: Preferences, security: Security, keys: ApiKeys, users: Users, updates: Updates }[t];
+  const Body = { preferences: Preferences, security: Security, keys: ApiKeys, users: Users, updates: Updates, ...Object.fromEntries(extra.map((x) => [x.key, x.component])) }[t];
   return html`<${SettingsShell} title="Account settings" back=${['/sites', 'Your sites']} tabs=${tabs} tab=${t} base="/settings"><${Body} /><//>`;
 }

@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Analytics\Stats\Stats;
 use App\Analytics\Support\Sql;
+use App\Contracts\Entitlements;
+use App\Events\SiteCreated;
 use App\Http\Controllers\Controller;
 use App\Models\Goal;
 use App\Models\Site;
@@ -51,13 +53,17 @@ class SiteController extends Controller
             $tz = 'UTC';
         }
         $user = $request->user();
-        $limit = config('tidemark.limits.sites_per_user');
-        if ($limit && ! $user->is_admin && $user->sites()->wherePivot('role', 'owner')->count() >= $limit) {
-            throw ValidationException::withMessages(['domain' => "Your plan allows up to {$limit} sites."]);
+        if (config('tidemark.verify_email') && ! $user->hasVerifiedEmail()) {
+            return response()->json(['error' => 'email_unverified', 'message' => 'Verify your email address before adding a site. We sent you a link.'], 403);
+        }
+        $allowed = app(Entitlements::class)->canCreateSite($user);
+        if ($allowed !== true) {
+            throw ValidationException::withMessages(['domain' => $allowed]);
         }
 
         $site = Site::create(['domain' => $domain, 'timezone' => $tz]);
         $site->members()->attach($user->id, ['role' => 'owner', 'id' => (string) Str::uuid()]);
+        SiteCreated::dispatch($site, $user);
 
         return response()->json(['data' => $this->present($site, $user)], 201);
     }

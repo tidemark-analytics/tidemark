@@ -54,10 +54,15 @@ return [
     // Visitor ids are derived from a salted hash; the salt changes every day, so visitors can't be followed across days.
     'salt' => env('TIDEMARK_SALT'),
 
-    // Cloud-mode plan limits (0 = unlimited).
+    // Require new accounts to confirm their email address (needs working mail settings) before they can add sites.
+    'verify_email' => (bool) env('TIDEMARK_VERIFY_EMAIL', false),
+
+    // JavaScript modules an extension package adds to the dashboard (see public/assets/js/extensions.js).
+    'extensions' => [],
+
+    // Plan limit (0 = unlimited). Extension packages can enforce richer limits through App\Contracts\Entitlements.
     'limits' => [
         'sites_per_user' => (int) env('TIDEMARK_MAX_SITES', 0),
-        'events_per_month' => (int) env('TIDEMARK_MAX_EVENTS', 0),
     ],
 
 ];

@@ -586,3 +586,6 @@ td > .pill { vertical-align: middle; }
 /* code boxes: keep the text and the Copy button on the same center line, also for one-liners */
 .code { align-items: center; padding: 10px 10px 10px 14px; min-height: 52px; }
 .code .code-t { align-self: center; }
+
+.banner { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: center; padding: 8px 16px; background: var(--warn-soft); color: var(--warn-ink); font-size: 13px; }
+.banner .btn { height: 26px; }

@@ -2,6 +2,16 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.11.0] - 2026-10-21
+
+### Added
+- **Password reset.** With an SMTP server configured, the sign-in page offers "Forgot your password?" and emails a one-hour link.
+- **Optional email verification.** `TIDEMARK_VERIFY_EMAIL=true` makes new accounts confirm their address before adding sites. Existing accounts and accounts created by an administrator count as verified.
+- **Extension points** for packages that build on Tidemark: an `Entitlements` contract (site creation and per-event recording checks), a `SiteCreated` event, and dashboard modules that can add Account settings tabs, banners and pages.
+
+### Removed
+- `TIDEMARK_MAX_EVENTS`, which was never enforced. Event quotas belong in an `Entitlements` implementation.
+
 ## [0.10.4] - 2026-10-20
 
 ### Fixed

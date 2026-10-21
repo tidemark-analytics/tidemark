@@ -7,10 +7,14 @@ use App\Models\ApiKey;
 use App\Models\User;
 use App\Support\Totp;
 use App\Updates\Updater;
+use Illuminate\Auth\Events\PasswordReset;
+use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password as PasswordBroker;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 
@@ -54,10 +58,65 @@ class AuthController extends Controller
             'password' => ['required', 'confirmed', Password::min(8)],
         ]);
         $user = User::create($data);
+        event(new Registered($user));
+        if (config('tidemark.verify_email')) {
+            $user->sendEmailVerificationNotification();
+        }
         Auth::guard('web')->login($user);
         $request->session()->regenerate();
 
         return response()->json(['user' => $this->present($user)], 201);
+    }
+
+    /** Always answers the same way, so it can't be used to find out which emails have accounts. */
+    public function forgotPassword(Request $request)
+    {
+        $data = $request->validate(['email' => 'required|email']);
+        if (self::mailConfigured()) {
+            PasswordBroker::sendResetLink($data);
+        }
+
+        return ['ok' => true];
+    }
+
+    public function resetPassword(Request $request)
+    {
+        $data = $request->validate(['token' => 'required|string', 'email' => 'required|email', 'password' => ['required', 'confirmed', Password::min(8)]]);
+        $status = PasswordBroker::reset($data, function (User $user, string $password) {
+            $user->forceFill(['password' => $password, 'remember_token' => Str::random(60)])->save();
+            event(new PasswordReset($user));
+        });
+        if ($status !== PasswordBroker::PasswordReset) {
+            throw ValidationException::withMessages(['email' => 'This reset link is invalid or has expired. Request a new one.']);
+        }
+
+        return ['ok' => true];
+    }
+
+    /** The link from the verification email (signed, so it works from any device). */
+    public function verifyEmail(Request $request, string $id, string $hash)
+    {
+        $user = User::find($id);
+        if ($user && hash_equals($hash, sha1($user->getEmailForVerification())) && ! $user->hasVerifiedEmail()) {
+            $user->markEmailAsVerified();
+        }
+
+        return redirect('/sites?verified=1');
+    }
+
+    public function resendVerification(Request $request)
+    {
+        $user = $request->user();
+        if (config('tidemark.verify_email') && ! $user->hasVerifiedEmail()) {
+            $user->sendEmailVerificationNotification();
+        }
+
+        return ['ok' => true];
+    }
+
+    public static function mailConfigured(): bool
+    {
+        return ! in_array(config('mail.default'), ['log', 'array', null], true);
     }
 
     public function logout(Request $request)
@@ -88,7 +147,7 @@ class AuthController extends Controller
 
     public function config()
     {
-        return ['registration' => (bool) config('tidemark.registration'), 'mode' => config('tidemark.mode'), 'name' => config('app.name')];
+        return ['registration' => (bool) config('tidemark.registration'), 'mode' => config('tidemark.mode'), 'name' => config('app.name'), 'password_reset' => self::mailConfigured()];
     }
 
     public function update(Request $request)
@@ -177,6 +236,7 @@ class AuthController extends Controller
         return [
             'id' => $u->id, 'name' => $u->name, 'email' => $u->email, 'is_admin' => $u->is_admin,
             'timezone' => $u->timezone, 'locale' => $u->locale, 'two_factor' => $u->hasTwoFactor(),
+            'email_verified' => $u->hasVerifiedEmail(), 'verification_required' => (bool) config('tidemark.verify_email'),
         ];
     }
 }

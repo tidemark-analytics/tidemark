@@ -1,4 +1,4 @@
-import { html, useState, api, navigate, Link, toast } from '../lib.js';
+import { html, useState, useEffect, api, navigate, Link, toast, useLocation } from '../lib.js';
 import { Field } from '../ui.js';
 import { Lockup } from '../logo.js';
 
@@ -12,6 +12,8 @@ function AuthShell({ title, sub, children }) {
 export function Login({ setUser }) {
   const [f, setF] = useState({ email: '', password: '', code: '' });
   const [needCode, setNeedCode] = useState(false);
+  const [canReset, setCanReset] = useState(false);
+  useEffect(() => { api('/config').then((c) => setCanReset(!!c.password_reset)).catch(() => {}); }, []);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   const submit = async (e) => {
@@ -29,6 +31,7 @@ export function Login({ setUser }) {
       <${Field} label="Password"><input type="password" required autocomplete="current-password" value=${f.password} onInput=${(e) => setF({ ...f, password: e.target.value })} /><//>
       ${needCode && html`<${Field} label="Authentication code" help="Enter the 6-digit code from your authenticator app."><input inputmode="numeric" autocomplete="one-time-code" autofocus value=${f.code} onInput=${(e) => setF({ ...f, code: e.target.value })} /><//>`}
       <button class="btn primary" style="height:38px" disabled=${busy}>${busy ? 'Signing in…' : 'Sign in'}</button>
+      ${canReset && html`<div style="text-align:center"><${Link} to="/forgot-password" class="muted">Forgot your password?<//></div>`}
       ${window.SD.registration && html`<div class="muted" style="text-align:center">New here? <${Link} to="/register" style="color:var(--accent-ink);font-weight:600">Create an account<//></div>`}
     </form><//>`;
 }
@@ -52,4 +55,40 @@ export function Register({ setUser }) {
       <button class="btn primary" style="height:38px">Create account</button>
       <div class="muted" style="text-align:center">Have an account? <${Link} to="/login" style="color:var(--accent-ink);font-weight:600">Sign in<//></div>
     </form><//>`;
+}
+
+export function ForgotPassword() {
+  const [email, setEmail] = useState('');
+  const [sent, setSent] = useState(false);
+  const [err, setErr] = useState('');
+  const submit = async (e) => {
+    e.preventDefault(); setErr('');
+    try { await api('/auth/forgot-password', { method: 'POST', body: { email } }); setSent(true); }
+    catch (x) { setErr((x.errors && Object.values(x.errors)[0][0]) || x.message); }
+  };
+  return html`<${AuthShell} title="Reset your password" sub="We'll email you a link to choose a new one.">
+    ${sent ? html`<div class="notice"><div>If an account exists for <b>${email}</b>, a reset link is on its way. It expires in an hour.</div></div><${Link} to="/login" class="btn">Back to sign in<//>`
+      : html`<form class="stack" onSubmit=${submit}>${err && html`<div class="alert">${err}</div>`}
+        <${Field} label="Email"><input type="email" required autofocus autocomplete="username" value=${email} onInput=${(e) => setEmail(e.target.value)} /><//>
+        <button class="btn primary" style="height:38px">Send reset link</button>
+        <div class="muted" style="text-align:center"><${Link} to="/login" style="color:var(--accent-ink);font-weight:600">Back to sign in<//></div></form>`}<//>`;
+}
+
+export function ResetPassword() {
+  const { query } = useLocation();
+  const [f, setF] = useState({ password: '', password_confirmation: '' });
+  const [err, setErr] = useState('');
+  const [done, setDone] = useState(false);
+  const submit = async (e) => {
+    e.preventDefault(); setErr('');
+    try { await api('/auth/reset-password', { method: 'POST', body: { ...f, token: query.token, email: query.email } }); setDone(true); }
+    catch (x) { setErr((x.errors && Object.values(x.errors)[0][0]) || x.message); }
+  };
+  if (!query.token || !query.email) return html`<${AuthShell} title="Link problem" sub="This reset link is incomplete."><${Link} to="/forgot-password" class="btn">Request a new link<//><//>`;
+  return html`<${AuthShell} title="Choose a new password" sub=${query.email}>
+    ${done ? html`<div class="notice"><div>Your password was changed.</div></div><${Link} to="/login" class="btn primary">Sign in<//>`
+      : html`<form class="stack" onSubmit=${submit}>${err && html`<div class="alert">${err}</div>`}
+        <${Field} label="New password" help="At least 8 characters."><input type="password" required minlength="8" autofocus autocomplete="new-password" value=${f.password} onInput=${(e) => setF({ ...f, password: e.target.value })} /><//>
+        <${Field} label="Confirm new password"><input type="password" required autocomplete="new-password" value=${f.password_confirmation} onInput=${(e) => setF({ ...f, password_confirmation: e.target.value })} /><//>
+        <button class="btn primary" style="height:38px">Change password</button></form>`}<//>`;
 }

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -10,7 +11,9 @@ use Illuminate\Notifications\Notifiable;
 
 class User extends Authenticatable
 {
-    use HasUuids, Notifiable;
+    // The MustVerifyEmail trait (without its interface) gives us hasVerifiedEmail() and the verification notification while
+    // keeping verification opt-in: Laravel only auto-sends it for models that implement the interface.
+    use HasUuids, MustVerifyEmail, Notifiable;
 
     protected $fillable = ['name', 'email', 'password', 'timezone', 'locale', 'is_admin'];
 

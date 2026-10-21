@@ -1,22 +1,29 @@
 import { html, render, useState, useEffect, api, navigate, useLocation, matchRoute, Link, Icon, toggleTheme, useToasts, UserCtx } from './lib.js';
 import { Pop } from './ui.js';
-import { Login, Register } from './pages/auth.js';
+import { Login, Register, ForgotPassword, ResetPassword } from './pages/auth.js';
 import { Dashboard } from './dashboard.js';
 import { SitesPage, NewSite, Installation } from './sites.js';
 import { SiteSettings, AccountSettings } from './settings.js';
 import { Logo, Lockup } from './logo.js';
+import { registry, loadExtensions } from './extensions.js';
 
-const routes = [
+const head = [
   ['/login', Login],
   ['/register', Register],
+  ['/forgot-password', ForgotPassword],
+  ['/reset-password', ResetPassword],
   ['/sites', SitesPage],
   ['/sites/new', NewSite],
   ['/settings/:tab?', AccountSettings],
   ['/share/:domain', (p) => html`<${Dashboard} ...${p} shared />`],
+];
+const tail = [
   ['/:domain/installation', Installation],
   ['/:domain/settings/:tab?', SiteSettings],
   ['/:domain', Dashboard],
 ];
+// extension pages sit between the fixed pages and the "/{domain}" catch-all
+const allRoutes = () => [...head, ...registry.routes, ...tail];
 const RESERVED = new Set(['', 'api', 'js', 'assets', 'install', 'up']);
 
 function TopBar({ user, shared }) {
@@ -34,11 +41,18 @@ function TopBar({ user, shared }) {
   </div></header>`;
 }
 
+function VerifyBanner({ user }) {
+  const [sent, setSent] = useState(false);
+  if (!user.verification_required || user.email_verified) return null;
+  return html`<div class="banner" role="status"><${Icon} name="info" size=${15} /><span>Please confirm your email address (${user.email}) to add sites. ${sent ? 'We sent you a new link.' : ''}</span>
+    ${!sent && html`<button class="btn sm" onClick=${async () => { await api('/auth/verification-notification', { method: 'POST' }); setSent(true); }}>Resend email</button>`}</div>`;
+}
+
 function App() {
   const { path } = useLocation();
   const toasts = useToasts();
   const [user, setUser] = useState(undefined);
-  const isAuth = path === '/login' || path === '/register';
+  const isAuth = ['/login', '/register', '/forgot-password', '/reset-password'].includes(path);
   const isShare = path.startsWith('/share/');
 
   useEffect(() => {
@@ -47,7 +61,7 @@ function App() {
   }, [isAuth, isShare]);
 
   const first = path.split('/')[1] || '';
-  const m = RESERVED.has(first) ? null : matchRoute(routes, path);
+  const m = RESERVED.has(first) ? null : matchRoute(allRoutes(), path);
   const publicRoute = isShare || (m && m.component === Dashboard);
   useEffect(() => { if (user === null && !isAuth && !publicRoute) navigate('/login', { replace: true }); }, [user, path]);
   useEffect(() => { if (user && isAuth) navigate('/sites', { replace: true }); }, [user, path]);
@@ -61,8 +75,10 @@ function App() {
   if (user === null && !publicRoute) return null;
   return html`<${UserCtx.Provider} value=${{ user, setUser }}>
     <${TopBar} user=${user} shared=${isShare} />
+    ${user && html`<${VerifyBanner} user=${user} />`}
+    ${user && registry.banners.map((B) => html`<${B} user=${user} />`)}
     ${Page ? html`<${Page} ...${m.params} />` : html`<main class="main"><div class="empty" style="padding-top:80px"><div class="ico"><${Icon} name="search" size=${20} /></div><b>Page not found</b><p>The page you're looking for doesn't exist.</p><${Link} to="/sites" class="btn">Your sites<//></div></main>`}
     ${toastEls}<//>`;
 }
 
-render(html`<${App} />`, document.getElementById('root'));
+loadExtensions(window.SD.extensions || []).finally(() => render(html`<${App} />`, document.getElementById('root')));

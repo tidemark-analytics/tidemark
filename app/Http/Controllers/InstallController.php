@@ -95,6 +95,7 @@ class InstallController extends Controller
             'password' => $data['password'],
             'is_admin' => true,
         ]);
+        $user->forceFill(['email_verified_at' => now()])->save();
         Installer::markInstalled();
         Auth::login($user);
 
