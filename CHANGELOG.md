@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.11.2] - 2026-10-21
+
+### Added
+- `TIDEMARK_TERMS_URL`, `TIDEMARK_PRIVACY_URL` and `TIDEMARK_REFUNDS_URL`: when set, the sign-in and sign-up screens link to your legal pages, and sign-up says that creating an account means agreeing to the terms.
+
 ## [0.11.1] - 2026-10-21
 
 ### Added

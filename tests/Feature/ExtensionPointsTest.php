@@ -99,4 +99,13 @@ class ExtensionPointsTest extends TestCase
         file_put_contents(storage_path('app/installed'), '1');
         $this->get('/login')->assertOk()->assertSee('\\/vendor\\/cloud\\/extension.js', false);
     }
+
+    public function test_configured_legal_links_are_handed_to_the_dashboard(): void
+    {
+        file_put_contents(storage_path('app/installed'), '1');
+        $this->get('/login')->assertOk()->assertSee('legal: {}', false); // nothing configured by default
+
+        config(['tidemark.legal' => ['terms' => 'https://example.com/terms', 'privacy' => 'https://example.com/privacy', 'refunds' => null]]);
+        $this->get('/login')->assertOk()->assertSee('https:\\/\\/example.com\\/terms', false)->assertDontSee('refunds');
+    }
 }

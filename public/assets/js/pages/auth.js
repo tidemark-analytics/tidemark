@@ -6,7 +6,15 @@ import { Lockup } from '../logo.js';
 function AuthShell({ title, sub, children }) {
   return html`<div class="auth-body"><div class="auth-card">
     <div class="brand big"><${Lockup} size=${34} /></div>
-    <div><h1>${title}</h1><p class="muted" style="margin:4px 0 0">${sub}</p></div>${children}</div></div>`;
+    <div><h1>${title}</h1><p class="muted" style="margin:4px 0 0">${sub}</p></div>${children}<${LegalLinks} /></div></div>`;
+}
+
+/** Terms / privacy / refund links, shown when the installation configures them (TIDEMARK_TERMS_URL and friends). */
+function LegalLinks() {
+  const l = window.SD.legal || {};
+  const items = [['terms', 'Terms'], ['privacy', 'Privacy notice'], ['refunds', 'Refund policy']].filter(([k]) => l[k]);
+  if (!items.length) return null;
+  return html`<nav class="legal-links" aria-label="Legal">${items.map(([k, label]) => html`<a href=${l[k]} target="_blank" rel="noopener">${label}</a>`)}</nav>`;
 }
 
 export function Login({ setUser }) {
@@ -52,6 +60,7 @@ export function Register({ setUser }) {
       <${Field} label="Email"><input type="email" required value=${f.email} onInput=${set('email')} /><//>
       <${Field} label="Password" help="At least 8 characters."><input type="password" required minlength="8" autocomplete="new-password" value=${f.password} onInput=${set('password')} /><//>
       <${Field} label="Confirm password"><input type="password" required autocomplete="new-password" value=${f.password_confirmation} onInput=${set('password_confirmation')} /><//>
+      ${(window.SD.legal || {}).terms && html`<p class="help" style="text-align:center">By creating an account you agree to the <a href=${window.SD.legal.terms} target="_blank" rel="noopener" style="color:var(--accent-ink)">Terms of Service</a>${window.SD.legal.privacy ? html` and acknowledge the <a href=${window.SD.legal.privacy} target="_blank" rel="noopener" style="color:var(--accent-ink)">privacy notice</a>` : ''}.</p>`}
       <button class="btn primary" style="height:38px">Create account</button>
       <div class="muted" style="text-align:center">Have an account? <${Link} to="/login" style="color:var(--accent-ink);font-weight:600">Sign in<//></div>
     </form><//>`;

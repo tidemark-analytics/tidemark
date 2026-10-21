@@ -103,6 +103,7 @@ Logo (pictorial mark: pier pilings with a tide line across them), palette, typog
 | `TIDEMARK_GEOIP_DATABASE` | `storage/app/geo/GeoLite2-City.mmdb` | Needs `composer require geoip2/geoip2`; Cloudflare/Vercel/CloudFront geo headers work with no setup |
 | `TIDEMARK_MAX_SITES` | `0` | Sites per user. `0` is unlimited |
 | `TIDEMARK_UPDATER` | `true` | `false` hides Account settings → Updates and disables its endpoints |
+| `TIDEMARK_TERMS_URL`, `TIDEMARK_PRIVACY_URL`, `TIDEMARK_REFUNDS_URL` | – | Links to your legal pages, shown on the sign-in and sign-up screens |
 | `TIDEMARK_VERIFY_EMAIL` | `false` | New accounts must confirm their email before adding sites (needs `MAIL_*` settings) |
 
 Behind a CDN (Cloudflare etc.) the real client IP and country are read from its headers automatically.

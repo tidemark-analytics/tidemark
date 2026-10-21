@@ -61,6 +61,14 @@ return [
     // Require new accounts to confirm their email address (needs working mail settings) before they can add sites.
     'verify_email' => (bool) env('TIDEMARK_VERIFY_EMAIL', false),
 
+    // Links to your legal pages. When set, the sign-in and sign-up screens show them, and sign-up says that creating an account
+    // means agreeing to the terms. (A hosted service typically needs all three; self-hosters can leave them empty.)
+    'legal' => [
+        'terms' => env('TIDEMARK_TERMS_URL'),
+        'privacy' => env('TIDEMARK_PRIVACY_URL'),
+        'refunds' => env('TIDEMARK_REFUNDS_URL'),
+    ],
+
     // JavaScript modules an extension package adds to the dashboard (see public/assets/js/extensions.js).
     'extensions' => [],
 

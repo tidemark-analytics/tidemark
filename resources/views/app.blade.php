@@ -18,6 +18,7 @@
             registration: @json((bool) config('tidemark.registration')),
             mode: @json(config('tidemark.mode')),
             extensions: @json(array_values(config('tidemark.extensions', []))),
+            legal: @json((object) array_filter(config('tidemark.legal', []))),
         };
     </script>
     <link rel="stylesheet" href="{{ asset('assets/app.css') }}?v={{ @filemtime(public_path('assets/app.css')) }}">
