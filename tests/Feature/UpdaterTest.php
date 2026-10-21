@@ -329,5 +329,7 @@ class UpdaterTest extends TestCase
         $this->getJson('/api/admin/update/check')->assertNotFound();
         $this->postJson('/api/admin/update/apply')->assertNotFound();
         $this->getJson('/api/me')->assertOk()->assertJsonPath('user.updater_enabled', false)->assertJsonMissingPath('user.update');
+        // saving the profile returns the same flag, so the dashboard never re-shows the Updates tab
+        $this->postJson('/api/me', ['email' => 'renamed@example.com'])->assertOk()->assertJsonPath('user.updater_enabled', false);
     }
 }

@@ -131,7 +131,6 @@ class AuthController extends Controller
     public function me(Request $request)
     {
         $user = $this->present($request->user());
-        $user['updater_enabled'] = (bool) config('tidemark.updater');
         if ($user['is_admin'] && config('tidemark.updater')) {
             $updater = app(Updater::class);
             $user['update'] = $updater->availableUpdate();
@@ -238,6 +237,7 @@ class AuthController extends Controller
             'id' => $u->id, 'name' => $u->name, 'email' => $u->email, 'is_admin' => $u->is_admin,
             'timezone' => $u->timezone, 'locale' => $u->locale, 'two_factor' => $u->hasTwoFactor(),
             'email_verified' => $u->hasVerifiedEmail(), 'verification_required' => (bool) config('tidemark.verify_email'),
+            'updater_enabled' => (bool) config('tidemark.updater'),
         ];
     }
 }

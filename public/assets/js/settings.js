@@ -182,7 +182,7 @@ function Preferences() {
   const { user, setUser } = useContext(UserCtx);
   const [f, setF] = useState({ name: user.name, email: user.email, timezone: user.timezone || 'UTC' });
   const [err, setErr] = useState(null);
-  const save = async (e) => { e.preventDefault(); setErr(null); try { const r = await api('/me', { method: 'POST', body: f }); setUser(r.user); toast('Saved'); } catch (x) { setErr(firstError(x)); } };
+  const save = async (e) => { e.preventDefault(); setErr(null); try { const r = await api('/me', { method: 'POST', body: f }); setUser({ ...user, ...r.user }); toast('Saved'); } catch (x) { setErr(firstError(x)); } };
   return html`<${Section} title="Profile"><form class="form" onSubmit=${save}>${err && html`<div class="alert">${err}</div>`}
       <${Field} label="Name"><input required value=${f.name} onInput=${(e) => setF({ ...f, name: e.target.value })} /><//>
       <${Field} label="Email"><input type="email" required value=${f.email} onInput=${(e) => setF({ ...f, email: e.target.value })} /><//>

@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.12.3] - 2026-10-21
+
+### Fixed
+- When the dashboard updater is turned off (`TIDEMARK_UPDATER=false`), saving your profile no longer brings the Updates tab back in Account settings. The saved-profile response now carries the same flag as every other user response.
+
 ## [0.12.2] - 2026-10-21
 
 ### Fixed
