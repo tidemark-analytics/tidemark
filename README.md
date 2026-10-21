@@ -102,6 +102,7 @@ Logo (pictorial mark: pier pilings with a tide line across them), palette, typog
 | `TIDEMARK_RETENTION_DAYS` | `0` | Delete raw data older than N days (daily via scheduler) |
 | `TIDEMARK_GEOIP_DATABASE` | `storage/app/geo/GeoLite2-City.mmdb` | Needs `composer require geoip2/geoip2`; Cloudflare/Vercel/CloudFront geo headers work with no setup |
 | `TIDEMARK_MAX_SITES` | `0` | Sites per user. `0` is unlimited |
+| `TIDEMARK_UPDATER` | `true` | `false` hides Account settings → Updates and disables its endpoints |
 | `TIDEMARK_VERIFY_EMAIL` | `false` | New accounts must confirm their email before adding sites (needs `MAIL_*` settings) |
 
 Behind a CDN (Cloudflare etc.) the real client IP and country are read from its headers automatically.

@@ -2,6 +2,10 @@
 
 return [
 
+    // Whether administrators can update Tidemark from Account settings → Updates. A hosted deployment that builds and deploys its
+    // own releases turns this off so nobody can overwrite it with the public release by accident.
+    'updater' => (bool) env('TIDEMARK_UPDATER', true),
+
     // GitHub repository checked for new releases when an administrator opens Account settings → Updates.
     // Look for new releases daily (a cron task) and every few hours while an administrator is using the app so the dashboard can
     // show an "update available" dot. Only the latest version number is requested; nothing about your sites or visitors is sent.

@@ -274,7 +274,7 @@ export function AccountSettings({ tab }) {
   useDocTitle('Settings');
   const { user } = useContext(UserCtx);
   const extra = registry.accountTabs.filter((x) => !x.visible || x.visible(user));
-  const tabs = [['preferences', 'Preferences'], ['security', 'Security'], ['keys', 'API keys'], ...extra.map((x) => [x.key, x.label, !!(x.dot && x.dot(user))]), ...(user.is_admin ? [['users', 'Users'], ['updates', 'Updates', !!user.update]] : [])];
+  const tabs = [['preferences', 'Preferences'], ['security', 'Security'], ['keys', 'API keys'], ...extra.map((x) => [x.key, x.label, !!(x.dot && x.dot(user))]), ...(user.is_admin ? [['users', 'Users'], ...(user.updater_enabled === false ? [] : [['updates', 'Updates', !!user.update]])] : [])];
   const t = tabs.find((x) => x[0] === tab) ? tab : 'preferences';
   const Body = { preferences: Preferences, security: Security, keys: ApiKeys, users: Users, updates: Updates, ...Object.fromEntries(extra.map((x) => [x.key, x.component])) }[t];
   return html`<${SettingsShell} title="Account settings" back=${['/sites', 'Your sites']} tabs=${tabs} tab=${t} base="/settings"><${Body} /><//>`;

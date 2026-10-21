@@ -131,7 +131,8 @@ class AuthController extends Controller
     public function me(Request $request)
     {
         $user = $this->present($request->user());
-        if ($user['is_admin']) {
+        $user['updater_enabled'] = (bool) config('tidemark.updater');
+        if ($user['is_admin'] && config('tidemark.updater')) {
             $updater = app(Updater::class);
             $user['update'] = $updater->availableUpdate();
             // refresh the daily check after the response has been sent, so it never slows the page down

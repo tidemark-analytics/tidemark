@@ -317,4 +317,17 @@ class UpdaterTest extends TestCase
         $this->expectException(UpdateException::class);
         (new Updater($this->base))->latest(true);
     }
+
+    public function test_the_dashboard_updater_can_be_turned_off_for_hosted_deployments(): void
+    {
+        config(['tidemark.updater' => false, 'tidemark.update_check' => true]);
+        $admin = User::create(['name' => 'A', 'email' => 'off@example.com', 'password' => 'password']);
+        $admin->forceFill(['is_admin' => true])->save();
+        $this->withHeader('X-Requested-With', 'XMLHttpRequest')->actingAs($admin);
+
+        $this->getJson('/api/admin/update')->assertNotFound();
+        $this->getJson('/api/admin/update/check')->assertNotFound();
+        $this->postJson('/api/admin/update/apply')->assertNotFound();
+        $this->getJson('/api/me')->assertOk()->assertJsonPath('user.updater_enabled', false)->assertJsonMissingPath('user.update');
+    }
 }

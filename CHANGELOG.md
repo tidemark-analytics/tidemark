@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.11.1] - 2026-10-21
+
+### Added
+- `TIDEMARK_UPDATER=false` turns off updating from the dashboard (the Updates tab and its endpoints). For deployments that build and ship their own releases.
+
 ## [0.11.0] - 2026-10-21
 
 ### Added

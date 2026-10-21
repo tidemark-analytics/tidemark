@@ -14,6 +14,7 @@ class UpdateController extends Controller
     private function admin(Request $r): void
     {
         abort_unless($r->user()->is_admin, 403);
+        abort_unless(config('tidemark.updater'), 404, 'Updates from the dashboard are turned off on this installation.');
     }
 
     public function show(Request $r)
