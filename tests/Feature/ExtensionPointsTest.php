@@ -108,4 +108,16 @@ class ExtensionPointsTest extends TestCase
         config(['tidemark.legal' => ['terms' => 'https://example.com/terms', 'privacy' => 'https://example.com/privacy', 'refunds' => null]]);
         $this->get('/login')->assertOk()->assertSee('https:\\/\\/example.com\\/terms', false)->assertDontSee('refunds');
     }
+
+    public function test_the_shell_versions_every_script_module_so_updates_are_never_served_stale(): void
+    {
+        $html = $this->get('/login')->getContent();
+
+        $this->assertMatchesRegularExpression('/<script type="importmap">/', $html);
+        preg_match('/<script type="importmap">(.*?)<\/script>/s', $html, $m);
+        $imports = json_decode($m[1], true)['imports'];
+        $lib = collect($imports)->first(fn ($v, $k) => str_ends_with($k, '/assets/js/lib.js'));
+        $this->assertMatchesRegularExpression('#/assets/js/lib\.js\?v=\d+$#', $lib);
+        $this->assertTrue(collect($imports)->keys()->contains(fn ($k) => str_ends_with($k, '/assets/js/pages/auth.js')));
+    }
 }

@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.12.2] - 2026-10-21
+
+### Fixed
+- After an update, browsers and CDNs no longer keep serving old dashboard scripts: every script module is now requested with a version in its address (through an import map), so a new release is picked up straight away without clearing any cache.
+
 ## [0.12.1] - 2026-10-21
 
 ### Fixed

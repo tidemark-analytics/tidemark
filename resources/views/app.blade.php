@@ -21,6 +21,7 @@
             legal: @json((object) array_filter(config('tidemark.legal', []))),
         };
     </script>
+    <script type="importmap">@json(['imports' => \App\Support\Assets::importMap()], JSON_UNESCAPED_SLASHES)</script>
     <link rel="stylesheet" href="{{ asset('assets/app.css') }}?v={{ @filemtime(public_path('assets/app.css')) }}">
 </head>
 <body>
