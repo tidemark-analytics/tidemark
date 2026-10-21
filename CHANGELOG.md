@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.12.4] - 2026-10-23
+
+### Changed
+- The terms, privacy and refund links on the sign-in and sign-up pages now sit at the bottom of the page instead of inside the card.
+
 ## [0.12.3] - 2026-10-21
 
 ### Fixed

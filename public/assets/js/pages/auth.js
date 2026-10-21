@@ -6,7 +6,7 @@ import { Lockup } from '../logo.js';
 function AuthShell({ title, sub, children }) {
   return html`<div class="auth-body"><div class="auth-card">
     <div class="brand big"><${Lockup} size=${34} /></div>
-    <div><h1>${title}</h1><p class="muted" style="margin:4px 0 0">${sub}</p></div>${children}<${LegalLinks} /></div></div>`;
+    <div><h1>${title}</h1><p class="muted" style="margin:4px 0 0">${sub}</p></div>${children}</div><${LegalLinks} /></div>`;
 }
 
 /** Terms / privacy / refund links, shown when the installation configures them (TIDEMARK_TERMS_URL and friends). */

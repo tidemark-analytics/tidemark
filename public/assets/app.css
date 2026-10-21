@@ -591,7 +591,10 @@ td > .pill { vertical-align: middle; }
 
 .banner { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: center; padding: 8px 16px; background: var(--warn-soft); color: var(--warn-ink); font-size: 13px; }
 .banner .btn { height: 26px; }
-.legal-links { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; font-size: 12.5px; padding-top: 4px; border-top: 1px solid var(--line); margin-top: 4px; }
+.legal-links { display: flex; gap: 6px 18px; justify-content: center; flex-wrap: wrap; font-size: 12.5px; }
+.auth-body { position: relative; }
+.auth-body:has(.legal-links) { padding-bottom: 76px; }
+.auth-body .legal-links { position: absolute; left: 24px; right: 24px; bottom: 24px; }
 .legal-links a { color: var(--ink-3); } .legal-links a:hover { color: var(--ink); text-decoration: underline; }
 
 /* ---- phone toolbar: site + live count on the first row, Filter / date / more share the second ---------------- */
