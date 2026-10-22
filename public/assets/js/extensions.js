@@ -7,12 +7,13 @@
 //     api.registerAccountTab({ key: 'billing', label: 'Billing', component: Billing, dot: (user) => user.needs_attention });
 //     api.registerBanner(({ user }) => html`<div class="notice">…</div>`);
 //     api.registerRoute('/pricing', PricingPage);
+//     api.registerMenuItem({ label: 'Support', href: 'https://help.example.com', icon: 'life-buoy', external: true });
 //   }
 import * as lib from './lib.js';
 import * as ui from './ui.js';
 import * as chart from './chart.js';
 
-export const registry = { routes: [], accountTabs: [], banners: [] };
+export const registry = { routes: [], accountTabs: [], banners: [], menuItems: [] };
 
 const api = {
   version: 1,
@@ -22,6 +23,8 @@ const api = {
   registerRoute: (pattern, component) => registry.routes.push([pattern, component]),
   /** A tab in Account settings: { key, label, component, visible?(user), dot?(user) }. */
   registerAccountTab: (tab) => registry.accountTabs.push(tab),
+  /** An entry in the account (avatar) menu, above Sign out: { label, href, icon?, external?, visible?(user) }. `icon` is a name in the icon sprite; `external` opens a new tab. */
+  registerMenuItem: (item) => registry.menuItems.push(item),
   /** A component shown under the top bar on every signed-in page; receives { user }. */
   registerBanner: (component) => registry.banners.push(component),
 };

@@ -42,3 +42,4 @@ refresh-cw
 layers
 tag
 circle-check
+life-buoy

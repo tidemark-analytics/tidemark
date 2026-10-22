@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.13.0] - 2026-10-22
+
+### Added
+- Extensions can add an entry to the account menu with `registerMenuItem({ label, href, icon, external, visible })`.
+
 ## [0.12.4] - 2026-10-23
 
 ### Changed
