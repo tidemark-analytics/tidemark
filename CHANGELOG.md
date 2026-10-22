@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.13.1] - 2026-10-22
+
+### Fixed
+- The icon sprite is now versioned like the scripts, so a newly added icon shows up straight after an update instead of staying blank until the browser's or CDN's cached copy of the sprite expires.
+
 ## [0.13.0] - 2026-10-22
 
 ### Added

@@ -245,4 +245,4 @@ export function toggleTheme() {
 
 /** Lucide icons (https://lucide.dev, ISC) served from one self-hosted sprite: public/assets/icons.svg.
  *  Add an icon: put its Lucide name in scripts/icons.txt and run scripts/build-icons.mjs. */
-export const Icon = ({ name, size = 16, class: cls = '', ...rest }) => html`<svg class=${'icon ' + cls} width=${size} height=${size} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" ...${rest}><use href=${`${BASE}/assets/icons.svg#${name}`} /></svg>`;
+export const Icon = ({ name, size = 16, class: cls = '', ...rest }) => html`<svg class=${'icon ' + cls} width=${size} height=${size} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" ...${rest}><use href=${`${BASE}/assets/icons.svg?v=${window.SD.icons}#${name}`} /></svg>`;
