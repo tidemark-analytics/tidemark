@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.17.0] - 2026-10-23
+
+### Added
+- Account menu entries registered by an extension can run a function instead of opening a link: `registerMenuItem({ label, onClick, icon })`.
+
 ## [0.16.2] - 2026-10-23
 
 ### Changed

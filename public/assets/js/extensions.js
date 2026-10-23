@@ -8,6 +8,7 @@
 //     api.registerBanner(({ user }) => html`<div class="notice">…</div>`);
 //     api.registerRoute('/pricing', PricingPage);
 //     api.registerMenuItem({ label: 'Support', href: 'https://help.example.com', icon: 'life-buoy', external: true });
+//     api.registerMenuItem({ label: 'Chat', onClick: () => openChat(), icon: 'life-buoy' });
 //   }
 import * as lib from './lib.js';
 import * as ui from './ui.js';
@@ -23,7 +24,7 @@ const api = {
   registerRoute: (pattern, component) => registry.routes.push([pattern, component]),
   /** A tab in Account settings: { key, label, component, visible?(user), dot?(user) }. */
   registerAccountTab: (tab) => registry.accountTabs.push(tab),
-  /** An entry in the account (avatar) menu, above Sign out: { label, href, icon?, external?, visible?(user) }. `icon` is a name in the icon sprite; `external` opens a new tab. */
+  /** An entry in the account (avatar) menu, above Sign out: { label, href | onClick, icon?, external?, visible?(user) }. Give `href` for a link (`external` opens a new tab) or `onClick` to run a function instead. `icon` is a name in the icon sprite. */
   registerMenuItem: (item) => registry.menuItems.push(item),
   /** A component shown under the top bar on every signed-in page; receives { user }. */
   registerBanner: (component) => registry.banners.push(component),

@@ -43,7 +43,9 @@ function TopBar({ user, shared }) {
         ${(close) => html`<div style="min-width:220px"><div class="who"><b>${user.name}</b><span class="muted">${user.email}</span></div><hr />
           <${Link} to="/sites" class="item" onClick=${close}><span>Your sites</span><${Icon} name="globe" size=${14} /><//>
           <${Link} to="/settings" class="item" onClick=${close}><span>Account settings${user.update && html`<span class="notif inline" aria-hidden="true"></span><span class="sr-only"> (update available)</span>`}</span><${Icon} name="settings" size=${14} /><//>
-          ${registry.menuItems.filter((m) => !m.visible || m.visible(user)).map((m) => html`<a class="item" href=${m.href} target=${m.external ? '_blank' : null} rel=${m.external ? 'noopener' : null} onClick=${close}><span>${m.label}</span><${Icon} name=${m.icon || 'external-link'} size=${14} /></a>`)}
+          ${registry.menuItems.filter((m) => !m.visible || m.visible(user)).map((m) => (m.onClick
+            ? html`<button class="item" onClick=${() => { close(); m.onClick(); }}><span>${m.label}</span><${Icon} name=${m.icon || 'external-link'} size=${14} /></button>`
+            : html`<a class="item" href=${m.href} target=${m.external ? '_blank' : null} rel=${m.external ? 'noopener' : null} onClick=${close}><span>${m.label}</span><${Icon} name=${m.icon || 'external-link'} size=${14} /></a>`))}
           <button class="item" onClick=${async () => { close(); await api('/auth/logout', { method: 'POST' }); window.location.assign(window.SD.base + '/login'); }}><span>Sign out</span><${Icon} name="log-out" size=${14} /></button></div>`}<//>`
       : !shared && html`<${Link} to="/login" class="btn sm">Sign in<//>`}
   </div></header>`;
