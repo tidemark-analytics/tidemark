@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.16.1] - 2026-10-23
+
+### Changed
+- The stat cards above the graph are shorter. The change against the previous period now sits to the right of the number instead of on its own line, so the cards are the same compact height whether or not a comparison is shown (on narrow cards it wraps below).
+
 ## [0.16.0] - 2026-10-23
 
 ### Added
