@@ -8,6 +8,7 @@ Simple, privacy-first web analytics that runs on **ordinary PHP shared hosting**
 - Cookie-free, no personal data: visitor ids are a salted hash that rotates every day, and IP addresses are never written to the database
 - One page, everything on it: visitors, visits, pageviews, views per visit, bounce rate and visit duration, with sources, pages, locations, devices and goals underneath
 - Plausible-compatible tracking script and Events API (`data-domain`, `window.plausible(...)`, `script.outbound-links.js`-style variants)
+- Import your history from Plausible's CSV export
 - Works on SQLite, MySQL/MariaDB and PostgreSQL
 - Designed to scale out later: swappable event sink, separate analytics database connection, stateless app tier
 

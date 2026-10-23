@@ -4,6 +4,7 @@ import { Loading, Empty, ErrorBox, Field, Confirm, Modal, Toggle, CodeBlock } fr
 import { Snippet } from './dashboard.js';
 import { registry } from './extensions.js';
 import { brandTheme } from './brand.js';
+import { importPlausible, removeImported } from './plausible.js';
 
 const zones = () => { try { return ['UTC', ...Intl.supportedValuesOf('timeZone')]; } catch (e) { return ['UTC']; } };
 const firstError = (x) => (x.errors && Object.values(x.errors)[0][0]) || x.message;
@@ -71,6 +72,33 @@ function MoveData({ site, reload }) {
     ${state && html`<div class=${'notice ' + (s.error ? 'danger' : '')} role="status"><div>${s.error ? html`Import stopped: ${s.error}. ` : s.done ? 'Import finished. ' : 'Importing… keep this tab open. '}${s.imported.toLocaleString()} visits and ${s.events.toLocaleString()} events added${s.skipped ? `, ${s.skipped.toLocaleString()} already here` : ''}${s.outdated ? `, ${s.outdated.toLocaleString()} older than your plan keeps` : ''}${s.invalid ? `, ${s.invalid.toLocaleString()} unreadable` : ''}.</div></div>`}<//>`;
 }
 
+function ImportPlausible({ site, reload }) {
+  const [state, setState] = useState(null);
+  const [confirm, setConfirm] = useState(false);
+  const bytes = (n) => (n >= 1e6 ? (n / 1e6).toFixed(0) + ' MB' : Math.round(n / 1e3) + ' KB');
+  const run = async (file) => {
+    setState({ busy: true, phase: 'Reading the file', done: 0, total: 1 });
+    try {
+      const r = await importPlausible(file, site.domain, (p) => setState({ busy: true, ...p }));
+      setState({ result: r });
+      reload();
+    } catch (x) { setState({ error: firstError(x) || x.message }); reload(); }
+  };
+  const s = state || {};
+  const imp = site.imported;
+  const pct = s.total ? Math.min(100, Math.round((s.done / s.total) * 100)) : 0;
+  return html`<${Section} title="Import from Plausible" help="Bring in your history from Plausible. In Plausible, open this site's Settings → Imports & exports, click Prepare download, then upload the .zip file here.">
+    ${imp && html`<div class="notice"><${Icon} name="info" size=${16} /><div>Imported from Plausible: <b>${imp.start}</b> to <b>${imp.end}</b>. These days are added to your dashboard when no filter is applied.</div></div>`}
+    <div class="row wrap">
+      <label class=${'btn ' + (s.busy ? 'disabled' : '')}>${imp ? 'Import again' : 'Choose the .zip file'}<input type="file" accept=".zip,application/zip" hidden disabled=${s.busy} onChange=${(e) => { const f = e.target.files[0]; e.target.value = ''; if (f) run(f); }} /></label>
+      ${imp && html`<button class="btn danger" disabled=${s.busy} onClick=${() => setConfirm(true)}>Remove imported data</button>`}</div>
+    ${s.busy && html`<div class="stack sm" role="status"><div class="muted">${s.phase}… keep this tab open. ${s.sent ? s.sent.toLocaleString() + ' rows sent' : ''}</div><progress max="100" value=${pct} style="width:100%"></progress></div>`}
+    ${s.error && html`<div class="notice danger" role="status"><div>Import stopped: ${s.error}</div></div>`}
+    ${s.result && html`<div class="notice" role="status"><${Icon} name="check" size=${16} /><div>${s.result.days ? `Imported ${s.result.days.toLocaleString()} days (${s.result.from} to ${s.result.to}).` : 'Nothing was imported.'}${s.result.skipped ? ` ${s.result.skipped.toLocaleString()} rows were left out because they are older than your plan keeps or overlap days Tidemark already recorded.` : ''}${s.result.customProps ? ' Custom properties are not imported.' : ''}</div></div>`}
+    <p class="muted small">Imported numbers are daily totals, so they appear in the graph, top stats and reports but not when you filter, and visitors are added up day by day. Importing again replaces the earlier import.</p>
+    ${confirm && html`<${Confirm} title="Remove imported data?" message="The days imported from Plausible will be removed from this dashboard. What Tidemark collected itself is not touched." confirmLabel="Remove" onClose=${() => setConfirm(false)} onConfirm=${async () => { await removeImported(site.domain); setState(null); reload(); toast('Imported data removed'); }} />`}<//>`;
+}
+
 function General({ site, reload }) {
   const [tz, setTz] = useState(site.timezone);
   const [confirm, setConfirm] = useState(null);
@@ -82,6 +110,7 @@ function General({ site, reload }) {
       <${Toggle} label="Form submissions" checked=${site.track_forms} onChange=${(v) => patch({ track_forms: v })} /><//>
     <${Section} title="Reporting timezone" help="Days start and end at midnight in this timezone."><div class="row"><select value=${tz} onChange=${(e) => setTz(e.target.value)} style="max-width:320px">${zones().map((z) => html`<option value=${z} selected=${z === tz}>${z}</option>`)}</select><button class="btn" disabled=${tz === site.timezone} onClick=${() => patch({ timezone: tz })}>Save</button></div><//>
     ${site.can_manage && html`<${MoveData} site=${site} reload=${reload} />`}
+    ${site.can_manage && html`<${ImportPlausible} site=${site} reload=${reload} />`}
     ${site.is_owner && html`<${Section} danger title="Danger zone"><div class="row spread wrap"><div><b>Reset statistics</b><div class="muted">Deletes all collected data but keeps the site.</div></div><button class="btn danger" onClick=${() => setConfirm('reset')}>Reset</button></div>
       <hr /><div class="row spread wrap"><div><b>Delete site</b><div class="muted">Removes the site and all its data permanently.</div></div><button class="btn danger" onClick=${() => setConfirm('delete')}>Delete site</button></div><//>`}
     ${confirm === 'reset' && html`<${Confirm} title="Reset statistics?" message=${`All collected data for ${site.domain} will be deleted. This can't be undone.`} confirmLabel="Reset" onClose=${() => setConfirm(null)} onConfirm=${async () => { await api(`/sites/${site.domain}/reset`, { method: 'POST' }); toast('Statistics reset'); reload(); }} />`}

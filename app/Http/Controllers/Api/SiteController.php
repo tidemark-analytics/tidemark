@@ -97,6 +97,7 @@ class SiteController extends Controller
     {
         $site = $request->attributes->get('site');
         $this->wipe($site->id);
+        PlausibleImportController::clear($site);
         foreach (['goals', 'sharedLinks', 'shields'] as $rel) {
             $site->{$rel}()->delete();
         }
@@ -110,7 +111,9 @@ class SiteController extends Controller
     /** Delete all collected data, keep the site. */
     public function reset(Request $request)
     {
-        $this->wipe($request->attributes->get('site')->id);
+        $site = $request->attributes->get('site');
+        $this->wipe($site->id);
+        PlausibleImportController::clear($site);
 
         return ['ok' => true];
     }
@@ -136,6 +139,7 @@ class SiteController extends Controller
             'has_data' => $first !== null,
             'first_visit_at' => $first?->toIso8601String(),
             'brand' => $site->brand(),
+            'imported' => $site->imported_from ? ['from' => $site->imported_from, 'start' => $site->imported_start?->toDateString(), 'end' => $site->imported_end?->toDateString()] : null,
         ] + (in_array($role, ['owner', 'admin'], true) ? ['branding' => [
             'allowed' => $site->brandingAllowed(), 'name' => $site->brand_name, 'color' => $site->brand_color, 'has_logo' => (bool) $site->brand_logo,
         ]] : []);

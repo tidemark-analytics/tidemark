@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BrandingController;
 use App\Http\Controllers\Api\DataController;
+use App\Http\Controllers\Api\PlausibleImportController;
 use App\Http\Controllers\Api\SettingsController as S;
 use App\Http\Controllers\Api\SiteController;
 use App\Http\Controllers\Api\StatsApiController;
@@ -69,6 +70,10 @@ Route::middleware('api.auth')->group(function () {
         Route::post('/reset', [SiteController::class, 'reset']);
         Route::get('/export/data', [DataController::class, 'export']);
         Route::post('/import', [DataController::class, 'import']);
+        Route::post('/import/plausible/start', [PlausibleImportController::class, 'start']);
+        Route::post('/import/plausible', [PlausibleImportController::class, 'store']);
+        Route::post('/import/plausible/finish', [PlausibleImportController::class, 'finish']);
+        Route::delete('/import/plausible', [PlausibleImportController::class, 'destroy']);
         Route::get('/goals', [S::class, 'goals']);
         Route::post('/goals', [S::class, 'createGoal']);
         Route::delete('/goals/{goal}', [S::class, 'deleteGoal']);

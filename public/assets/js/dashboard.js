@@ -291,6 +291,7 @@ export function Dashboard({ domain, shared }) {
       <${MoreMenu} site=${s} scope=${scope} intervals=${intervals} />
     </div>
     <${FilterChips} scope=${scope} edit=${(f) => setFilter(f)} />
+    ${s.imported && scope.filters.length > 0 && html`<p class="muted small imported-note">Data imported from Plausible (${s.imported.start} to ${s.imported.end}) is left out while a filter is applied.</p>`}
     ${!s.has_data && !live && html`<${Waiting} site=${s} onData=${() => { site.reload(); setRev((r) => r + 1); }} />`}
     <${TopGraph} site=${s} scope=${scope} live=${live} onIntervals=${setIntervals} />
     <div class="grid2 panels">

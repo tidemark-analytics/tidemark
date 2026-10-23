@@ -21,7 +21,12 @@ class Stats
 
     public const DIMS = [...self::VISIT_DIMS, 'page'];
 
-    public function __construct(public Site $site) {}
+    private Imported $imported;
+
+    public function __construct(public Site $site)
+    {
+        $this->imported = new Imported($site);
+    }
 
     // ------------------------------------------------------------------------------------------------ builders
     private function visitsQ(Period $p, Filters $f, bool $applyFilters = true): Builder
@@ -70,10 +75,17 @@ class Stats
         if ($goal = $f->goalName()) {
             return $this->goalTopStats($p, $f);
         }
-        $agg = $this->visitsQ($p, $f)->selectRaw(self::AGG)->first();
+        $agg = (array) $this->visitsQ($p, $f)->selectRaw(self::AGG)->first();
         $pageviews = (int) $this->eventsQ($p, $f)->where('e.name', 'pageview')->count();
+        if ($range = $this->imported->range($p, $f)) {
+            $t = $this->imported->totals($range);
+            foreach (['visitors', 'visits', 'bounces', 'dur'] as $k) {
+                $agg[$k] = (int) $agg[$k] + $t[$k];
+            }
+            $pageviews += $t['pageviews'];
+        }
 
-        return self::derive((array) $agg + ['pageviews' => $pageviews]);
+        return self::derive($agg + ['pageviews' => $pageviews]);
     }
 
     private function goalTopStats(Period $p, Filters $f): array
@@ -96,6 +108,18 @@ class Stats
         $t = Sql::connection()->table('visits')->where('site_id', $this->site->id)->min('started_at');
 
         return $t ? CarbonImmutable::parse($t, 'UTC') : null;
+    }
+
+    /** The earliest day with any data, imported or collected, for the "all time" period. */
+    public function firstDataAt(): ?CarbonImmutable
+    {
+        $native = $this->firstVisitAt();
+        if (! $this->imported->exists()) {
+            return $native;
+        }
+        $imported = CarbonImmutable::parse($this->site->imported_start->toDateString(), $this->site->timezone);
+
+        return $native && $native->lt($imported) ? $native : $imported;
     }
 
     // ------------------------------------------------------------------------------------------------ time series
@@ -121,6 +145,16 @@ class Stats
             $be = $this->bucket('e.created_at', $p);
             foreach ($this->eventsQ($p, $f)->where('e.name', 'pageview')->selectRaw("{$be} as t, COUNT(*) as pageviews")->groupBy('t')->get() as $r) {
                 $byBucket[$r->t]['pageviews'] = (int) $r->pageviews;
+            }
+            if ($range = $this->imported->range($p, $f)) {
+                foreach ($this->imported->series($range, $p) as $label => $t) {
+                    $b = $byBucket[$label] ?? [];
+                    foreach (['visitors', 'visits', 'bounces', 'dur'] as $k) {
+                        $b[$k] = (int) ($b[$k] ?? 0) + $t[$k];
+                    }
+                    $b['pageviews'] = (int) ($b['pageviews'] ?? 0) + $t['pageviews'];
+                    $byBucket[$label] = $b;
+                }
             }
         }
 
@@ -195,6 +229,9 @@ class Stats
 
     private function visitRows(string $dim, Period $p, Filters $f, int $limit, int $offset, ?string $search): array
     {
+        if (($range = $this->imported->range($p, $f)) && Imported::supports($dim)) {
+            return $this->mergedVisitRows($dim, $p, $f, $range, $limit, $offset, $search);
+        }
         $col = 'v.'.$dim;
         $q = $this->visitsQ($p, $f)->selectRaw("{$col} as name, ".self::AGG)->groupBy($col)->orderByDesc('visitors')->orderBy('name')->limit($limit)->offset($offset);
         if ($dim !== 'source') {
@@ -218,8 +255,97 @@ class Stats
         return $out;
     }
 
+    /**
+     * Native rows and imported rows for a dimension added together by name, then ordered and paged as one list.
+     *
+     * @param  array{0:string,1:string}  $range
+     */
+    private function mergedVisitRows(string $dim, Period $p, Filters $f, array $range, int $limit, int $offset, ?string $search): array
+    {
+        $col = 'v.'.$dim;
+        $q = $this->visitsQ($p, $f)->selectRaw("{$col} as name, ".self::AGG)->groupBy($col)->limit(5000);
+        if ($dim !== 'source') {
+            $q->whereNotNull($col)->where($col, '!=', '');
+        }
+        $this->applySearch($q, $col, $search);
+        $merged = [];
+        $add = function (string $key, array $r) use (&$merged) {
+            $row = &$merged[$key];
+            $row ??= ['name' => $key === '' ? null : $key, 'visitors' => 0, 'visits' => 0, 'bounces' => 0, 'dur' => 0, 'pv' => 0];
+            foreach (['visitors', 'visits', 'bounces', 'dur', 'pv'] as $k) {
+                $row[$k] += (int) $r[$k];
+            }
+            unset($row);
+        };
+        foreach ($q->get() as $r) {
+            $add((string) ($r->name ?? ''), (array) $r);
+        }
+        foreach ($this->imported->breakdown($dim, $range, $search) as $r) {
+            $add($r->name, (array) $r);
+        }
+        if ($dim === 'source' && $search === null && ($direct = $this->imported->direct($range))) {
+            $add('', (array) $direct);
+        }
+        uasort($merged, fn ($a, $b) => [$b['visitors'], (string) $a['name']] <=> [$a['visitors'], (string) $b['name']]);
+        $page = array_slice(array_values($merged), $offset, $limit);
+
+        $names = array_values(array_filter(array_column($page, 'name')));
+        $views = $dim === 'exit_page' ? $this->pageviewsByPath($p, $f, $names) : [];
+        $importedViews = $dim === 'exit_page' ? $this->imported->lookup('page', $range, $names) : [];
+        $out = [];
+        foreach ($page as $r) {
+            $d = self::derive($r);
+            $row = ['name' => $r['name'] ?? Filters::DIRECT, 'visitors' => $d['visitors'], 'visits' => $d['visits'], 'pageviews' => $d['pageviews'], 'bounce_rate' => $d['bounce_rate'], 'visit_duration' => $d['visit_duration']];
+            if ($dim === 'exit_page') {
+                $total = ($views[$r['name']] ?? 0) + (int) ($importedViews[$r['name']]->pv ?? 0);
+                $row['exit_rate'] = $total ? min(100, (int) round($d['visits'] / $total * 100)) : 0;
+            }
+            $out[] = $row;
+        }
+
+        return $out;
+    }
+
+    /** @param array{0:string,1:string} $range */
+    private function mergedPageRows(Period $p, Filters $f, array $range, int $limit, int $offset, ?string $search): array
+    {
+        $q = $this->eventsQ($p, $f)->where('e.name', 'pageview')->selectRaw('e.pathname as name, COUNT(DISTINCT e.visitor_id) as visitors, COUNT(*) as pageviews')->groupBy('e.pathname')->limit(5000);
+        $this->applySearch($q, 'e.pathname', $search);
+        $merged = [];
+        foreach ($q->get() as $r) {
+            $merged[(string) $r->name] = ['name' => $r->name, 'visitors' => (int) $r->visitors, 'pageviews' => (int) $r->pageviews];
+        }
+        foreach ($this->imported->breakdown('page', $range, $search) as $r) {
+            $row = &$merged[$r->name];
+            $row ??= ['name' => $r->name, 'visitors' => 0, 'pageviews' => 0];
+            $row['visitors'] += (int) $r->visitors;
+            $row['pageviews'] += (int) $r->pv;
+            unset($row);
+        }
+        uasort($merged, fn ($a, $b) => [$b['visitors'], (string) $a['name']] <=> [$a['visitors'], (string) $b['name']]);
+        $page = array_slice(array_values($merged), $offset, $limit);
+
+        $names = array_column($page, 'name');
+        $visits = $bounces = [];
+        if ($names) {
+            foreach ($this->visitsQ($p, $f)->whereIn('v.entry_page', $names)->selectRaw('v.entry_page as name, COUNT(*) as visits, COALESCE(SUM(CASE WHEN v.is_bounce THEN 1 ELSE 0 END), 0) as bounces')->groupBy('v.entry_page')->get() as $r) {
+                $visits[$r->name] = (int) $r->visits;
+                $bounces[$r->name] = (int) $r->bounces;
+            }
+            foreach ($this->imported->lookup('entry_page', $range, $names) as $name => $r) {
+                $visits[$name] = ($visits[$name] ?? 0) + (int) $r->visits;
+                $bounces[$name] = ($bounces[$name] ?? 0) + (int) $r->bounces;
+            }
+        }
+
+        return array_map(fn ($r) => ['name' => $r['name'], 'visitors' => $r['visitors'], 'pageviews' => $r['pageviews'], 'bounce_rate' => ($visits[$r['name']] ?? 0) ? (int) round($bounces[$r['name']] / $visits[$r['name']] * 100) : null], $page);
+    }
+
     private function pageRows(Period $p, Filters $f, int $limit, int $offset, ?string $search): array
     {
+        if ($range = $this->imported->range($p, $f)) {
+            return $this->mergedPageRows($p, $f, $range, $limit, $offset, $search);
+        }
         $q = $this->eventsQ($p, $f)->where('e.name', 'pageview')->selectRaw('e.pathname as name, COUNT(DISTINCT e.visitor_id) as visitors, COUNT(*) as pageviews')
             ->groupBy('e.pathname')->orderByDesc('visitors')->orderBy('name')->limit($limit)->offset($offset);
         $this->applySearch($q, 'e.pathname', $search);
@@ -290,11 +416,24 @@ class Stats
     {
         $base = $f->without('goal');
         $visitors = (int) $this->visitsQ($p, $base)->selectRaw('COUNT(DISTINCT v.visitor_id) as n')->value('n');
+        $range = $this->imported->range($p, $f);
+        $importedEvents = [];
+        if ($range) {
+            $visitors += $this->imported->totals($range)['visitors'];
+            $importedEvents = $this->imported->events($range);
+        }
         $out = [];
         foreach ($this->site->goals()->orderBy('created_at')->get() as $goal) {
             $g = new Filters([...$base->rules, ['is', 'goal', [$goal->name]]], $this->site);
             $r = $this->eventsQ($p, $g)->selectRaw('COUNT(DISTINCT e.visitor_id) as uniq, COUNT(*) as total')->first();
-            $out[] = ['id' => $goal->id, 'name' => $goal->name, 'type' => $goal->type, 'visitors' => (int) $r->uniq, 'events' => (int) $r->total, 'conversion_rate' => $visitors ? round($r->uniq / $visitors * 100, 1) : 0];
+            $uniq = (int) $r->uniq;
+            $total = (int) $r->total;
+            if ($range) {
+                $imp = $goal->type === 'page' ? $this->imported->pageGoal($range, $goal->value) : ($importedEvents[$goal->value] ?? ['visitors' => 0, 'events' => 0]);
+                $uniq += $imp['visitors'];
+                $total += $imp['events'];
+            }
+            $out[] = ['id' => $goal->id, 'name' => $goal->name, 'type' => $goal->type, 'visitors' => $uniq, 'events' => $total, 'conversion_rate' => $visitors ? round($uniq / $visitors * 100, 1) : 0];
         }
         usort($out, fn ($a, $b) => $b['visitors'] <=> $a['visitors']);
 

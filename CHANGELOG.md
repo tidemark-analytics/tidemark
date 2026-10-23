@@ -2,6 +2,12 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.16.0] - 2026-10-23
+
+### Added
+- Import from Plausible. In a site's Settings → General, upload the zip that Plausible's Settings → Imports & exports prepares. The browser reads it and sends the numbers in batches, so very large exports work (a 215 MB export of 3.6 years imports in about a minute).
+- Imported days are daily totals added to the top stats, the graph and the reports (sources, channels, referrers, UTM fields, pages, entry and exit pages, countries, regions, devices, browsers, operating systems, and custom events for matching goals). They are left out while a filter is applied, only days before Tidemark's first recorded visit are imported, and importing again replaces the earlier import. "Remove imported data" undoes it.
+
 ## [0.15.2] - 2026-10-22
 
 ### Changed

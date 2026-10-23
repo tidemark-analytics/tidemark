@@ -38,6 +38,8 @@ class PruneEvents extends Command
             }
             $total += $db->table('visits')->whereIn('id', $ids)->delete();
         } while (true);
+        $day = now()->subDays($days)->toDateString();
+        $total += $db->table('imported_visitors')->where('date', '<', $day)->delete() + $db->table('imported_breakdowns')->where('date', '<', $day)->delete();
         $this->info("Pruned {$total} rows older than {$days} days.");
 
         return self::SUCCESS;

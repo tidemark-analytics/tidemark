@@ -17,7 +17,7 @@ class StatsController extends Controller
         /** @var Site $site */
         $site = $r->attributes->get('site');
         $stats = new Stats($site);
-        $first = $r->input('period') === 'all' ? $stats->firstVisitAt() : null;
+        $first = $r->input('period') === 'all' ? $stats->firstDataAt() : null;
 
         return [$site, $stats, Period::fromRequest($r, $site->timezone, $first), Filters::fromRequest($r, $site)];
     }

@@ -19,7 +19,7 @@ class Site extends Model
 
     protected function casts(): array
     {
-        return ['public' => 'boolean', 'track_outbound' => 'boolean', 'track_downloads' => 'boolean', 'track_forms' => 'boolean'];
+        return ['public' => 'boolean', 'track_outbound' => 'boolean', 'track_downloads' => 'boolean', 'track_forms' => 'boolean', 'imported_start' => 'date', 'imported_end' => 'date'];
     }
 
     public function members(): BelongsToMany
