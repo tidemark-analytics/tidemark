@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.18.0] - 2026-10-23
+
+### Added
+- Extensions can keep an administrator's site list and site switcher to the sites they belong to, by implementing the new optional `App\Contracts\LimitsSiteList` next to `Entitlements`. The Sites page then points to where the other sites can be browsed. Self-hosted installs are unchanged: administrators still see every site.
+
 ## [0.17.0] - 2026-10-23
 
 ### Added

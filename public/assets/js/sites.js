@@ -27,6 +27,7 @@ export function SitesPage() {
     <div class="row wrap">${total > 3 && html`<div class="searchbox"><${Icon} name="search" size=${14} /><input placeholder="Search sites" aria-label="Search sites" value=${q} onInput=${(e) => setQ(e.target.value)} /></div>`}
       ${total > 1 && html`<select aria-label="Sort" value=${sort} onChange=${(e) => setSort(e.target.value)} style="width:auto"><option value="visitors">Most visitors</option><option value="name">Name</option></select>`}
       <${Link} to="/sites/new" class="btn primary"><${Icon} name="plus" size=${14} /> Add a site<//></div></header>
+    ${res.data && res.data.other_sites && res.data.other_sites.count > 0 && html`<div class="notice other-sites"><${Icon} name="info" size=${16} /><div>These are the sites you belong to. ${res.data.other_sites.count.toLocaleString()} other ${res.data.other_sites.count === 1 ? 'site' : 'sites'} on this installation ${res.data.other_sites.count === 1 ? 'is' : 'are'} listed separately. <${Link} to=${res.data.other_sites.path}>View them<//></div></div>`}
     ${res.loading && !res.data ? html`<${Loading} />` : total === 0 ? html`<${Empty} title="Add your first site" icon="globe">Tidemark counts visitors without cookies or personal data. Add a site to get a tracking snippet.<${Link} to="/sites/new" class="btn primary" style="margin-top:10px">Add a site<//><//>`
       : list.length ? html`<div class="sites">${list.map((s) => html`<${SiteCard} s=${s} />`)}</div>` : html`<${Empty} title="No matching sites" icon="search" />`}
   </main>`;

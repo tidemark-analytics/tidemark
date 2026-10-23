@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Analytics\Stats\Stats;
 use App\Analytics\Support\Sql;
 use App\Contracts\Entitlements;
+use App\Contracts\LimitsSiteList;
 use App\Events\SiteCreated;
 use App\Http\Controllers\Controller;
 use App\Models\Goal;
@@ -19,14 +20,19 @@ class SiteController extends Controller
     /** The user's sites with their last-24h numbers (the "My personal sites" screen). */
     public function index(Request $request)
     {
-        $sites = Site::visibleTo($request->user())->orderBy('domain')->get()->map(function (Site $s) use ($request) {
-            $r = $s->only(['id', 'domain', 'public']) + ['role' => $s->roleOf($request->user()), 'created_at' => $s->created_at];
+        $user = $request->user();
+        $entitlements = app(Entitlements::class);
+        $otherPath = $entitlements instanceof LimitsSiteList ? $entitlements->otherSitesPath($user) : null;
+        // an extension can keep an administrator's list to their own sites; the rest are browsed elsewhere
+        $query = $otherPath ? Site::query()->whereHas('members', fn ($q) => $q->where('users.id', $user->id)) : Site::visibleTo($user);
+        $sites = $query->orderBy('domain')->get()->map(function (Site $s) use ($user) {
+            $r = $s->only(['id', 'domain', 'public']) + ['role' => $s->roleOf($user), 'created_at' => $s->created_at];
             $r += (new Stats($s))->last24h();
 
             return $r;
         });
 
-        return ['data' => $sites];
+        return ['data' => $sites, 'other_sites' => $otherPath ? ['path' => $otherPath, 'count' => max(0, Site::count() - $sites->count())] : null];
     }
 
     public static function normalizeDomain(string $raw): string
