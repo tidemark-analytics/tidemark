@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.16.2] - 2026-10-23
+
+### Changed
+- Stat cards: the change against the previous period is plain coloured text instead of a pill, the padding above and below is even, and the number scales with the card so the number and its change always stay on one line. The six-card row now switches to three columns below 1140 px, where the cards would otherwise be too narrow.
+
 ## [0.16.1] - 2026-10-23
 
 ### Changed

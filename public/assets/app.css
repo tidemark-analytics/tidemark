@@ -443,18 +443,20 @@ label.btn.disabled { opacity: .5; pointer-events: none; }
 
 .graph-card { overflow: hidden; }
 .metric-tabs { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); border-bottom: 1px solid var(--line); }
-@media (max-width: 900px) { .metric-tabs { grid-auto-flow: row; grid-template-columns: repeat(3, minmax(0, 1fr)); } .metric { border-bottom: 1px solid var(--line); } .metric:nth-child(3n) { border-right: 0; } .metric.on::after { bottom: -1px; } }
+@media (max-width: 1140px) { .metric-tabs { grid-auto-flow: row; grid-template-columns: repeat(3, minmax(0, 1fr)); } .metric { border-bottom: 1px solid var(--line); } .metric:nth-child(3n) { border-right: 0; } .metric.on::after { bottom: -1px; } }
 @media (max-width: 560px) { .metric-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); } .metric:nth-child(3n) { border-right: 1px solid var(--line); } .metric:nth-child(2n) { border-right: 0; } }
-.metric { text-align: left; background: none; border: 0; border-right: 1px solid var(--line); padding: 16px 18px 14px; cursor: pointer; position: relative; display: flex; flex-direction: column; gap: 6px; min-width: 0; transition: background 0.12s; }
+.metric { text-align: left; background: none; border: 0; border-right: 1px solid var(--line); padding: 15px 18px; cursor: pointer; position: relative; display: flex; flex-direction: column; gap: 6px; min-width: 0; container-type: inline-size; transition: background 0.12s; }
 .metric:last-child { border-right: 0; }
 .metric:hover { background: var(--surface-2); }
 .metric::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--series-1); transform: scaleX(0); transition: transform 0.2s var(--ease); }
 .metric.on::after { transform: scaleX(1); }
-.metric .k { font-size: 12.5px; color: var(--ink-3); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.metric .k { line-height: 1.25; font-size: 12.5px; color: var(--ink-3); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .metric.on .k { color: var(--accent-ink); }
-.metric .v { font-size: 26px; line-height: 1.1; font-weight: 600; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
-.metric .vd { display: flex; align-items: center; flex-wrap: wrap; column-gap: 8px; row-gap: 4px; min-width: 0; }
-.metric .d { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.metric .v { font-size: clamp(13px, calc((100cqw - 60px) / 4.5), 24px); line-height: 1.15; font-weight: 600; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.metric .vd { display: flex; align-items: baseline; flex-wrap: nowrap; gap: 6px; min-width: 0; white-space: nowrap; }
+.metric .d { display: flex; align-items: center; font-size: 12.5px; }
+/* the change against the previous period is plain coloured text beside the number, never a pill */
+.metric .delta { background: none; padding: 0; height: auto; border-radius: 0; font-size: 12px; gap: 2px; }
 .metric .prevv { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .graph-b { padding: 16px 18px 12px; }
 .graph-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 6px; }

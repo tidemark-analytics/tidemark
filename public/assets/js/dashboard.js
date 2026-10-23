@@ -21,7 +21,7 @@ function Delta({ metric, change }) {
   if (change === null || change === undefined) return null;
   const flat = Math.abs(change) < 0.05;
   const good = LOWER_IS_BETTER.has(metric) ? change < 0 : change > 0;
-  return html`<span class=${'delta ' + (flat ? 'flat' : good ? 'up' : 'down')}>${!flat && html`<${Icon} name=${change > 0 ? 'arrow-up' : 'arrow-down'} size=${11} />`}${Math.abs(change).toFixed(change % 1 === 0 ? 0 : 1)}%</span>`;
+  return html`<span class=${'delta ' + (flat ? 'flat' : good ? 'up' : 'down')}>${!flat && html`<${Icon} name=${change > 0 ? 'arrow-up' : 'arrow-down'} size=${11} />`}${Math.abs(change) >= 1000 ? '999%+' : Math.abs(change).toFixed(change % 1 === 0 ? 0 : 1) + '%'}</span>`;
 }
 
 function TopGraph({ site, scope, live, onIntervals }) {
