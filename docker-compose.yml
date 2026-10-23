@@ -1,0 +1,16 @@
+# Tidemark with its data in a Docker volume (SQLite). Start it with:  docker compose up -d
+# then open http://localhost:8080/install to create your admin account.
+services:
+  tidemark:
+    image: ghcr.io/tidemark-analytics/tidemark:latest
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - tidemark-data:/data
+    environment:
+      # where visitors and your browser reach Tidemark; used in the tracking snippet and links
+      APP_URL: http://localhost:8080
+
+volumes:
+  tidemark-data:

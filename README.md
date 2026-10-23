@@ -26,6 +26,16 @@ Simple, privacy-first web analytics that runs on **ordinary PHP shared hosting**
 
 Requirements: PHP 8.3+, `mbstring`, `openssl`, `pdo` + one of `pdo_sqlite` / `pdo_mysql` / `pdo_pgsql`, `fileinfo`, `ctype`, `tokenizer`, `xml`.
 
+## Install with Docker
+
+A pre-built image for amd64 and arm64 is published to `ghcr.io/tidemark-analytics/tidemark`. With the [`docker-compose.yml`](docker-compose.yml) in this repository:
+
+```bash
+docker compose up -d
+```
+
+then open `http://localhost:8080/install` to create your admin account. Everything that changes lives in the `/data` volume (settings, the SQLite database, logs), the scheduler runs inside the container, and you update by pulling a newer image (`docker compose pull && docker compose up -d`); migrations run on the first request. MySQL, MariaDB and PostgreSQL work too: choose them in the installer and point them at your database container.
+
 ### Local development
 
 ```bash
