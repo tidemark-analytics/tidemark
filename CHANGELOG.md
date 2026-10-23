@@ -2,6 +2,13 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.15.0] - 2026-10-22
+
+### Added
+- Branding for public pages. In a site's settings, a new **Branding** tab sets a display name, a brand color and a logo (PNG, JPEG, WebP or SVG up to 100 KB). People who open the public dashboard or a shared link see them in the header and as the interface accent; signed-in members keep the normal look.
+- Public dashboards and shared links now end with a small "Analytics by Tidemark" link (`TIDEMARK_BRAND_URL` changes where it points).
+- Extensions can limit branding by implementing the new optional `App\Contracts\AllowsBranding` next to `Entitlements`. Self-hosted installs have no limit.
+
 ## [0.14.0] - 2026-10-22
 
 ### Added

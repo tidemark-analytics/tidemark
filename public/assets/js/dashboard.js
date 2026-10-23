@@ -1,5 +1,5 @@
 // The site dashboard: toolbar (site, filters, date), top stats + graph, then the report panels.
-import { html, useState, useEffect, useMemo, useRef, useApi, api, useLocation, setQuery, setFilters, parseFilters, navigate, Link, Icon, toast, PERIODS, FILTER_OPS, FILTER_DIMS, dimLabel, todayStr, shiftDate, fmt, fmtShort, dur, countryName, shareAuth, share, useDocTitle, useScope, BASE, UserCtx, useContext } from './lib.js';
+import { setBrand, html, useState, useEffect, useMemo, useRef, useApi, api, useLocation, setQuery, setFilters, parseFilters, navigate, Link, Icon, toast, PERIODS, FILTER_OPS, FILTER_DIMS, dimLabel, todayStr, shiftDate, fmt, fmtShort, dur, countryName, shareAuth, share, useDocTitle, useScope, BASE, UserCtx, useContext } from './lib.js';
 import { Pop, Modal, Loading, Empty, Field, CodeBlock, useDebounced } from './ui.js';
 import { LineChart, ChartTable, bucketText } from './chart.js';
 import { Sources, Pages, Locations, Devices, Behaviors } from './reports.js';
@@ -263,6 +263,9 @@ export function Dashboard({ domain, shared }) {
   const s = site.data && site.data.data;
   const scope = useScope(s);
   useDocTitle(domain);
+  // visitors to a public or shared dashboard see the site's own branding; signed-in members keep the normal look
+  const brand = !user && s ? s.brand : null;
+  useEffect(() => { setBrand(brand); return () => setBrand(null); }, [brand && brand.color, brand && brand.name, brand && brand.has_logo, brand && brand.logo && brand.logo.length]);
   useEffect(() => {
     const onScroll = () => { const t = document.querySelector('.toolbar.sticky'); if (t) t.classList.toggle('raised', window.scrollY > 8); };
     window.addEventListener('scroll', onScroll, { passive: true });

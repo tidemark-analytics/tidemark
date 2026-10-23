@@ -1,4 +1,4 @@
-import { html, render, useState, useEffect, api, navigate, useLocation, matchRoute, Link, Icon, toggleTheme, useToasts, UserCtx } from './lib.js';
+import { html, render, useState, useEffect, useBrand, api, navigate, useLocation, matchRoute, Link, Icon, toggleTheme, useToasts, UserCtx } from './lib.js';
 import { Pop } from './ui.js';
 import { Login, Register, ForgotPassword, ResetPassword } from './pages/auth.js';
 import { Dashboard } from './dashboard.js';
@@ -26,9 +26,16 @@ const tail = [
 const allRoutes = () => [...head, ...registry.routes, ...tail];
 const RESERVED = new Set(['', 'api', 'js', 'assets', 'install', 'up']);
 
+function PublicFooter() {
+  return html`<footer class="pubfoot"><a href=${window.SD.brandUrl || 'https://tidemarkanalytics.com'} target="_blank" rel="noopener"><span>Analytics by</span><${Lockup} size=${15} /></a></footer>`;
+}
+
 function TopBar({ user, shared }) {
+  const brand = useBrand();
+  const custom = !user && brand && (brand.logo || brand.name);
   return html`<a class="skip" href="#main" onClick=${(e) => { e.preventDefault(); const t = document.getElementById('main'); t && (t.setAttribute('tabindex', '-1'), t.focus()); }}>Skip to content</a><header class="topbar"><div class="topbar-in">
-    <${Link} to=${user ? '/sites' : '/login'} class="brand" aria-label="Tidemark home"><${Lockup} size=${24} /><//>
+    ${custom ? html`<span class="brand custom">${brand.logo && html`<img class="brand-logo" src=${brand.logo} alt=${brand.name || ''} />`}${brand.name && html`<span class="brand-name">${brand.name}</span>`}</span>`
+      : html`<${Link} to=${user ? '/sites' : '/login'} class="brand" aria-label="Tidemark home"><${Lockup} size=${24} /><//>`}
     ${shared && html`<span class="pill">Shared view</span>`}
     <span class="grow"></span>
     <button class="btn ghost icon" onClick=${toggleTheme} aria-label="Toggle light and dark theme" title="Toggle theme"><${Icon} name="sun" size=${16} class="theme-sun" /><${Icon} name="moon" size=${16} class="theme-moon" /></button>
@@ -79,6 +86,7 @@ function App() {
     ${user && html`<${VerifyBanner} user=${user} />`}
     ${user && registry.banners.map((B) => html`<${B} user=${user} />`)}
     ${Page ? html`<${Page} ...${m.params} />` : html`<main class="main"><div class="empty" style="padding-top:80px"><div class="ico"><${Icon} name="search" size=${20} /></div><b>Page not found</b><p>The page you're looking for doesn't exist.</p><${Link} to="/sites" class="btn">Your sites<//></div></main>`}
+    ${publicRoute && !user && html`<${PublicFooter} />`}
     ${toastEls}<//>`;
 }
 

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\BrandingController;
 use App\Http\Controllers\Api\DataController;
 use App\Http\Controllers\Api\SettingsController as S;
 use App\Http\Controllers\Api\SiteController;
@@ -62,6 +63,9 @@ Route::middleware('api.auth')->group(function () {
 
     Route::middleware('site:manage')->prefix('/sites/{site}')->group(function () {
         Route::patch('/', [SiteController::class, 'update']);
+        Route::patch('/branding', [BrandingController::class, 'update']);
+        Route::post('/branding/logo', [BrandingController::class, 'uploadLogo']);
+        Route::delete('/branding/logo', [BrandingController::class, 'deleteLogo']);
         Route::post('/reset', [SiteController::class, 'reset']);
         Route::get('/export/data', [DataController::class, 'export']);
         Route::post('/import', [DataController::class, 'import']);

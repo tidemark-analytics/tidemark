@@ -1,4 +1,4 @@
-// Site settings (General, Visibility, Goals, People, Shields) and account settings (Preferences, Security, API keys, Users).
+// Site settings (General, Visibility, Branding, Goals, People, Shields) and account settings (Preferences, Security, API keys, Users).
 import { html, useState, useEffect, useApi, api, navigate, Link, Icon, toast, copy, toggleTheme, UserCtx, useContext, useDocTitle, ago, countryName, BASE } from './lib.js';
 import { Loading, Empty, ErrorBox, Field, Confirm, Modal, Toggle, CodeBlock } from './ui.js';
 import { Snippet } from './dashboard.js';
@@ -104,6 +104,42 @@ function Visibility({ site, reload }) {
     ${del && html`<${Confirm} title="Delete shared link?" message=${`Anyone using "${del.name}" will lose access immediately.`} onClose=${() => setDel(null)} onConfirm=${async () => { await api(`/sites/${site.domain}/shared-links/${del.id}`, { method: 'DELETE' }); links.reload(); }} />`}`;
 }
 
+function Branding({ site, reload }) {
+  const b = site.branding || { allowed: true, name: '', color: null, has_logo: false };
+  const [name, setName] = useState(b.name || '');
+  const [color, setColor] = useState(b.color || '');
+  const [busy, setBusy] = useState(false);
+  const valid = color === '' || /^#[0-9a-fA-F]{6}$/.test(color);
+  const changed = name !== (b.name || '') || color !== (b.color || '');
+  const run = async (fn, ok) => { setBusy(true); try { await fn(); reload(); toast(ok); } catch (x) { toast(firstError(x), 'err'); } setBusy(false); };
+  const save = () => run(() => api(`/sites/${site.domain}/branding`, { method: 'PATCH', body: { brand_name: name.trim(), brand_color: color } }), 'Saved');
+  const upload = (e) => {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!f) return;
+    const body = new FormData();
+    body.append('logo', f);
+    run(() => api(`/sites/${site.domain}/branding/logo`, { method: 'POST', body }), 'Logo updated');
+  };
+  return html`<${Section} title="Branding" help="Show your own logo, name and color to people who open the public dashboard or a shared link. A small “Analytics by Tidemark” link always stays in the footer.">
+      ${!b.allowed && html`<div class="notice"><${Icon} name="info" size=${16} /><div>Custom branding is included with Pro. <${Link} to="/settings">Open your account settings<//> to upgrade.</div></div>`}
+      <div class="form">
+        <${Field} label="Display name" help="Shown in the header next to (or instead of) the logo. Leave empty to keep the Tidemark logo."><input value=${name} maxlength="60" disabled=${!b.allowed} onInput=${(e) => setName(e.target.value)} placeholder=${site.domain} /><//>
+        <${Field} label="Brand color" help="Used for buttons, links and the chart."><div class="row">
+          <input type="color" value=${valid && color ? color : '#0e7c86'} disabled=${!b.allowed} onInput=${(e) => setColor(e.target.value)} style="width:48px;padding:2px;height:36px" aria-label="Pick a color" />
+          <input value=${color} disabled=${!b.allowed} onInput=${(e) => setColor(e.target.value.trim())} placeholder="#0e7c86" style="max-width:140px" class="mono" aria-label="Color hex code" />
+          ${color && html`<button class="btn sm ghost" disabled=${!b.allowed} onClick=${() => setColor('')}>Reset</button>`}</div>
+          ${!valid && html`<span class="help" style="color:var(--bad)">Use six hex digits, like #0e7c86.</span>`}<//>
+        <div><button class="btn primary" disabled=${!b.allowed || busy || !changed || !valid} onClick=${save}>Save</button></div>
+      </div><//>
+    <${Section} title="Logo" help="PNG, JPEG, WebP or SVG, up to 100 KB. A wide logo about 28 pixels tall works best.">
+      ${site.brand && site.brand.logo && html`<div class="logo-preview"><img src=${site.brand.logo} alt="Current logo" /></div>`}
+      <div class="row">
+        <label class=${'btn' + (!b.allowed || busy ? ' disabled' : '')}>${b.has_logo ? 'Replace logo' : 'Upload logo'}<input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" hidden disabled=${!b.allowed || busy} onChange=${upload} /></label>
+        ${b.has_logo && html`<button class="btn danger" disabled=${!b.allowed || busy} onClick=${() => run(() => api(`/sites/${site.domain}/branding/logo`, { method: 'DELETE' }), 'Logo removed')}>Remove</button>`}</div>
+      ${!site.public && html`<p class="muted small">Branding shows on the public dashboard and shared links. This site's dashboard is private, so only shared links use it. <${Link} to=${`/${site.domain}/settings/visibility`}>Visibility settings<//></p>`}<//>`;
+}
+
 function NewLink({ site, onClose, onDone }) {
   const [f, setF] = useState({ name: '', password: '' });
   const [err, setErr] = useState(null);
@@ -171,9 +207,9 @@ export function SiteSettings({ domain, tab }) {
   if (res.error) return html`<main class="main"><${ErrorBox} error=${res.error} /></main>`;
   if (!s) return html`<main class="main"><${Loading} /></main>`;
   if (!s.can_manage) return html`<main class="main"><${Empty} title="No access" icon="lock">Only site owners and admins can change settings.<//></main>`;
-  const tabs = [['general', 'General'], ['visibility', 'Visibility'], ['goals', 'Goals'], ['people', 'People'], ['shields', 'Shields']];
+  const tabs = [['general', 'General'], ['visibility', 'Visibility'], ['branding', 'Branding'], ['goals', 'Goals'], ['people', 'People'], ['shields', 'Shields']];
   const t = tabs.find((x) => x[0] === tab) ? tab : 'general';
-  const Body = { general: General, visibility: Visibility, goals: Goals, people: People, shields: Shields }[t];
+  const Body = { general: General, visibility: Visibility, branding: Branding, goals: Goals, people: People, shields: Shields }[t];
   return html`<${SettingsShell} title=${`${domain} settings`} back=${[`/${domain}`, 'Dashboard']} tabs=${tabs} tab=${t} base=${`/${domain}/settings`}><${Body} site=${s} reload=${res.reload} /><//>`;
 }
 

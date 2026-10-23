@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Contracts\AllowsBranding;
+use App\Contracts\Entitlements;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -11,7 +13,9 @@ class Site extends Model
 {
     use HasUuids;
 
-    protected $fillable = ['domain', 'timezone', 'public', 'track_outbound', 'track_downloads', 'track_forms'];
+    protected $fillable = ['domain', 'timezone', 'public', 'track_outbound', 'track_downloads', 'track_forms', 'brand_name', 'brand_color', 'brand_logo', 'brand_logo_mime'];
+
+    protected $hidden = ['brand_logo'];
 
     protected function casts(): array
     {
@@ -52,6 +56,34 @@ class Site extends Model
         $role = $this->members()->where('users.id', $user->id)->first()?->pivot->role;
 
         return $role ?? ($user->is_admin ? 'owner' : null);
+    }
+
+    /** Whether this site may show its own branding on public pages (always true unless an extension limits it). */
+    public function brandingAllowed(): bool
+    {
+        $entitlements = app(Entitlements::class);
+
+        return ! ($entitlements instanceof AllowsBranding) || $entitlements->allowsBranding($this);
+    }
+
+    /**
+     * The branding public pages should show, or null for the default Tidemark look. The logo is a data URI so it travels with
+     * the site's own (already access-checked) response.
+     *
+     * @return array{name:?string,color:?string,logo:?string}|null
+     */
+    public function brand(bool $withLogo = true): ?array
+    {
+        if (! $this->brandingAllowed() || ! ($this->brand_name || $this->brand_color || $this->brand_logo)) {
+            return null;
+        }
+
+        return [
+            'name' => $this->brand_name,
+            'color' => $this->brand_color,
+            'logo' => $withLogo && $this->brand_logo ? 'data:'.$this->brand_logo_mime.';base64,'.$this->brand_logo : null,
+            'has_logo' => (bool) $this->brand_logo,
+        ];
     }
 
     /** Script file name for the snippet: Plausible-style extensions in the file name, e.g. script.outbound-links.js */

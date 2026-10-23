@@ -135,6 +135,9 @@ class SiteController extends Controller
             'script' => $site->scriptName(),
             'has_data' => $first !== null,
             'first_visit_at' => $first?->toIso8601String(),
-        ];
+            'brand' => $site->brand(),
+        ] + (in_array($role, ['owner', 'admin'], true) ? ['branding' => [
+            'allowed' => $site->brandingAllowed(), 'name' => $site->brand_name, 'color' => $site->brand_color, 'has_logo' => (bool) $site->brand_logo,
+        ]] : []);
     }
 }

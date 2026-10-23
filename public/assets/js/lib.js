@@ -243,6 +243,40 @@ export function toggleTheme() {
   try { localStorage.setItem('tidemark.theme', next); } catch (e) { /* private mode */ }
 }
 
+// -------------------------------------------------------------------------------------------- site branding
+// A site's own logo, name and color on its public pages. The color is applied as the interface accent for as long as the page is open.
+const brandSubs = new Set();
+let currentBrand = null;
+const BRAND_VARS = ['--accent', '--accent-hover', '--accent-ink', '--accent-soft', '--accent-ring', '--on-accent', '--series-1', '--series-1-wash'];
+
+export function setBrand(brand) {
+  currentBrand = brand || null;
+  const style = document.documentElement.style;
+  const color = brand && /^#[0-9a-f]{6}$/i.test(brand.color || '') ? brand.color : null;
+  if (!color) { BRAND_VARS.forEach((v) => style.removeProperty(v)); } else {
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16));
+    const lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+    const set = {
+      '--accent': color,
+      '--accent-hover': `color-mix(in srgb, ${color} 82%, #000)`,
+      '--accent-ink': `color-mix(in srgb, ${color} 70%, var(--ink))`,
+      '--accent-soft': `color-mix(in srgb, ${color} 12%, var(--surface))`,
+      '--accent-ring': `color-mix(in srgb, ${color} 30%, transparent)`,
+      '--on-accent': lum > 0.55 ? '#0b1b22' : '#ffffff',
+      '--series-1': color,
+      '--series-1-wash': `color-mix(in srgb, ${color} 11%, transparent)`,
+    };
+    for (const [k, v] of Object.entries(set)) style.setProperty(k, v);
+  }
+  brandSubs.forEach((fn) => fn(currentBrand));
+}
+
+export function useBrand() {
+  const [brand, set] = useState(currentBrand);
+  useEffect(() => { brandSubs.add(set); return () => brandSubs.delete(set); }, []);
+  return brand;
+}
+
 /** Lucide icons (https://lucide.dev, ISC) served from one self-hosted sprite: public/assets/icons.svg.
  *  Add an icon: put its Lucide name in scripts/icons.txt and run scripts/build-icons.mjs. */
 export const Icon = ({ name, size = 16, class: cls = '', ...rest }) => html`<svg class=${'icon ' + cls} width=${size} height=${size} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" ...${rest}><use href=${`${BASE}/assets/icons.svg?v=${window.SD.icons}#${name}`} /></svg>`;

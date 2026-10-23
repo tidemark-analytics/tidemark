@@ -61,6 +61,9 @@ return [
     // Require new accounts to confirm their email address (needs working mail settings) before they can add sites.
     'verify_email' => (bool) env('TIDEMARK_VERIFY_EMAIL', false),
 
+    // Where the "Analytics by Tidemark" link in the footer of public dashboards points.
+    'brand_url' => env('TIDEMARK_BRAND_URL', 'https://tidemarkanalytics.com'),
+
     // Links to your legal pages. When set, the sign-in and sign-up screens show them, and sign-up says that creating an account
     // means agreeing to the terms. (A hosted service typically needs all three; self-hosters can leave them empty.)
     'legal' => [
