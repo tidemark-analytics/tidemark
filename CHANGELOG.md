@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.15.2] - 2026-10-22
+
+### Changed
+- The Docker image accepts `PUID` and `PGID` (default 1000) and gives `/data` to that user on start, so bind-mounted folders work without a manual `chown`. Unraid's `99:100` works out of the box.
+
 ## [0.15.1] - 2026-10-22
 
 ### Changed
