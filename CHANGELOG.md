@@ -2,6 +2,12 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.15.1] - 2026-10-22
+
+### Changed
+- A site's brand color now takes over the whole public page, not just the accents: backgrounds, borders and text pick up its hue, in both the light and the dark theme.
+- The brand color is checked for contrast (WCAG AA). If the chosen color is too light or too dark for readable text, buttons or chart lines, Tidemark uses the closest shade that passes, and the Branding settings say which shades visitors will see.
+
 ## [0.15.0] - 2026-10-22
 
 ### Added

@@ -3,6 +3,7 @@ import { html, useState, useEffect, useApi, api, navigate, Link, Icon, toast, co
 import { Loading, Empty, ErrorBox, Field, Confirm, Modal, Toggle, CodeBlock } from './ui.js';
 import { Snippet } from './dashboard.js';
 import { registry } from './extensions.js';
+import { brandTheme } from './brand.js';
 
 const zones = () => { try { return ['UTC', ...Intl.supportedValuesOf('timeZone')]; } catch (e) { return ['UTC']; } };
 const firstError = (x) => (x.errors && Object.values(x.errors)[0][0]) || x.message;
@@ -111,6 +112,7 @@ function Branding({ site, reload }) {
   const [busy, setBusy] = useState(false);
   const valid = color === '' || /^#[0-9a-fA-F]{6}$/.test(color);
   const changed = name !== (b.name || '') || color !== (b.color || '');
+  const shown = (() => { if (!valid || !color) return { changed: false }; const l = brandTheme(color, false); const d = brandTheme(color, true); return { changed: l.changed || d.changed, light: l.accent, dark: d.accent }; })();
   const run = async (fn, ok) => { setBusy(true); try { await fn(); reload(); toast(ok); } catch (x) { toast(firstError(x), 'err'); } setBusy(false); };
   const save = () => run(() => api(`/sites/${site.domain}/branding`, { method: 'PATCH', body: { brand_name: name.trim(), brand_color: color } }), 'Saved');
   const upload = (e) => {
@@ -129,7 +131,8 @@ function Branding({ site, reload }) {
           <input type="color" value=${valid && color ? color : '#0e7c86'} disabled=${!b.allowed} onInput=${(e) => setColor(e.target.value)} style="width:48px;padding:2px;height:36px" aria-label="Pick a color" />
           <input value=${color} disabled=${!b.allowed} onInput=${(e) => setColor(e.target.value.trim())} placeholder="#0e7c86" style="max-width:140px" class="mono" aria-label="Color hex code" />
           ${color && html`<button class="btn sm ghost" disabled=${!b.allowed} onClick=${() => setColor('')}>Reset</button>`}</div>
-          ${!valid && html`<span class="help" style="color:var(--bad)">Use six hex digits, like #0e7c86.</span>`}<//>
+          ${!valid && html`<span class="help" style="color:var(--bad)">Use six hex digits, like #0e7c86.</span>`}
+          ${valid && color && shown.changed && html`<span class="help">So text stays readable (WCAG AA contrast), visitors see this as <b class="mono">${shown.light}</b> on light pages and <b class="mono">${shown.dark}</b> on dark ones, the closest shades that pass.</span>`}<//>
         <div><button class="btn primary" disabled=${!b.allowed || busy || !changed || !valid} onClick=${save}>Save</button></div>
       </div><//>
     <${Section} title="Logo" help="PNG, JPEG, WebP or SVG, up to 100 KB. A wide logo about 28 pixels tall works best.">

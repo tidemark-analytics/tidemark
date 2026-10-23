@@ -1,5 +1,6 @@
 // Core helpers: preact/htm re-exports, API client, router, formatting, date-range + filter state.
 import * as P from '../vendor/preact-htm.js';
+import { brandTheme, BRAND_VARS } from './brand.js';
 export const { h, html, render, useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, createContext, useContext, Component } = P;
 
 export const BASE = window.SD.base;
@@ -244,30 +245,27 @@ export function toggleTheme() {
 }
 
 // -------------------------------------------------------------------------------------------- site branding
-// A site's own logo, name and color on its public pages. The color is applied as the interface accent for as long as the page is open.
+// A site's own logo, name and color on its public pages. brandTheme() turns the color into a full readable theme (see brand.js), which
+// is applied to the page for as long as it is open and follows the light/dark switch.
 const brandSubs = new Set();
 let currentBrand = null;
-const BRAND_VARS = ['--accent', '--accent-hover', '--accent-ink', '--accent-soft', '--accent-ring', '--on-accent', '--series-1', '--series-1-wash'];
+const isDarkNow = () => (document.documentElement.dataset.theme ? document.documentElement.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches);
+
+function paintBrand() {
+  const style = document.documentElement.style;
+  BRAND_VARS.forEach((v) => style.removeProperty(v));
+  const color = currentBrand && /^#[0-9a-f]{6}$/i.test(currentBrand.color || '') ? currentBrand.color : null;
+  if (color) for (const [k, v] of Object.entries(brandTheme(color, isDarkNow()).vars)) style.setProperty(k, v);
+}
+
+if (typeof document !== 'undefined') {
+  new MutationObserver(() => currentBrand && paintBrand()).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => currentBrand && paintBrand());
+}
 
 export function setBrand(brand) {
   currentBrand = brand || null;
-  const style = document.documentElement.style;
-  const color = brand && /^#[0-9a-f]{6}$/i.test(brand.color || '') ? brand.color : null;
-  if (!color) { BRAND_VARS.forEach((v) => style.removeProperty(v)); } else {
-    const [r, g, b] = [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16));
-    const lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
-    const set = {
-      '--accent': color,
-      '--accent-hover': `color-mix(in srgb, ${color} 82%, #000)`,
-      '--accent-ink': `color-mix(in srgb, ${color} 70%, var(--ink))`,
-      '--accent-soft': `color-mix(in srgb, ${color} 12%, var(--surface))`,
-      '--accent-ring': `color-mix(in srgb, ${color} 30%, transparent)`,
-      '--on-accent': lum > 0.55 ? '#0b1b22' : '#ffffff',
-      '--series-1': color,
-      '--series-1-wash': `color-mix(in srgb, ${color} 11%, transparent)`,
-    };
-    for (const [k, v] of Object.entries(set)) style.setProperty(k, v);
-  }
+  paintBrand();
   brandSubs.forEach((fn) => fn(currentBrand));
 }
 
