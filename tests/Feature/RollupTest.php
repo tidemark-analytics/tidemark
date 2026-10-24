@@ -54,6 +54,15 @@ class RollupTest extends TestCase
         return $this->getJson("/api/sites/{$domain}/stats/top?".http_build_query($q + ['period' => 'day']))->assertOk()->json('stats.visitors.value');
     }
 
+    public function test_a_rollup_cannot_take_the_name_of_an_app_page(): void
+    {
+        $this->site('a.example.com');
+
+        foreach (['admin', 'settings', 'sites'] as $name) {
+            $this->postJson('/api/rollups', ['name' => $name, 'all' => true])->assertStatus(422);
+        }
+    }
+
     public function test_a_rollup_adds_up_the_sites_it_includes(): void
     {
         $a = $this->site('a.example.com');
