@@ -4,6 +4,9 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Changed
+- An extension can now keep an administrator's site list to their own sites with no mention of the others (an empty path from `LimitsSiteList`), so a hosted service's customer interface never hints at other customers.
+
 ## [0.28.0] - 2026-11-07
 
 ### Added
