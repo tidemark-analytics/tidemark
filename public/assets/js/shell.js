@@ -1,5 +1,5 @@
 // The signed-in app shell: the harbor sidebar (sites, sections of the open dashboard, account) and the ⌘K command palette.
-import { html, useState, useEffect, useMemo, useRef, useApi, api, navigate, Link, Icon, toggleTheme, setQuery, PERIODS, UserCtx, useContext } from './lib.js';
+import { html, useState, useEffect, useMemo, useRef, useApi, api, navigate, Link, Icon, setQuery, PERIODS, UserCtx, useContext } from './lib.js';
 import { Pop } from './ui.js';
 import { Lockup } from './logo.js';
 import { registry } from './extensions.js';
@@ -110,7 +110,6 @@ export function Sidebar({ user, path }) {
       ${current && html`${canManage && html`<${Link} to=${'/' + domain + '/settings'} class=${'side-link ' + (onSite('/' + domain + '/settings') ? 'on' : '')}><${Icon} name="settings" size=${16} /><span>Site settings</span><//>`}`}
     </nav>
     <div class="side-foot">
-      <button class="side-link" onClick=${toggleTheme}><${Icon} name="sun" size=${16} class="theme-sun" /><${Icon} name="moon" size=${16} class="theme-moon" /><span>Light / dark</span></button>
       <${AccountMenu} user=${user} align="left" btnClass="side-account" named />
     </div>
   </aside>`;
@@ -147,7 +146,6 @@ export function CommandPalette({ path }) {
     ((sites.data && sites.data.data) || []).forEach((s) => out.push({ group: 'Sites', icon: s.rollup ? 'layers' : 'globe', label: s.domain, hint: s.rollup ? 'Rollup' : '', run: go('/' + s.domain) }));
     if (domain) out.push({ group: 'Go to', icon: 'settings', label: 'Site settings', run: go(`/${domain}/settings`) });
     out.push({ group: 'Go to', icon: 'layout-dashboard', label: 'All sites', run: go('/sites') }, { group: 'Go to', icon: 'plus', label: 'Add a site', run: go('/sites/new') }, { group: 'Go to', icon: 'settings', label: 'Account settings', run: go('/settings') });
-    out.push({ group: 'App', icon: 'sun', label: 'Switch light / dark', run: toggleTheme });
     return out;
   }, [domain, sites.data]);
   const shown = useMemo(() => items.filter((i) => i.label.toLowerCase().includes(q.toLowerCase())).slice(0, 14), [items, q]);

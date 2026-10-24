@@ -5,6 +5,9 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 ## [Unreleased]
 
 ### Changed
+- The light and dark toggle is gone from the sidebar, the top bar and the command palette for signed-in users. Choose Light, Dark or System under Account settings → Profile. Public and shared dashboards keep a toggle for visitors.
+
+### Changed
 - A calmer filter menu. After choosing what to filter by, one search box with the operator beside it lists the values with their visitor counts. Tick several, or type to narrow the list and press Enter, then apply. Filters have icons, the Filter button shows how many are active, and Save as segment and Manage segments have a cleaner layout.
 
 ### Changed
