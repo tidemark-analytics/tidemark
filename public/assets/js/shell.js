@@ -1,5 +1,5 @@
 // The signed-in app shell: the harbor sidebar (sites, sections of the open dashboard, account) and the ⌘K command palette.
-import { html, useState, useEffect, useMemo, useRef, useApi, api, navigate, Link, Icon, fmtShort, setQuery, PERIODS, UserCtx, useContext } from './lib.js';
+import { html, useState, useEffect, useMemo, useRef, useApi, api, navigate, Link, Icon, fmtShort, setQuery, BASE, PERIODS, UserCtx, useContext } from './lib.js';
 import { Pop } from './ui.js';
 import { Lockup } from './logo.js';
 import { registry } from './extensions.js';
@@ -21,6 +21,7 @@ export function AccountMenu({ user, align = 'right', btnClass = 'btn ghost avata
     ${(close) => html`<div style="min-width:220px"><div class="who"><b>${user.name}</b><span class="muted">${user.email}</span></div><hr />
       ${!compact && html`<div>      <${Link} to="/sites" class="item" onClick=${close}><span>Your sites</span><${Icon} name="globe" size=${14} /><//>
       <${Link} to="/settings" class="item" onClick=${close}><span>Account settings${user.update && html`<span class="notif inline" aria-hidden="true"></span><span class="sr-only"> (update available)</span>`}</span><${Icon} name="settings" size=${14} /><//>
+      ${user.is_admin && registry.adminUi && html`<a class="item" href=${BASE + registry.adminUi.href} onClick=${close}><span>${registry.adminUi.label}</span><${Icon} name="shield-check" size=${14} /></a>`}
       <a class="item" href="https://discord.gg/sCkHD3PPZh" target="_blank" rel="noopener" onClick=${close}><span>Community (Discord)</span><${Icon} name="users" size=${14} /></a>
       ${registry.menuItems.filter((m) => !m.visible || m.visible(user)).map((m) => (m.onClick
         ? html`<button class="item" onClick=${() => { close(); m.onClick(); }}><span>${m.label}</span><${Icon} name=${m.icon || 'external-link'} size=${14} /></button>`
@@ -113,8 +114,9 @@ export function Sidebar({ user, path }) {
       <div class="side-grp">Workspace</div>
       <${Link} to="/sites" class=${'side-link ' + (path === '/sites' || path.startsWith('/sites/') ? 'on' : '')}><${Icon} name="layout-dashboard" size=${16} /><span>Sites</span>${list.length > 0 && html`<em class="side-count">${list.length}</em>`}<//>
       <${Link} to="/settings" class=${'side-link ' + (path === '/settings' || (path.startsWith('/settings/') && !/^\/settings\/(users|updates)/.test(path)) ? 'on' : '')}><${Icon} name="user" size=${16} /><span>Account</span><//>
-      ${user.is_admin && html`<${Link} to="/settings/users" class=${'side-link ' + (path.startsWith('/settings/users') ? 'on' : '')}><${Icon} name="users" size=${16} /><span>Users</span><//>`}
-      ${user.is_admin && user.updater_enabled !== false && html`<${Link} to="/settings/updates" class=${'side-link ' + (path.startsWith('/settings/updates') ? 'on' : '')}><${Icon} name="refresh-cw" size=${16} /><span>Updates</span>${user.update && html`<span class="notif inline" aria-hidden="true"></span><span class="sr-only"> (update available)</span>`}<//>`}
+      ${user.is_admin && registry.adminUi && html`<a class="side-link" href=${BASE + registry.adminUi.href}><${Icon} name="shield-check" size=${16} /><span>${registry.adminUi.label}</span><${Icon} name="chevron-right" size=${13} class="side-ext" /></a>`}
+      ${user.is_admin && !registry.adminUi && html`<${Link} to="/settings/users" class=${'side-link ' + (path.startsWith('/settings/users') ? 'on' : '')}><${Icon} name="users" size=${16} /><span>Users</span><//>`}
+      ${user.is_admin && !registry.adminUi && user.updater_enabled !== false && html`<${Link} to="/settings/updates" class=${'side-link ' + (path.startsWith('/settings/updates') ? 'on' : '')}><${Icon} name="refresh-cw" size=${16} /><span>Updates</span>${user.update && html`<span class="notif inline" aria-hidden="true"></span><span class="sr-only"> (update available)</span>`}<//>`}
       ${!current && recent.length > 0 && html`<div class="side-grp">Busiest sites</div>
         ${recent.map((s) => html`<${Link} to=${'/' + s.domain} class="side-site" title=${s.domain}><${Icon} name=${s.rollup ? 'layers' : 'globe'} size=${14} /><span class="trunc">${s.domain}</span><em>${fmtShort(s.visitors)}</em><//>`)}`}
       <div class="side-grp">Help</div>

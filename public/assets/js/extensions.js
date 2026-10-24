@@ -9,12 +9,13 @@
 //     api.registerRoute('/pricing', PricingPage);
 //     api.registerMenuItem({ label: 'Support', href: 'https://help.example.com', icon: 'life-buoy', external: true });
 //     api.registerMenuItem({ label: 'Chat', onClick: () => openChat(), icon: 'life-buoy' });
+//     api.registerAdminUi({ href: '/admin' }); // operators get this separate interface; Users and Updates move out of Account settings
 //   }
 import * as lib from './lib.js';
 import * as ui from './ui.js';
 import * as chart from './chart.js';
 
-export const registry = { routes: [], accountTabs: [], banners: [], menuItems: [] };
+export const registry = { routes: [], accountTabs: [], banners: [], menuItems: [], adminUi: null };
 
 const api = {
   version: 1,
@@ -26,6 +27,8 @@ const api = {
   registerAccountTab: (tab) => registry.accountTabs.push(tab),
   /** An entry in the account (avatar) menu, above Sign out: { label, href | onClick, icon?, external?, visible?(user) }. Give `href` for a link (`external` opens a new tab) or `onClick` to run a function instead. `icon` is a name in the icon sprite. */
   registerMenuItem: (item) => registry.menuItems.push(item),
+  /** A separate administration interface served at `href` (a full page, not a route of this app): { href, label? }. Administrators get a link to it in the sidebar, and Users and Updates leave Account settings (the other interface can show them). */
+  registerAdminUi: (ui) => { registry.adminUi = { label: 'Admin', ...ui }; },
   /** A component shown under the top bar on every signed-in page; receives { user }. */
   registerBanner: (component) => registry.banners.push(component),
 };

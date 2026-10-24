@@ -15,7 +15,7 @@ use Illuminate\Validation\ValidationException;
  */
 class RollupController extends Controller
 {
-    private const RESERVED = ['sites', 'settings', 'login', 'register', 'share', 'install', 'api', 'js', 'assets', 'up', 'storage', 'build', 'rollups'];
+    private const RESERVED = ['sites', 'settings', 'login', 'register', 'share', 'install', 'api', 'js', 'assets', 'up', 'storage', 'build', 'rollups', 'admin'];
 
     /** The sites a person could put in a rollup: the ones they belong to. */
     public function candidates(Request $r)

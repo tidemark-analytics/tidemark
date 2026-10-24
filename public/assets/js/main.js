@@ -25,7 +25,7 @@ const tail = [
 ];
 // extension pages sit between the fixed pages and the "/{domain}" catch-all
 const allRoutes = () => [...head, ...registry.routes, ...tail];
-const RESERVED = new Set(['', 'api', 'js', 'assets', 'install', 'up']);
+const RESERVED = new Set(['', 'api', 'js', 'assets', 'install', 'up', 'admin']);
 
 function PublicFooter() {
   return html`<footer class="pubfoot"><a href=${window.SD.brandUrl || 'https://tidemarkanalytics.com'} target="_blank" rel="noopener"><span>Analytics by</span><${Lockup} size=${15} /></a></footer>`;
