@@ -674,3 +674,7 @@ td > .pill { vertical-align: middle; }
 .jlist .mrow.sel { box-shadow: inset 0 0 0 1.5px var(--accent); }
 .jlist .mrow:disabled { cursor: default; }
 .jcol.idle .panel-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; }
+
+/* choice lists (rollup sites): small native controls, not full-width inputs */
+label.row > input[type="radio"], label.row > input[type="checkbox"] { width: auto; height: auto; flex: none; margin: 0; accent-color: var(--accent); }
+label.row { display: flex; flex-direction: row; justify-content: flex-start; text-align: left; cursor: pointer; gap: 8px; align-items: center; }

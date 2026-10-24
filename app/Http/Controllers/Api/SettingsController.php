@@ -67,6 +67,9 @@ class SettingsController extends Controller
         if ($type !== 'event') {
             throw ValidationException::withMessages(['currency' => 'Only custom events can report revenue.']);
         }
+        if ($site->isRollup()) {
+            throw ValidationException::withMessages(['currency' => 'Revenue goals are not supported in rollups, because the sites may use different currencies.']);
+        }
         if (! $site->revenueAllowed()) {
             throw ValidationException::withMessages(['currency' => 'Revenue reporting is not available on this plan.']);
         }
@@ -194,6 +197,7 @@ class SettingsController extends Controller
     public function createShield(Request $r)
     {
         $site = $r->attributes->get('site');
+        abort_if($site->isRollup(), 422, 'Shields apply to the sites a rollup adds up, not to the rollup.');
         $data = $r->validate(['type' => ['required', Rule::in(['ip', 'country', 'page', 'hostname'])], 'value' => 'required|string|max:255']);
         $value = trim($data['value']);
         if ($data['type'] === 'country') {
@@ -233,6 +237,7 @@ class SettingsController extends Controller
     public function addPerson(Request $r)
     {
         $site = $r->attributes->get('site');
+        abort_if($site->isRollup(), 422, 'A rollup is private to its owner. Share it with a shared link instead.');
         $data = $r->validate(['email' => 'required|email', 'role' => ['required', Rule::in(['admin', 'viewer'])]]);
         $user = User::where('email', $data['email'])->first();
         if (! $user) {

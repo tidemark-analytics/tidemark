@@ -38,6 +38,7 @@ class DataController extends Controller
     {
         /** @var Site $site */
         $site = $request->attributes->get('site');
+        abort_if($site->isRollup(), 422, 'A rollup has no data of its own to export. Export its sites instead.');
         $gzip = function_exists('deflate_init');
         $name = $site->domain.'_'.now()->format('Ymd').'.ndjson'.($gzip ? '.gz' : '');
 
@@ -89,6 +90,7 @@ class DataController extends Controller
     {
         /** @var Site $site */
         $site = $request->attributes->get('site');
+        abort_if($site->isRollup(), 422, 'Data can only be imported into a site that collects its own.');
         $data = $request->validate([
             'header' => 'sometimes|array',
             'visits' => 'required|array|max:'.self::MAX_VISITS_PER_REQUEST,

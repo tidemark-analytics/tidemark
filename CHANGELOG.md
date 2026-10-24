@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.23.0] - 2026-11-03
+
+### Added
+- **Rollups.** One dashboard that adds up several of your sites (Your sites → Create a rollup). Choose the sites, or include all of them, including ones you add later. A rollup has the dashboard you know, with its own goals, funnels, segments, branding, visibility and shared links, and its timezone starts as the one most of its sites use. Your sites keep their own dashboards and data. Imported data and revenue goals are left out (the sites may use different currencies), and a rollup only ever shows sites you belong to. Extensions can limit who may create them with the new optional `App\Contracts\AllowsRollups`.
+
 ## [0.22.1] - 2026-11-02
 
 ### Fixed

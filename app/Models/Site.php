@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Contracts\AllowsBranding;
 use App\Contracts\AllowsConversionReports;
 use App\Contracts\AllowsExploration;
+use App\Contracts\AllowsRollups;
 use App\Contracts\Entitlements;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
@@ -15,18 +16,73 @@ class Site extends Model
 {
     use HasUuids;
 
-    protected $fillable = ['domain', 'timezone', 'public', 'track_outbound', 'track_downloads', 'track_forms', 'brand_name', 'brand_color', 'brand_logo', 'brand_logo_mime'];
+    protected $fillable = ['kind', 'rollup_all', 'domain', 'timezone', 'public', 'track_outbound', 'track_downloads', 'track_forms', 'brand_name', 'brand_color', 'brand_logo', 'brand_logo_mime'];
 
     protected $hidden = ['brand_logo'];
 
     protected function casts(): array
     {
-        return ['public' => 'boolean', 'track_outbound' => 'boolean', 'track_downloads' => 'boolean', 'track_forms' => 'boolean', 'imported_start' => 'date', 'imported_end' => 'date'];
+        return ['rollup_all' => 'boolean', 'public' => 'boolean', 'track_outbound' => 'boolean', 'track_downloads' => 'boolean', 'track_forms' => 'boolean', 'imported_start' => 'date', 'imported_end' => 'date'];
     }
 
     public function members(): BelongsToMany
     {
         return $this->belongsToMany(User::class)->withPivot('role')->withTimestamps();
+    }
+
+    public function isRollup(): bool
+    {
+        return $this->kind === 'rollup';
+    }
+
+    /** Sites that collect their own data, as opposed to rollups. */
+    public function scopeReal($query)
+    {
+        return $query->where('kind', '!=', 'rollup');
+    }
+
+    public function scopeRollups($query)
+    {
+        return $query->where('kind', 'rollup');
+    }
+
+    /** The sites a rollup adds up (chosen ones, or all of the owner's sites). */
+    public function rollupMembers(): BelongsToMany
+    {
+        return $this->belongsToMany(Site::class, 'rollup_sites', 'rollup_id', 'site_id');
+    }
+
+    /**
+     * The ids whose data this dashboard shows: its own for a site; for a rollup the member sites that its owner still belongs to (for "all", owns), so
+     * a rollup never reaches data its owner can no longer see. A rollup with no members shows nothing.
+     *
+     * @return array<int,string>
+     */
+    public function memberSiteIds(): array
+    {
+        if (! $this->isRollup()) {
+            return [$this->id];
+        }
+        $ownerId = $this->members()->wherePivot('role', 'owner')->value('users.id');
+        if (! $ownerId) {
+            return [];
+        }
+        // "all" means the sites the owner owns, so an operator's rollup never takes in customers' sites they can merely open; chosen sites
+        // can be any the owner belongs to, because that is a deliberate pick
+        $reachable = Site::real()->whereHas('members', fn ($q) => $q->where('users.id', $ownerId)->when($this->rollup_all, fn ($w) => $w->where('site_user.role', 'owner')));
+        if (! $this->rollup_all) {
+            $reachable->whereIn('id', $this->rollupMembers()->pluck('sites.id'));
+        }
+
+        return $reachable->pluck('id')->all();
+    }
+
+    /** Whether this person may create rollups (always true unless an extension limits it). */
+    public static function rollupsAllowedFor(User $user): bool
+    {
+        $entitlements = app(Entitlements::class);
+
+        return ! ($entitlements instanceof AllowsRollups) || $entitlements->allowsRollups($user);
     }
 
     public function goals(): HasMany
@@ -81,6 +137,9 @@ class Site extends Model
     /** Whether this site may report revenue on its goals (always true unless an extension limits it). */
     public function revenueAllowed(): bool
     {
+        if ($this->isRollup()) {
+            return false; // the member sites may report in different currencies
+        }
         $entitlements = app(Entitlements::class);
 
         return ! ($entitlements instanceof AllowsConversionReports) || $entitlements->allowsRevenue($this);

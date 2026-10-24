@@ -2,7 +2,7 @@ import { html, render, useState, useEffect, useBrand, api, navigate, useLocation
 import { Pop } from './ui.js';
 import { Login, Register, ForgotPassword, ResetPassword } from './pages/auth.js';
 import { Dashboard } from './dashboard.js';
-import { SitesPage, NewSite, Installation } from './sites.js';
+import { SitesPage, NewSite, NewRollup, Installation } from './sites.js';
 import { SiteSettings, AccountSettings } from './settings.js';
 import { Logo, Lockup } from './logo.js';
 import { registry, loadExtensions } from './extensions.js';
@@ -14,6 +14,7 @@ const head = [
   ['/reset-password', ResetPassword],
   ['/sites', SitesPage],
   ['/sites/new', NewSite],
+  ['/sites/rollup', NewRollup],
   ['/settings/:tab?', AccountSettings],
   ['/share/:domain', (p) => html`<${Dashboard} ...${p} shared />`],
 ];

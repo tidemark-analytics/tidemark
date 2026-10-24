@@ -25,9 +25,9 @@ class SiteController extends Controller
         $entitlements = app(Entitlements::class);
         $otherPath = $entitlements instanceof LimitsSiteList ? $entitlements->otherSitesPath($user) : null;
         // an extension can keep an administrator's list to their own sites; the rest are browsed elsewhere
-        $query = $otherPath ? Site::query()->whereHas('members', fn ($q) => $q->where('users.id', $user->id)) : Site::visibleTo($user);
+        $query = $otherPath ? Site::query()->whereHas('members', fn ($q) => $q->where('users.id', $user->id)) : Site::visibleTo($user)->where(fn ($q) => $q->where('kind', '!=', 'rollup')->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id)));
         $sites = $query->orderBy('domain')->get()->map(function (Site $s) use ($user) {
-            $r = $s->only(['id', 'domain', 'public']) + ['role' => $s->roleOf($user), 'created_at' => $s->created_at];
+            $r = $s->only(['id', 'domain', 'public']) + ['role' => $s->roleOf($user), 'created_at' => $s->created_at, 'rollup' => $s->isRollup()] + ($s->isRollup() ? ['members' => count($s->memberSiteIds())] : []);
             $r += (new Stats($s))->last24h();
 
             return $r;
@@ -120,6 +120,7 @@ class SiteController extends Controller
     public function reset(Request $request)
     {
         $site = $request->attributes->get('site');
+        abort_if($site->isRollup(), 422, 'A rollup has no data of its own to reset. Reset its sites instead.');
         $this->wipe($site->id);
         PlausibleImportController::clear($site);
 
@@ -139,7 +140,7 @@ class SiteController extends Controller
         $role ??= $site->roleOf($user);
         $first = (new Stats($site))->firstVisitAt();
 
-        return $site->only(['id', 'domain', 'timezone', 'public', 'track_outbound', 'track_downloads', 'track_forms']) + [
+        return $site->only(['id', 'domain', 'timezone', 'public', 'track_outbound', 'track_downloads', 'track_forms']) + ['rollup' => $site->isRollup() ? ['all' => $site->rollup_all, 'sites' => $site->rollupMembers()->orderBy('domain')->get(['sites.id', 'sites.domain'])->map->only(['id', 'domain'])->all(), 'count' => count($site->memberSiteIds())] : null] + [
             'role' => $role,
             'can_manage' => in_array($role, ['owner', 'admin'], true),
             'is_owner' => $role === 'owner',

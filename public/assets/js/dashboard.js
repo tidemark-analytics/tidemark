@@ -282,10 +282,10 @@ function MoreMenu({ site, scope, intervals }) {
 // ---------------------------------------------------------------------------------------- site switcher
 function SiteSwitcher({ site, linkable }) {
   const sites = useApi(linkable ? '/sites' : null, null, [], { enabled: linkable });
-  if (!linkable) return html`<div class="siteswitch static"><${Icon} name="globe" size=${16} /><b>${site.domain}</b></div>`;
-  return html`<${Pop} align="left" ariaLabel="Switch site" btnClass="siteswitch" label=${html`<${Icon} name="globe" size=${16} /><b>${site.domain}</b><${Icon} name="chevron-down" size=${13} class="muted" />`}>
+  if (!linkable) return html`<div class="siteswitch static"><${Icon} name=${site.rollup ? 'layers' : 'globe'} size=${16} /><b>${site.domain}</b></div>`;
+  return html`<${Pop} align="left" ariaLabel="Switch site" btnClass="siteswitch" label=${html`<${Icon} name=${site.rollup ? 'layers' : 'globe'} size=${16} /><b>${site.domain}</b><${Icon} name="chevron-down" size=${13} class="muted" />`}>
     ${(close) => html`<div style="min-width:240px">
-      ${((sites.data && sites.data.data) || []).map((s) => html`<${Link} to=${'/' + s.domain} class=${'item ' + (s.domain === site.domain ? 'on' : '')} onClick=${close}><span>${s.domain}</span><//>`)}
+      ${[...((sites.data && sites.data.data) || [])].sort((a, b) => (a.rollup !== b.rollup ? (a.rollup ? -1 : 1) : a.domain.localeCompare(b.domain))).map((s) => html`<${Link} to=${'/' + s.domain} class=${'item ' + (s.domain === site.domain ? 'on' : '')} onClick=${close}><span>${s.domain}</span>${s.rollup && html`<span class="muted">Rollup</span>`}<//>`)}
       <hr /><${Link} to="/sites/new" class="item" onClick=${close}><span>Add a site</span><${Icon} name="plus" size=${14} /><//>
       <${Link} to="/sites" class="item" onClick=${close}><span>All sites</span><//></div>`}<//>`;
 }
@@ -305,6 +305,7 @@ export function Snippet({ site }) {
 
 function Waiting({ site, onData }) {
   useEffect(() => { const id = setInterval(() => api(`/sites/${site.domain}`).then((r) => r.data.has_data && onData()).catch(() => {}), 5000); return () => clearInterval(id); }, [site.domain]);
+  if (site.rollup) return html`<section class="card waiting"><div class="onboard-ico"><span class="dot"></span></div><div class="grow"><h2>No visits yet</h2><p class="muted">${site.rollup.count === 0 ? 'This rollup has no sites yet.' : `The ${site.rollup.count} ${site.rollup.count === 1 ? 'site' : 'sites'} in this rollup haven't recorded a visit.`} ${site.can_manage ? html`<${Link} to=${`/${site.domain}/settings/sites`}>Choose its sites<//>` : ''}</p></div></section>`;
   return html`<section class="card waiting"><div class="onboard-ico"><span class="dot"></span></div>
     <div class="grow"><h2>Waiting for your first pageview</h2><p class="muted">Paste this snippet in the <code>${"<head>"}</code> of every page on <b>${site.domain}</b>. This page updates as soon as the first visit arrives.</p><${Snippet} site=${site} /></div></section>`;
 }

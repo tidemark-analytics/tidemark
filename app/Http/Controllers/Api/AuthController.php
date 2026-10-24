@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ApiKey;
+use App\Models\Site;
 use App\Models\User;
 use App\Support\Totp;
 use App\Updates\Updater;
@@ -238,6 +239,7 @@ class AuthController extends Controller
             'timezone' => $u->timezone, 'locale' => $u->locale, 'two_factor' => $u->hasTwoFactor(),
             'email_verified' => $u->hasVerifiedEmail(), 'verification_required' => (bool) config('tidemark.verify_email'),
             'updater_enabled' => (bool) config('tidemark.updater'),
+            'can_rollup' => Site::rollupsAllowedFor($u),
         ];
     }
 }

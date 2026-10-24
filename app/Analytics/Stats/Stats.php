@@ -25,24 +25,34 @@ class Stats
 
     private Imported $imported;
 
+    /** @var array<int,string> the sites whose data is counted: just this one, or every member of a rollup */
+    private array $ids;
+
     public function __construct(public Site $site)
     {
         $this->imported = new Imported($site);
+        $this->ids = $site->memberSiteIds();
+    }
+
+    /** Limits a query to this dashboard's site, or to all the sites of a rollup. */
+    private function ofSites(Builder $q, string $column): Builder
+    {
+        return count($this->ids) === 1 ? $q->where($column, $this->ids[0]) : $q->whereIn($column, $this->ids);
     }
 
     // ------------------------------------------------------------------------------------------------ builders
     private function visitsQ(Period $p, Filters $f, bool $applyFilters = true): Builder
     {
         $col = $p->key === 'realtime' ? 'v.ended_at' : 'v.started_at';
-        $q = Sql::connection()->table('visits as v')->where('v.site_id', $this->site->id)->whereBetween($col, [$p->startSql(), $p->endSql()]);
+        $q = $this->ofSites(Sql::connection()->table('visits as v'), 'v.site_id')->whereBetween($col, [$p->startSql(), $p->endSql()]);
 
         return $applyFilters ? $f->applyToVisits($q) : $q;
     }
 
     private function eventsQ(Period $p, Filters $f): Builder
     {
-        $q = Sql::connection()->table('events as e')->join('visits as v', 'v.id', '=', 'e.visit_id')
-            ->where('e.site_id', $this->site->id)->whereBetween('e.created_at', [$p->startSql(), $p->endSql()]);
+        $q = $this->ofSites(Sql::connection()->table('events as e')->join('visits as v', 'v.id', '=', 'e.visit_id'), 'e.site_id')
+            ->whereBetween('e.created_at', [$p->startSql(), $p->endSql()]);
 
         return $f->applyToEvents($q);
     }
@@ -146,14 +156,14 @@ class Stats
 
     public function currentVisitors(Filters $f): int
     {
-        $q = Sql::connection()->table('visits as v')->where('v.site_id', $this->site->id)->where('v.ended_at', '>=', gmdate('Y-m-d H:i:s', time() - 300));
+        $q = $this->ofSites(Sql::connection()->table('visits as v'), 'v.site_id')->where('v.ended_at', '>=', gmdate('Y-m-d H:i:s', time() - 300));
 
         return (int) $f->applyToVisits($q)->selectRaw('COUNT(DISTINCT v.visitor_id) as n')->value('n');
     }
 
     public function firstVisitAt(): ?CarbonImmutable
     {
-        $t = Sql::connection()->table('visits')->where('site_id', $this->site->id)->min('started_at');
+        $t = $this->ofSites(Sql::connection()->table('visits'), 'site_id')->min('started_at');
 
         return $t ? CarbonImmutable::parse($t, 'UTC') : null;
     }
@@ -509,8 +519,8 @@ class Stats
         $steps = $funnel->steps()->with('goal')->get()->filter(fn ($s) => $s->goal)->values();
         $matchers = $steps->map(fn ($s) => $this->stepMatcher($s->goal))->all();
         $filters = new Filters(array_values(array_filter($f->rules, fn ($r) => isset(Filters::VISIT_DIMS[$r[1]]))), $this->site);
-        $q = Sql::connection()->table('events as e')->join('visits as v', 'v.id', '=', 'e.visit_id')
-            ->where('e.site_id', $this->site->id)->whereBetween('e.created_at', [$p->startSql(), $p->endSql()]);
+        $q = $this->ofSites(Sql::connection()->table('events as e')->join('visits as v', 'v.id', '=', 'e.visit_id'), 'e.site_id')
+            ->whereBetween('e.created_at', [$p->startSql(), $p->endSql()]);
         $filters->applyToEvents($q);
         $q->where(function ($w) use ($steps) {
             foreach ($steps as $s) {
@@ -591,7 +601,7 @@ class Stats
     public function journeys(Period $p, Filters $f, array $steps, string $direction = 'start', ?string $search = null, int $limit = 12): array
     {
         $visitFilters = new Filters(array_values(array_filter($f->rules, fn ($r) => isset(Filters::VISIT_DIMS[$r[1]]))), $this->site);
-        $q = Sql::connection()->table('events as e')->whereIn('e.visit_id', $this->visitsQ($p, $visitFilters)->select('v.id'))->where('e.site_id', $this->site->id)
+        $q = $this->ofSites(Sql::connection()->table('events as e')->whereIn('e.visit_id', $this->visitsQ($p, $visitFilters)->select('v.id')), 'e.site_id')
             ->orderBy('e.visit_id')->orderBy('e.created_at')->orderBy('e.id')->select('e.visit_id', 'e.visitor_id', 'e.name', 'e.pathname');
 
         $seen = [];     // item key => [visitor id => true]

@@ -143,7 +143,7 @@ class Collector
         foreach (array_filter(array_map('trim', explode(',', strtolower($domain)))) as $candidate) {
             $candidate = preg_replace('/^www\./', '', $candidate);
             $found = Cache::remember('tdm:site:'.$candidate, 60, function () use ($candidate) {
-                $site = Site::where('domain', $candidate)->first();
+                $site = Site::real()->where('domain', $candidate)->first();
 
                 return $site ? ['id' => $site->id, 'domain' => $site->domain, 'owner_id' => $site->members()->wherePivot('role', 'owner')->value('users.id'), 'shields' => $site->shields()->get()->groupBy('type')->map(fn ($g) => $g->pluck('value')->all())->all(), 'currencies' => Schema::hasColumn('goals', 'currency') ? $site->goals()->where('type', 'event')->whereNotNull('currency')->pluck('currency', 'value')->all() : []] : 0;
             });

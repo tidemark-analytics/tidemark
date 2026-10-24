@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BrandingController;
 use App\Http\Controllers\Api\DataController;
 use App\Http\Controllers\Api\PlausibleImportController;
+use App\Http\Controllers\Api\RollupController;
 use App\Http\Controllers\Api\SegmentController;
 use App\Http\Controllers\Api\SettingsController as S;
 use App\Http\Controllers\Api\SiteController;
@@ -64,6 +65,8 @@ Route::middleware('api.auth')->group(function () {
     Route::post('/me/keys', [AuthController::class, 'createKey']);
     Route::delete('/me/keys/{id}', [AuthController::class, 'deleteKey']);
 
+    Route::get('/rollups/candidates', [RollupController::class, 'candidates']);
+    Route::post('/rollups', [RollupController::class, 'store']);
     Route::get('/sites', [SiteController::class, 'index']);
     Route::post('/sites', [SiteController::class, 'store']);
 
@@ -76,6 +79,7 @@ Route::middleware('api.auth')->group(function () {
 
     Route::middleware('site:manage')->prefix('/sites/{site}')->group(function () {
         Route::patch('/', [SiteController::class, 'update']);
+        Route::put('/rollup', [RollupController::class, 'update']);
         Route::patch('/branding', [BrandingController::class, 'update']);
         Route::post('/branding/logo', [BrandingController::class, 'uploadLogo']);
         Route::delete('/branding/logo', [BrandingController::class, 'deleteLogo']);

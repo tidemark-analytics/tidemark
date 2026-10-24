@@ -29,6 +29,7 @@ class PlausibleImportController extends Controller
     {
         /** @var Site $site */
         $site = $request->attributes->get('site');
+        abort_if($site->isRollup(), 422, 'Data can only be imported into a site that collects its own.');
         $this->clear($site);
         [$from, $until] = $this->allowedDays($site);
 

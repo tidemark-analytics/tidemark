@@ -103,6 +103,9 @@ function General({ site, reload }) {
   const [tz, setTz] = useState(site.timezone);
   const [confirm, setConfirm] = useState(null);
   const patch = async (body) => { try { await api(`/sites/${site.domain}`, { method: 'PATCH', body }); reload(); toast('Saved'); } catch (x) { toast(firstError(x), 'err'); } };
+ if (site.rollup) return html`<${Section} title="Reporting timezone" help="Days start and end at midnight in this timezone. It starts as the timezone most of the rollup's sites use."><div class="row"><select value=${tz} onChange=${(e) => setTz(e.target.value)} style="max-width:320px">${zones().map((z) => html`<option value=${z} selected=${z === tz}>${z}</option>`)}</select><button class="btn" disabled=${tz === site.timezone} onClick=${() => patch({ timezone: tz })}>Save</button></div><//>
+    ${site.is_owner && html`<${Section} danger title="Danger zone"><div class="row spread wrap"><div><b>Delete rollup</b><div class="muted">Removes this dashboard and its goals. Your sites and their data are not touched.</div></div><button class="btn danger" onClick=${() => setConfirm('delete')}>Delete rollup</button></div><//>`}
+    ${confirm === 'delete' && html`<${Confirm} title=${`Delete ${site.domain}?`} message="The rollup and its goals will be deleted. The sites it adds up are not affected." onClose=${() => setConfirm(null)} onConfirm=${async () => { await api(`/sites/${site.domain}`, { method: 'DELETE' }); navigate('/sites'); }} />`}`;
   return html`<${Section} title="Tracking snippet" help="Place this in the <head> of every page."><${Snippet} site=${site} /><//>
     <${Section} title="Tracking extras" help="Each one adds a small extension to the script and a matching goal.">
       <${Toggle} label="Outbound link clicks" checked=${site.track_outbound} onChange=${(v) => patch({ track_outbound: v })} />
@@ -199,18 +202,18 @@ function Goals({ site }) {
   return html`<${Section} title="Goals" help="A goal counts how many visitors did something: triggered a custom event, or visited a page.">
       <form class="row wrap goalform" onSubmit=${add}><select value=${type} onChange=${(e) => setType(e.target.value)} aria-label="Goal type" style="width:auto"><option value="event">Custom event</option><option value="page">Pageview</option></select>
         <input class="grow" required placeholder=${type === 'event' ? 'Event name, e.g. Purchase' : 'Page path, e.g. /thanks or /blog/*'} value=${value} onInput=${(e) => setValue(e.target.value)} aria-label="Goal value" />
-        ${type === 'event' && html`<${CurrencySelect} value=${currency} onChange=${setCurrency} disabled=${!revenue} />`}<button class="btn primary">Add goal</button></form>
-      ${!revenue && html`<div class="notice"><${Icon} name="info" size=${16} /><div>Revenue reporting is included with Pro. <${Link} to="/settings">Open your account settings<//> to upgrade.</div></div>`}
+        ${type === 'event' && !site.rollup && html`<${CurrencySelect} value=${currency} onChange=${setCurrency} disabled=${!revenue} />`}<button class="btn primary">Add goal</button></form>
+      ${!revenue && !site.rollup && html`<div class="notice"><${Icon} name="info" size=${16} /><div>Revenue reporting is included with Pro. <${Link} to="/settings">Open your account settings<//> to upgrade.</div></div>`}
       ${err && html`<div class="alert">${err}</div>`}
       ${res.data && res.data.data.length === 0 && html`<p class="muted">No goals yet.</p>`}
-      ${res.data && res.data.data.length > 0 && html`<div class="tscroll"><table class="t"><thead><tr><th>Goal</th><th>Type</th><th>Revenue</th><th></th></tr></thead><tbody>${res.data.data.map((g) => html`<tr><td>${g.name}</td><td class="muted">${g.type === 'event' ? 'Custom event' : 'Pageview'}</td>
-        <td>${g.type === 'event' ? html`<${CurrencySelect} value=${g.currency} onChange=${(c) => setGoalCurrency(g, c)} disabled=${!revenue && !g.currency} label=${'Revenue currency for ' + g.name} />` : html`<span class="muted">–</span>`}</td>
+      ${res.data && res.data.data.length > 0 && html`<div class="tscroll"><table class="t"><thead><tr><th>Goal</th><th>Type</th>${!site.rollup && html`<th>Revenue</th>`}<th></th></tr></thead><tbody>${res.data.data.map((g) => html`<tr><td>${g.name}</td><td class="muted">${g.type === 'event' ? 'Custom event' : 'Pageview'}</td>
+        ${!site.rollup && html`<td>${g.type === 'event' ? html`<${CurrencySelect} value=${g.currency} onChange=${(c) => setGoalCurrency(g, c)} disabled=${!revenue && !g.currency} label=${'Revenue currency for ' + g.name} />` : html`<span class="muted">–</span>`}</td>`}
         <td class="right"><button class="btn sm ghost danger" onClick=${async () => { setErr(null); try { await api(`/sites/${site.domain}/goals/${g.id}`, { method: 'DELETE' }); res.reload(); } catch (x) { setErr(firstError(x)); } }}>Delete</button></td></tr>`)}</tbody></table></div>`}
     <//>
-    <${Section} title="Sending custom events" help="Call this from your site's code to record a goal conversion.">
+    ${site.rollup ? html`<p class="muted small">Goals in a rollup match events and pages by name in every site it adds up. Revenue goals aren't available because the sites may use different currencies.</p>` : html`<${Section} title="Sending custom events" help="Call this from your site's code to record a goal conversion.">
       <${CodeBlock} text="window.plausible('Signup', { props: { plan: 'pro' } })" /><p class="muted">Or tag an element without code: add <code>class="plausible-event-name=Signup"</code>, with the <code>tagged-events</code> script variant.</p><//>
     <${Section} title="Reporting revenue" help="Choose a currency for a custom-event goal, then send an amount with the event. Totals and averages appear when you filter by that goal.">
-      <${CodeBlock} text="window.plausible('Purchase', { revenue: { amount: 29.99, currency: 'USD' } })" /><p class="muted">With the tag method, add <code>plausible-revenue-amount=29.99</code> and <code>plausible-revenue-currency=USD</code> to the class. Amounts sent in another currency are converted into the goal's currency with the European Central Bank's daily rates.</p><//>`;
+      <${CodeBlock} text="window.plausible('Purchase', { revenue: { amount: 29.99, currency: 'USD' } })" /><p class="muted">With the tag method, add <code>plausible-revenue-amount=29.99</code> and <code>plausible-revenue-currency=USD</code> to the class. Amounts sent in another currency are converted into the goal's currency with the European Central Bank's daily rates.</p><//>`}`;
 }
 
 function Funnels({ site }) {
@@ -247,6 +250,24 @@ function Funnels({ site }) {
       ${res.data && res.data.data.length > 0 && html`<div class="tscroll"><table class="t"><thead><tr><th>Funnel</th><th>Steps</th><th></th></tr></thead><tbody>${res.data.data.map((f) => html`<tr><td><b>${f.name}</b></td><td class="muted">${f.steps.map((s) => goalName(s.goal_id)).join(' → ')}</td>
         <td class="right"><button class="btn sm ghost" disabled=${!allowed} onClick=${() => open(f)}>Edit</button><button class="btn sm ghost danger" onClick=${async () => { await api(`/sites/${site.domain}/funnels/${f.id}`, { method: 'DELETE' }); res.reload(); }}>Delete</button></td></tr>`)}</tbody></table></div>`}
     <//>`;
+}
+
+/** Which of the owner's sites a rollup adds up. */
+function RollupSites({ site, reload }) {
+  const cands = useApi('/rollups/candidates', null, []);
+  const [all, setAll] = useState(site.rollup.all);
+  const [chosen, setChosen] = useState(site.rollup.sites.map((s) => s.domain));
+  const [err, setErr] = useState(null);
+  const list = (cands.data && cands.data.data) || [];
+  const dirty = all !== site.rollup.all || (!all && JSON.stringify([...chosen].sort()) !== JSON.stringify(site.rollup.sites.map((s) => s.domain).sort()));
+  const save = async () => { setErr(null); try { await api(`/sites/${site.domain}/rollup`, { method: 'PUT', body: { all, sites: all ? undefined : chosen } }); reload(); toast('Saved'); } catch (x) { setErr(firstError(x)); } };
+  return html`<${Section} title="Sites in this rollup" help="Changing the list changes the whole history: a site you take out disappears from this dashboard's past as well as its future, and the other way round. Your sites themselves are never changed.">
+    ${err && html`<div class="alert">${err}</div>`}
+    <div class="stack sm"><label class="row"><input type="radio" name="scope" checked=${all} onChange=${() => setAll(true)} /> <span><b>All the sites I own</b>, including ones I add later</span></label>
+      <label class="row"><input type="radio" name="scope" checked=${!all} onChange=${() => setAll(false)} /> <span>Only the sites I choose</span></label></div>
+    ${!all && html`<div class="stack sm" role="group" aria-label="Sites in this rollup">${list.map((s) => html`<label class="row"><input type="checkbox" checked=${chosen.includes(s.domain)} onChange=${(e) => setChosen(e.target.checked ? [...chosen, s.domain] : chosen.filter((d) => d !== s.domain))} /> <span>${s.domain}</span></label>`)}</div>`}
+    ${all && html`<p class="muted small">Right now that is ${site.rollup.count} ${site.rollup.count === 1 ? 'site' : 'sites'}.</p>`}
+    <div><button class="btn primary" disabled=${!dirty || (!all && !chosen.length)} onClick=${save}>Save</button></div><//>`;
 }
 
 function People({ site }) {
@@ -286,9 +307,9 @@ export function SiteSettings({ domain, tab }) {
   if (res.error) return html`<main class="main"><${ErrorBox} error=${res.error} /></main>`;
   if (!s) return html`<main class="main"><${Loading} /></main>`;
   if (!s.can_manage) return html`<main class="main"><${Empty} title="No access" icon="lock">Only site owners and admins can change settings.<//></main>`;
-  const tabs = [['general', 'General'], ['visibility', 'Visibility'], ['branding', 'Branding'], ['goals', 'Goals'], ['funnels', 'Funnels'], ['people', 'People'], ['shields', 'Shields']];
+  const tabs = s.rollup ? [['general', 'General'], ['sites', 'Sites'], ['visibility', 'Visibility'], ['branding', 'Branding'], ['goals', 'Goals'], ['funnels', 'Funnels']] : [['general', 'General'], ['visibility', 'Visibility'], ['branding', 'Branding'], ['goals', 'Goals'], ['funnels', 'Funnels'], ['people', 'People'], ['shields', 'Shields']];
   const t = tabs.find((x) => x[0] === tab) ? tab : 'general';
-  const Body = { general: General, visibility: Visibility, branding: Branding, goals: Goals, funnels: Funnels, people: People, shields: Shields }[t];
+  const Body = { general: General, visibility: Visibility, branding: Branding, goals: Goals, funnels: Funnels, sites: RollupSites, people: People, shields: Shields }[t];
   return html`<${SettingsShell} title=${`${domain} settings`} back=${[`/${domain}`, 'Dashboard']} tabs=${tabs} tab=${t} base=${`/${domain}/settings`}><${Body} site=${s} reload=${res.reload} /><//>`;
 }
 
