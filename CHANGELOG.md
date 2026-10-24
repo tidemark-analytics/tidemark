@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.22.1] - 2026-11-02
+
+### Fixed
+- The top stats show the date ranges and previous values only while a comparison is switched on; otherwise they show just the value and its change, as before.
+
 ## [0.22.0] - 2026-11-02
 
 ### Added

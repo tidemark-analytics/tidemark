@@ -61,7 +61,7 @@ function TopGraph({ site, scope, live, onIntervals }) {
         <span class="k">${label}</span>
         <span class="vd"><span class="v">${s ? fmtv(s.value) : html`<span class="skeleton" style="display:inline-block;width:64px;height:26px"></span>`}</span>
         ${s && comparing && !(s.value === 0 && !s.previous) ? html`<span class="d" title=${s.previous !== null && s.previous !== undefined ? 'Previous: ' + fmtv(s.previous) : ''}><${Delta} metric=${k} change=${s.change} /></span>` : ''}</span>
-        ${s && comparing && top.data.comparison_period ? html`<span class="cmp"><span class="range">${rangeLabel(top.data.period)}</span><span class="pv">${s.previous === null || s.previous === undefined ? '–' : fmtv(s.previous)}</span><span class="range">${rangeLabel(top.data.comparison_period)}</span></span>` : ''}</button>`;
+        ${s && comparing && scope.params.comparison && top.data.comparison_period ? html`<span class="cmp"><span class="range">${rangeLabel(top.data.period)}</span><span class="pv">${s.previous === null || s.previous === undefined ? '–' : fmtv(s.previous)}</span><span class="range">${rangeLabel(top.data.comparison_period)}</span></span>` : ''}</button>`;
     })}</div>
     <div class=${'graph-b ' + (busy && g ? 'stale' : '')}>
       ${graph.error && !g ? html`<div class="panel-empty" style="min-height:300px"><b>Couldn't load the graph</b><p class="muted">${graph.error.message}</p><button class="btn sm" onClick=${() => { graph.reload(); top.reload(); }}>Try again</button></div>` : !g ? html`<div class="skeleton" style="height:300px"></div>` : asTable
