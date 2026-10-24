@@ -947,3 +947,6 @@ button.fact:hover { border-color: var(--accent); background: var(--surface); }
 .ri-ico.good { background: var(--good-soft); color: var(--good); }
 .nowrap { white-space: nowrap; }
 @media (max-width: 560px) { .theme-opts { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+/* the sidebar already leads back to your sites and the dashboard; keep the link only where there is no sidebar */
+@media (min-width: 1024px) { .has-side .page-head .crumb-back { display: none; } }
