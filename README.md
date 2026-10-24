@@ -1,6 +1,18 @@
-# Tidemark
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="public/assets/logo/tidemark-horizontal-dark.svg">
+    <img src="public/assets/logo/tidemark-horizontal.svg" alt="Tidemark" width="260">
+  </picture>
+</p>
 
 [![CI](https://github.com/tidemark-analytics/tidemark/actions/workflows/ci.yml/badge.svg)](https://github.com/tidemark-analytics/tidemark/actions/workflows/ci.yml) [![Latest release](https://img.shields.io/github/v/release/tidemark-analytics/tidemark)](https://github.com/tidemark-analytics/tidemark/releases/latest) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![Discord](https://img.shields.io/badge/chat-Discord-5865F2?logo=discord&logoColor=white)](https://discord.gg/sCkHD3PPZh)
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset=".github/assets/dashboard-dark.png">
+    <img src=".github/assets/dashboard-light.png" alt="The Tidemark dashboard: a summary, KPI tiles, a graph and reports for traffic, audience and conversions" width="900">
+  </picture>
+</p>
 
 Simple, privacy-first web analytics that runs on **ordinary PHP shared hosting**. One light dashboard in the spirit of
 [Plausible](https://plausible.io), built with Laravel — upload a zip, open `/install`, done. No Node, no Docker, no SSH required.
