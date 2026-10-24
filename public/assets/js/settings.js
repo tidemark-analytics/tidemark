@@ -141,11 +141,15 @@ function Visibility({ site, reload }) {
   return html`<${Section} title="Public dashboard" help="Anyone with the address can view this site's stats — no sign-in needed."><${Toggle} label="Make the dashboard public" checked=${site.public} onChange=${setPublic} />
       ${site.public && html`<${CodeBlock} text=${`${window.SD.origin}/${site.domain}`} />`}<//>
     <${Section} title="Shared links" help="Private, read-only links you can revoke at any time. Add a password if you like.">
-      ${links.data && links.data.data.length === 0 && html`<p class="muted">No shared links yet.</p>`}
-      ${(links.data ? links.data.data : []).map((l) => html`<div class="row spread wrap linkrow"><div class="grow"><b>${l.name}</b> ${l.password_protected && html`<span class="pill warn"><${Icon} name="lock" size=${11} /> Password</span>`}<div class="mono muted trunc">${url(l)}</div></div>
-        <div class="row"><button class="btn sm" onClick=${() => copy(url(l))}><${Icon} name="copy" size=${13} /> Copy</button><button class="btn sm danger" onClick=${() => setDel(l)}>Delete</button></div></div>`)}
-      <div><button class="btn" onClick=${() => setAdding(true)}><${Icon} name="plus" size=${14} /> New shared link</button></div><//>
-    ${adding && html`<${NewLink} site=${site} onClose=${() => setAdding(false)} onDone=${() => { setAdding(false); links.reload(); }} />`}
+      ${!adding && html`<div class="section-actions"><button class="btn primary" onClick=${() => setAdding(true)}><${Icon} name="plus" size=${14} /> New shared link</button></div>`}
+      ${adding && html`<${NewLink} site=${site} onClose=${() => setAdding(false)} onDone=${() => { setAdding(false); links.reload(); toast('Shared link created'); }} />`}
+      ${links.data && links.data.data.length === 0 && !adding && html`<div class="empty-inline"><${Icon} name="link" size=${18} /><div><b>No shared links yet</b><span>Create one to give someone read-only access without making the dashboard public. You can protect it with a password and delete it any time.</span></div></div>`}
+      ${links.data && links.data.data.length > 0 && html`<ul class="rows" aria-label="Shared links">${links.data.data.map((l) => html`<li class="rowitem">
+        <span class="ri-ico" aria-hidden="true"><${Icon} name=${l.password_protected ? 'lock' : 'link'} size=${16} /></span>
+        <div class="grow ri-main"><b class="trunc">${l.name} ${l.password_protected && html`<span class="pill warn"><${Icon} name="lock" size=${11} /> Password</span>`}</b><span class="mono muted trunc">${url(l)}</span></div>
+        <button class="btn sm" onClick=${() => copy(url(l))}><${Icon} name="copy" size=${13} /> Copy</button>
+        <button class="btn ghost icon sm danger" aria-label=${'Delete shared link ' + l.name} title="Delete link" onClick=${() => setDel(l)}><${Icon} name="trash-2" size=${15} /></button></li>`)}</ul>`}
+    <//>
     ${del && html`<${Confirm} title="Delete shared link?" message=${`Anyone using "${del.name}" will lose access immediately.`} onClose=${() => setDel(null)} onConfirm=${async () => { await api(`/sites/${site.domain}/shared-links/${del.id}`, { method: 'DELETE' }); links.reload(); }} />`}`;
 }
 
@@ -190,10 +194,16 @@ function Branding({ site, reload }) {
 function NewLink({ site, onClose, onDone }) {
   const [f, setF] = useState({ name: '', password: '' });
   const [err, setErr] = useState(null);
-  const save = async () => { try { await api(`/sites/${site.domain}/shared-links`, { method: 'POST', body: { name: f.name, password: f.password || null } }); onDone(); } catch (x) { setErr(firstError(x)); } };
-  return html`<${Modal} title="New shared link" onClose=${onClose} footer=${html`<button class="btn" onClick=${onClose}>Cancel</button><button class="btn primary" disabled=${!f.name} onClick=${save}>Create link</button>`}>
-    <div class="form">${err && html`<div class="alert">${err}</div>`}<${Field} label="Name" help="Only you will see this."><input autofocus value=${f.name} onInput=${(e) => setF({ ...f, name: e.target.value })} placeholder="Marketing team" /><//>
-    <${Field} label="Password (optional)"><input type="password" autocomplete="new-password" value=${f.password} onInput=${(e) => setF({ ...f, password: e.target.value })} /><//></div><//>`;
+  const [busy, setBusy] = useState(false);
+  const save = async (e) => { e.preventDefault(); setErr(null); setBusy(true); try { await api(`/sites/${site.domain}/shared-links`, { method: 'POST', body: { name: f.name, password: f.password || null } }); onDone(); } catch (x) { setErr(firstError(x)); setBusy(false); } };
+  return html`<form class="goal-add" onSubmit=${save}>
+    ${err && html`<div class="alert">${err}</div>`}
+    <div class="fields2">
+      <${Field} label="Name" help="Only you will see this."><input autofocus required value=${f.name} onInput=${(e) => setF({ ...f, name: e.target.value })} placeholder="Marketing team" /><//>
+      <${Field} label="Password (optional)" help="Visitors enter it before they see the dashboard."><input type="password" autocomplete="new-password" value=${f.password} onInput=${(e) => setF({ ...f, password: e.target.value })} /><//>
+    </div>
+    <div class="row"><button class="btn primary" disabled=${!f.name || busy}>Create link</button><button type="button" class="btn" onClick=${onClose}>Cancel</button></div>
+  </form>`;
 }
 
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'NZD', 'CHF', 'JPY', 'CNY', 'HKD', 'SGD', 'INR', 'BRL', 'MXN', 'ZAR', 'SEK', 'NOK', 'DKK', 'PLN', 'CZK'];

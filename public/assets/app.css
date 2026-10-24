@@ -891,3 +891,5 @@ button.fact:hover { border-color: var(--accent); background: var(--surface); }
 .ref > b { font-size: 13.5px; font-weight: 600; }
 .ref + .ref { padding-top: 6px; border-top: 1px solid var(--line); margin-top: 4px; }
 .ref + .ref > b { margin-top: 6px; }
+.fields2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px; align-items: start; }
+@media (max-width: 640px) { .fields2 { grid-template-columns: minmax(0, 1fr); } }
