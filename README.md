@@ -95,7 +95,7 @@ Logo (pictorial mark: pier pilings with a tide line across them), palette, typog
 
 ## Interface notes
 
-- **Layout:** one top bar and one dashboard per site at `/{domain}` — no sidebar, no footer. Site switcher, current visitors, *Filter*, date picker and a ⋮ menu (interval, CSV export, settings) sit in one sticky toolbar.
+- **Layout:** a sidebar lists your sites and the sections of the open dashboard (Overview, Traffic, Audience, Conversions) and opens a ⌘K command palette; one dashboard per site at `/{domain}`. It opens with a plain-language summary and six KPI tiles, with a sticky toolbar for current visitors, *Filter*, the date picker and a ⋮ menu (interval, CSV export, settings). Narrow screens use a top bar instead of the sidebar.
 - **Charts:** hairline grids, one tooltip with the comparison series, keyboard control (←/→) and a *View as table* twin. Refetching dims the previous render instead of flashing skeletons.
 - **Colors:** deep-water neutrals with **Tide** teal as the interface color and **Buoy** amber as the signal. Chart series (`--series-1` Lagoon teal, `--series-2` amber) pass the palette validator on both themes — light `#0891a0`/`#d97706`, dark `#1fa3a8`/`#cf7f0c`. Re-validate if you change them.
 - **Accessibility:** visible focus rings, focus-trapped dialogs, labeled controls, `prefers-reduced-motion` and forced-colors support, light/dark/system themes.
