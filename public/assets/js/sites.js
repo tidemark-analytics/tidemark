@@ -1,5 +1,5 @@
 // "Your sites" list, adding a site, and the installation step.
-import { html, useState, useEffect, useMemo, useApi, api, navigate, Link, Icon, toast, fmtShort, useDocTitle, UserCtx, useContext } from './lib.js';
+import { html, useState, useEffect, useMemo, useApi, api, navigate, Link, Icon, toast, fmtShort, useDocTitle, UserCtx, useContext, BASE } from './lib.js';
 import { Loading, Empty, Field, ErrorBox, Sparkline, Toggle } from './ui.js';
 import { Snippet } from './dashboard.js';
 
@@ -30,7 +30,7 @@ export function SitesPage() {
       ${total > 1 && html`<select aria-label="Sort" value=${sort} onChange=${(e) => setSort(e.target.value)} style="width:auto"><option value="visitors">Most visitors</option><option value="name">Name</option></select>`}
       ${realSites >= 2 && html`<${Link} to="/sites/rollup" class="btn" title="Add up several of your sites in one dashboard"><${Icon} name="layers" size=${14} /> Create a rollup<//>`}
       <${Link} to="/sites/new" class="btn primary"><${Icon} name="plus" size=${14} /> Add a site<//></div></header>
-    ${res.data && res.data.other_sites && res.data.other_sites.count > 0 && html`<div class="notice other-sites"><${Icon} name="info" size=${16} /><div>These are the sites you belong to. ${res.data.other_sites.count.toLocaleString()} other ${res.data.other_sites.count === 1 ? 'site' : 'sites'} on this installation ${res.data.other_sites.count === 1 ? 'is' : 'are'} listed separately. <${Link} to=${res.data.other_sites.path}>View them<//></div></div>`}
+    ${res.data && res.data.other_sites && res.data.other_sites.count > 0 && html`<div class="notice other-sites"><${Icon} name="info" size=${16} /><div>These are the sites you belong to. ${res.data.other_sites.count.toLocaleString()} other ${res.data.other_sites.count === 1 ? 'site' : 'sites'} on this installation ${res.data.other_sites.count === 1 ? 'is' : 'are'} listed separately. <a href=${BASE + res.data.other_sites.path}>View them</a></div></div>`}
     ${res.loading && !res.data ? html`<${Loading} />` : total === 0 ? html`<${Empty} title="Add your first site" icon="globe">Tidemark counts visitors without cookies or personal data. Add a site to get a tracking snippet.<${Link} to="/sites/new" class="btn primary" style="margin-top:10px">Add a site<//><//>`
       : list.length ? html`<div class="sites">${list.map((s) => html`<${SiteCard} s=${s} />`)}</div>` : html`<${Empty} title="No matching sites" icon="search" />`}
   </main>`;

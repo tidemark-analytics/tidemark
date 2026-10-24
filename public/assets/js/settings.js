@@ -489,7 +489,7 @@ function ApiKeys() {
   <//>`;
 }
 
-function Users() {
+export function Users() {
   const { user } = useContext(UserCtx);
   const res = useApi('/admin/users', null, []);
   const blank = { name: '', email: '', password: '', is_admin: false };
@@ -519,7 +519,7 @@ function Users() {
 const mb = (n) => (n / 1048576).toFixed(n < 10485760 ? 1 : 0) + ' MB';
 const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => { const r = (Math.random() * 16) | 0; return (c === 'x' ? r : (r & 3) | 8).toString(16); }));
 
-function Updates() {
+export function Updates() {
   const { setUser } = useContext(UserCtx);
   const refreshUser = async () => { try { setUser((await api('/me')).user); } catch (e) { /* keep the current state */ } };
   const res = useApi('/admin/update', null, []);
@@ -603,7 +603,9 @@ export function AccountSettings({ tab }) {
   useDocTitle('Settings');
   const { user } = useContext(UserCtx);
   const extra = registry.accountTabs.filter((x) => !x.visible || x.visible(user));
-  const tabs = [['profile', 'Profile'], ['security', 'Security'], ...extra.map((x) => [x.key, x.label, !!(x.dot && x.dot(user))]), ...(user.is_admin ? [['users', 'Users'], ...(user.updater_enabled === false ? [] : [['updates', 'Updates', !!user.update]])] : [])];
+  const tabs = [['profile', 'Profile'], ['security', 'Security'], ...extra.map((x) => [x.key, x.label, !!(x.dot && x.dot(user))]), ...(user.is_admin && !registry.adminUi ? [['users', 'Users'], ...(user.updater_enabled === false ? [] : [['updates', 'Updates', !!user.update]])] : [])];
+  // administration lives in its own interface when an extension provides one
+  if (registry.adminUi && user.is_admin && ['users', 'updates', 'customers'].includes(tab)) { window.location.replace(registry.adminUi.href + (tab === 'customers' ? '' : '/' + tab)); return null; }
   const moved = { preferences: 'profile', keys: 'security' }; // older links still land in the right place
   const t = [tab, moved[tab]].find((k) => tabs.some((x) => x[0] === k)) || 'profile';
   const Body = { profile: Profile, security: Security, users: Users, updates: Updates, ...Object.fromEntries(extra.map((x) => [x.key, x.component])) }[t];

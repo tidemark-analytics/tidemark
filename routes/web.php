@@ -25,5 +25,5 @@ Route::middleware('installed')->group(function () {
     Route::view('/sites/{any?}', 'app')->where('any', '.*');
     Route::view('/settings/{any?}', 'app')->where('any', '.*');
     Route::view('/share/{any}', 'app')->where('any', '.*');
-    Route::view('/{domain}/{any?}', 'app')->where('domain', '(?!(api|js|assets|install|up|storage|build)$)[^/]+')->where('any', '.*');
+    Route::view('/{domain}/{any?}', 'app')->where('domain', '(?!(api|js|assets|install|up|storage|build|admin)$)[^/]+')->where('any', '.*');
 });
