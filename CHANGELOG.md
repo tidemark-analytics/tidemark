@@ -6,6 +6,7 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ### Changed
 - Site settings are grouped into four tabs: Tracking (snippet, extras and shields), Conversions (goals and funnels), Sharing and access (people, public dashboard, shared links and branding) and Data (reporting timezone, export and import, and the danger zone). Rollups have Sites, Conversions, Sharing and Data. Older links to the previous tabs still work.
+- Account settings are four tabs: Profile (with a Light, Dark or System theme choice), Security (password, two-factor and API keys), Users and Updates. Goals, funnels, shared links, people, branding, shields, API keys and users use the same inline forms and lists instead of pop-ups and tables.
 
 ### Fixed
 - A long email address no longer gets cut off in the account menu in the sidebar; it wraps onto a second line.

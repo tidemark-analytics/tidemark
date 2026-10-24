@@ -927,3 +927,23 @@ button.fact:hover { border-color: var(--accent); background: var(--surface); }
 .bp svg .l { fill: none; stroke: var(--bc); stroke-width: 2; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
 .bp-foot { padding: 7px 12px; border-top: 1px solid var(--line); font-size: 10.5px; color: var(--ink-3); text-align: center; }
 .seg.wrapseg { flex-wrap: wrap; }
+
+/* account settings */
+.avatar.big { width: 48px; height: 48px; font-size: 19px; }
+.profile-head { display: flex; align-items: center; gap: 14px; padding-bottom: 4px; }
+.form.wide { max-width: 640px; }
+.tzfield { max-width: 320px; }
+.theme-opts { display: grid; grid-template-columns: repeat(3, minmax(0, 150px)); gap: 12px; }
+.theme-opt { display: flex; flex-direction: column; gap: 8px; align-items: stretch; padding: 8px; background: var(--surface); border: 1px solid var(--line-2); border-radius: 12px; cursor: pointer; font-size: 13px; font-weight: 560; color: var(--ink-2); }
+.theme-opt:hover { border-color: var(--ink-3); }
+.theme-opt.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; color: var(--ink); }
+.theme-opt .tp { display: flex; flex-direction: column; gap: 4px; height: 56px; border-radius: 8px; padding: 8px; border: 1px solid rgba(128,128,128,.25); }
+.theme-opt .tp i { display: block; height: 6px; border-radius: 3px; }
+.theme-opt .tp i:nth-child(1) { width: 40%; } .theme-opt .tp i:nth-child(2) { width: 75%; } .theme-opt .tp i:nth-child(3) { width: 55%; }
+.theme-opt.light .tp { background: #f4f7f7; } .theme-opt.light .tp i { background: #0e7c86; opacity: .75; }
+.theme-opt.dark .tp { background: #081418; } .theme-opt.dark .tp i { background: #4fc3be; opacity: .8; }
+.theme-opt.system .tp { background: linear-gradient(90deg, #f4f7f7 50%, #081418 50%); } .theme-opt.system .tp i { background: #0e7c86; opacity: .8; }
+.rowitem.boxed { border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.ri-ico.good { background: var(--good-soft); color: var(--good); }
+.nowrap { white-space: nowrap; }
+@media (max-width: 560px) { .theme-opts { grid-template-columns: repeat(3, minmax(0, 1fr)); } }

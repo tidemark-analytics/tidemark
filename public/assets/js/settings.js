@@ -1,5 +1,5 @@
 // Site settings (General, Visibility, Branding, Goals, People, Shields) and account settings (Preferences, Security, API keys, Users).
-import { html, useState, useEffect, useApi, api, navigate, Link, Icon, toast, copy, toggleTheme, UserCtx, useContext, useDocTitle, ago, countryName, flag, BASE } from './lib.js';
+import { html, useState, useEffect, useApi, api, navigate, Link, Icon, toast, copy, toggleTheme, setTheme, currentTheme, UserCtx, useContext, useDocTitle, ago, countryName, flag, BASE } from './lib.js';
 import { Loading, Empty, ErrorBox, Field, Confirm, Modal, Toggle, CodeBlock } from './ui.js';
 import { Snippet } from './dashboard.js';
 import { registry } from './extensions.js';
@@ -406,68 +406,105 @@ export function SiteSettings({ domain, tab }) {
 }
 
 // -------------------------------------------------------------------------------------- account settings
-function Preferences() {
+const initial = (u) => (u.name || u.email || '?').slice(0, 1).toUpperCase();
+
+function Profile() {
   const { user, setUser } = useContext(UserCtx);
   const [f, setF] = useState({ name: user.name, email: user.email, timezone: user.timezone || 'UTC' });
   const [err, setErr] = useState(null);
+  const [theme, setThemeState] = useState(currentTheme());
+  const changed = f.name !== user.name || f.email !== user.email || f.timezone !== (user.timezone || 'UTC');
   const save = async (e) => { e.preventDefault(); setErr(null); try { const r = await api('/me', { method: 'POST', body: f }); setUser({ ...user, ...r.user }); toast('Saved'); } catch (x) { setErr(firstError(x)); } };
-  return html`<${Section} title="Profile"><form class="form" onSubmit=${save}>${err && html`<div class="alert">${err}</div>`}
-      <${Field} label="Name"><input required value=${f.name} onInput=${(e) => setF({ ...f, name: e.target.value })} /><//>
-      <${Field} label="Email"><input type="email" required value=${f.email} onInput=${(e) => setF({ ...f, email: e.target.value })} /><//>
-      <${Field} label="Timezone"><select value=${f.timezone} onChange=${(e) => setF({ ...f, timezone: e.target.value })}>${zones().map((z) => html`<option value=${z} selected=${z === f.timezone}>${z}</option>`)}</select><//>
-      <div><button class="btn primary">Save changes</button></div></form><//>
-    <${Section} title="Appearance" help="Follows your system by default."><div><button class="btn" onClick=${toggleTheme}><${Icon} name="sun" size=${14} /> Switch light / dark</button></div><//>`;
+  const pick = (t) => { setTheme(t); setThemeState(t); };
+  const THEMES = [['light', 'Light'], ['dark', 'Dark'], ['system', 'System']];
+  return html`<${Section} title="Profile" help="Your name and email are used to sign in and are shown to people you share sites with.">
+      <form class="form wide" onSubmit=${save}>
+        <div class="profile-head"><span class="avatar big" aria-hidden="true">${initial(f)}</span><div class="ri-main"><b>${f.name || 'Your name'}</b><span class="muted">${f.email}</span></div></div>
+        ${err && html`<div class="alert">${err}</div>`}
+        <div class="fields2"><${Field} label="Name"><input required value=${f.name} onInput=${(e) => setF({ ...f, name: e.target.value })} /><//>
+          <${Field} label="Email"><input type="email" required value=${f.email} onInput=${(e) => setF({ ...f, email: e.target.value })} /><//></div>
+        <${Field} label="Timezone" help="Used for dates in your own views. Each site's reports use that site's own timezone." class="tzfield"><select value=${f.timezone} onChange=${(e) => setF({ ...f, timezone: e.target.value })}>${zones().map((z) => html`<option value=${z} selected=${z === f.timezone}>${z}</option>`)}</select><//>
+        <div class="row"><button class="btn primary" disabled=${!changed}>Save changes</button>${changed && html`<span class="muted small">Unsaved changes</span>`}</div></form><//>
+    <${Section} title="Appearance" help="System follows your device and switches with it.">
+      <div class="theme-opts" role="radiogroup" aria-label="Theme">${THEMES.map(([k, l]) => html`<button type="button" role="radio" aria-checked=${theme === k} class=${'theme-opt ' + k + (theme === k ? ' on' : '')} onClick=${() => pick(k)}><span class="tp" aria-hidden="true"><i></i><i></i><i></i></span><span>${l}</span></button>`)}</div><//>`;
 }
 
 function Security() {
   const { user, setUser } = useContext(UserCtx);
-  const [pw, setPw] = useState({ current_password: '', password: '', password_confirmation: '' });
+  const blank = { current_password: '', password: '', password_confirmation: '' };
+  const [pw, setPw] = useState(blank);
   const [err, setErr] = useState(null);
   const [setup, setSetup] = useState(null);
   const [code, setCode] = useState('');
-  const [disable, setDisable] = useState(false);
+  const [disabling, setDisabling] = useState(false);
   const [dpw, setDpw] = useState('');
-  const changePw = async (e) => { e.preventDefault(); setErr(null); try { await api('/me/password', { method: 'POST', body: pw }); setPw({ current_password: '', password: '', password_confirmation: '' }); toast('Password updated'); } catch (x) { setErr(firstError(x)); } };
+  const changePw = async (e) => { e.preventDefault(); setErr(null); try { await api('/me/password', { method: 'POST', body: pw }); setPw(blank); toast('Password updated'); } catch (x) { setErr(firstError(x)); } };
   const refresh = async () => setUser((await api('/me')).user);
-  return html`<${Section} title="Password"><form class="form" onSubmit=${changePw}>${err && html`<div class="alert">${err}</div>`}
-      <${Field} label="Current password"><input type="password" required autocomplete="current-password" value=${pw.current_password} onInput=${(e) => setPw({ ...pw, current_password: e.target.value })} /><//>
-      <${Field} label="New password" help="At least 8 characters."><input type="password" required minlength="8" autocomplete="new-password" value=${pw.password} onInput=${(e) => setPw({ ...pw, password: e.target.value })} /><//>
-      <${Field} label="Confirm new password"><input type="password" required autocomplete="new-password" value=${pw.password_confirmation} onInput=${(e) => setPw({ ...pw, password_confirmation: e.target.value })} /><//>
-      <div><button class="btn primary">Update password</button></div></form><//>
-    <${Section} title="Two-factor authentication" help="Require a code from an authenticator app when signing in.">
-      ${user.two_factor ? html`<div class="row spread wrap"><span class="pill good"><${Icon} name="shield-check" size=${12} /> Enabled</span><button class="btn danger" onClick=${() => setDisable(true)}>Disable</button></div>`
-        : setup ? html`<div class="form"><p>Add this secret to your authenticator app, then enter the 6-digit code it shows.</p><${CodeBlock} text=${setup.secret} /><a class="muted" href=${setup.uri}>Open in authenticator app</a>
-          <${Field} label="Code"><input inputmode="numeric" autocomplete="one-time-code" value=${code} onInput=${(e) => setCode(e.target.value)} /><//>
-          <div><button class="btn primary" onClick=${async () => { try { await api('/me/two-factor/confirm', { method: 'POST', body: { code } }); setSetup(null); await refresh(); toast('Two-factor enabled'); } catch (x) { toast(firstError(x), 'err'); } }}>Confirm and enable</button></div></div>`
-        : html`<div><button class="btn" onClick=${async () => setSetup(await api('/me/two-factor', { method: 'POST' }))}>Set up two-factor</button></div>`}<//>
-    ${disable && html`<${Modal} title="Disable two-factor" onClose=${() => setDisable(false)} footer=${html`<button class="btn danger" onClick=${async () => { try { await api('/me/two-factor', { method: 'DELETE', body: { password: dpw } }); setDisable(false); await refresh(); } catch (x) { toast(firstError(x), 'err'); } }}>Disable</button>`}>
-      <${Field} label="Confirm your password"><input type="password" autofocus value=${dpw} onInput=${(e) => setDpw(e.target.value)} /><//><//>`}`;
+  const mismatch = pw.password_confirmation !== '' && pw.password !== pw.password_confirmation;
+  return html`<${Section} title="Password" help="Use at least 8 characters.">
+      <form class="form wide" onSubmit=${changePw}>${err && html`<div class="alert">${err}</div>`}
+        <${Field} label="Current password" class="tzfield"><input type="password" required autocomplete="current-password" value=${pw.current_password} onInput=${(e) => setPw({ ...pw, current_password: e.target.value })} /><//>
+        <div class="fields2"><${Field} label="New password"><input type="password" required minlength="8" autocomplete="new-password" value=${pw.password} onInput=${(e) => setPw({ ...pw, password: e.target.value })} /><//>
+          <${Field} label="Confirm new password" help=${mismatch ? 'The passwords don\'t match yet.' : ''}><input type="password" required autocomplete="new-password" value=${pw.password_confirmation} onInput=${(e) => setPw({ ...pw, password_confirmation: e.target.value })} /><//></div>
+        <div><button class="btn primary" disabled=${!pw.current_password || !pw.password || mismatch}>Update password</button></div></form><//>
+    <${Section} title="Two-factor authentication" help="Require a code from an authenticator app when you sign in.">
+      ${user.two_factor ? html`<div class="rowitem boxed"><span class="ri-ico good" aria-hidden="true"><${Icon} name="shield-check" size=${16} /></span><div class="grow ri-main"><b>Two-factor is on</b><span class="muted">You'll be asked for a code from your authenticator app at sign-in.</span></div>
+          ${!disabling && html`<button class="btn sm danger" onClick=${() => setDisabling(true)}>Turn off</button>`}</div>
+        ${disabling && html`<form class="goal-add" onSubmit=${async (e) => { e.preventDefault(); try { await api('/me/two-factor', { method: 'DELETE', body: { password: dpw } }); setDisabling(false); setDpw(''); await refresh(); toast('Two-factor turned off'); } catch (x) { toast(firstError(x), 'err'); } }}>
+          <${Field} label="Confirm your password to turn it off"><input type="password" autofocus required value=${dpw} onInput=${(e) => setDpw(e.target.value)} /><//>
+          <div class="row"><button class="btn danger" disabled=${!dpw}>Turn off two-factor</button><button type="button" class="btn" onClick=${() => { setDisabling(false); setDpw(''); }}>Cancel</button></div></form>`}`
+        : setup ? html`<div class="goal-add"><p>Add this secret to your authenticator app, then enter the 6-digit code it shows.</p><${CodeBlock} text=${setup.secret} /><a class="muted small" href=${setup.uri}>Open in authenticator app</a>
+          <${Field} label="Code" class="tzfield"><input inputmode="numeric" autocomplete="one-time-code" placeholder="123456" value=${code} onInput=${(e) => setCode(e.target.value)} /><//>
+          <div class="row"><button class="btn primary" disabled=${!code.trim()} onClick=${async () => { try { await api('/me/two-factor/confirm', { method: 'POST', body: { code } }); setSetup(null); setCode(''); await refresh(); toast('Two-factor enabled'); } catch (x) { toast(firstError(x), 'err'); } }}>Confirm and turn on</button><button class="btn" onClick=${() => { setSetup(null); setCode(''); }}>Cancel</button></div></div>`
+        : html`<div class="rowitem boxed"><span class="ri-ico" aria-hidden="true"><${Icon} name="shield" size=${16} /></span><div class="grow ri-main"><b>Two-factor is off</b><span class="muted">Add a second step to protect your account if your password leaks.</span></div>
+          <button class="btn sm primary" onClick=${async () => setSetup(await api('/me/two-factor', { method: 'POST' }))}>Set up</button></div>`}<//>
+    <${ApiKeys} />`;
 }
 
 function ApiKeys() {
   const res = useApi('/me/keys', null, []);
   const [name, setName] = useState('');
   const [token, setToken] = useState(null);
-  const create = async (e) => { e.preventDefault(); const r = await api('/me/keys', { method: 'POST', body: { name } }); setToken(r.token); setName(''); res.reload(); };
-  return html`<${Section} title="API keys" help="Use a key as a Bearer token with the Stats API (/api/v1/stats/…). Keys have the same access as you."><form class="row wrap" onSubmit=${create}><input class="grow" required placeholder="Key name, e.g. Reporting script" aria-label="Key name" value=${name} onInput=${(e) => setName(e.target.value)} /><button class="btn primary">Create key</button></form>
-    ${token && html`<div class="notice"><${Icon} name="key" size=${16} /><div><b>Copy your key now — it won't be shown again.</b><${CodeBlock} text=${token} /></div></div>`}
-    ${res.data && !res.data.data.length && html`<p class="muted">No keys yet.</p>`}
-    ${res.data && res.data.data.length > 0 && html`<div class="tscroll"><table class="t"><thead><tr><th>Name</th><th>Last used</th><th></th></tr></thead><tbody>${res.data.data.map((k) => html`<tr><td>${k.name}</td><td class="muted">${k.last_used_at ? ago(k.last_used_at.replace('T', ' ').slice(0, 19)) : 'Never'}</td><td class="right"><button class="btn sm ghost danger" onClick=${async () => { await api('/me/keys/' + k.id, { method: 'DELETE' }); res.reload(); }}>Revoke</button></td></tr>`)}</tbody></table></div>`}<//>`;
+  const [err, setErr] = useState(null);
+  const keys = (res.data && res.data.data) || [];
+  const create = async (e) => { e.preventDefault(); setErr(null); try { const r = await api('/me/keys', { method: 'POST', body: { name } }); setToken(r.token); setName(''); res.reload(); } catch (x) { setErr(firstError(x)); } };
+  const revoke = async (k) => { setErr(null); try { await api('/me/keys/' + k.id, { method: 'DELETE' }); res.reload(); } catch (x) { setErr(firstError(x)); } };
+  return html`<${Section} title="API keys" help="Use a key as a Bearer token with the Stats API (/api/v1/stats/…). A key has the same access as you.">
+    <form class="goal-add" onSubmit=${create}><div class="goal-add-row"><input class="grow" required placeholder="Key name, e.g. Reporting script" aria-label="Key name" value=${name} onInput=${(e) => setName(e.target.value)} /><button class="btn primary" disabled=${!name.trim()}>Create key</button></div></form>
+    ${token && html`<div class="notice"><${Icon} name="key" size=${16} /><div><b>Copy your key now. It won't be shown again.</b><${CodeBlock} text=${token} /></div></div>`}
+    ${err && html`<div class="alert">${err}</div>`}
+    ${res.data && !keys.length && html`<div class="empty-inline"><${Icon} name="key" size=${18} /><div><b>No keys yet</b><span>Create one to read your stats from a script or another tool.</span></div></div>`}
+    ${keys.length > 0 && html`<ul class="rows" aria-label="API keys">${keys.map((k) => html`<li class="rowitem">
+      <span class="ri-ico" aria-hidden="true"><${Icon} name="key" size=${16} /></span>
+      <div class="grow ri-main"><b class="trunc">${k.name}</b><span class="muted">${k.last_used_at ? 'Last used ' + ago(k.last_used_at.replace('T', ' ').slice(0, 19)) : 'Never used'}</span></div>
+      <button class="btn ghost icon sm danger" aria-label=${'Revoke key ' + k.name} title="Revoke key" onClick=${() => revoke(k)}><${Icon} name="trash-2" size=${15} /></button></li>`)}</ul>`}
+  <//>`;
 }
 
 function Users() {
   const { user } = useContext(UserCtx);
   const res = useApi('/admin/users', null, []);
-  const [f, setF] = useState({ name: '', email: '', password: '', is_admin: false });
+  const blank = { name: '', email: '', password: '', is_admin: false };
+  const [f, setF] = useState(blank);
+  const [adding, setAdding] = useState(false);
   const [err, setErr] = useState(null);
   const [del, setDel] = useState(null);
-  const add = async (e) => { e.preventDefault(); setErr(null); try { await api('/admin/users', { method: 'POST', body: f }); setF({ name: '', email: '', password: '', is_admin: false }); res.reload(); toast('User created'); } catch (x) { setErr(firstError(x)); } };
-  return html`<${Section} title="Add a user"><form class="form" onSubmit=${add}>${err && html`<div class="alert">${err}</div>`}
-      <div class="grid2"><${Field} label="Name"><input required value=${f.name} onInput=${(e) => setF({ ...f, name: e.target.value })} /><//><${Field} label="Email"><input type="email" required value=${f.email} onInput=${(e) => setF({ ...f, email: e.target.value })} /><//></div>
-      <${Field} label="Temporary password" help="At least 8 characters."><input type="password" required minlength="8" autocomplete="new-password" value=${f.password} onInput=${(e) => setF({ ...f, password: e.target.value })} /><//>
-      <${Toggle} label="Administrator" help="Can manage users and every site." checked=${f.is_admin} onChange=${(v) => setF({ ...f, is_admin: v })} /><div><button class="btn primary">Create user</button></div></form><//>
-    <${Section} title="Users">${res.data && html`<div class="tscroll"><table class="t"><thead><tr><th>User</th><th>Role</th><th class="right">Sites</th><th></th></tr></thead><tbody>${res.data.data.map((u) => html`<tr><td><b>${u.name}</b><div class="muted">${u.email}</div></td><td>${u.is_admin ? html`<span class="pill brand">Admin</span>` : 'Member'}</td><td class="right">${u.sites_count}</td>
-      <td class="right">${u.id !== user.id && html`<button class="btn sm ghost danger" onClick=${() => setDel(u)}>Delete</button>`}</td></tr>`)}</tbody></table></div>`}<//>
+  const users = (res.data && res.data.data) || [];
+  const add = async (e) => { e.preventDefault(); setErr(null); try { await api('/admin/users', { method: 'POST', body: f }); setF(blank); setAdding(false); res.reload(); toast('User created'); } catch (x) { setErr(firstError(x)); } };
+  return html`<${Section} title="Users" help="People who can sign in to this Tidemark install. Give them access to a site under that site's Sharing and access settings.">
+      ${!adding && html`<div class="section-actions"><button class="btn primary" onClick=${() => setAdding(true)}><${Icon} name="plus" size=${14} /> New user</button></div>`}
+      ${adding && html`<form class="goal-add" onSubmit=${add}>${err && html`<div class="alert">${err}</div>`}
+        <div class="fields2"><${Field} label="Name"><input required autofocus value=${f.name} onInput=${(e) => setF({ ...f, name: e.target.value })} /><//><${Field} label="Email"><input type="email" required value=${f.email} onInput=${(e) => setF({ ...f, email: e.target.value })} /><//></div>
+        <${Field} label="Temporary password" help="At least 8 characters. They can change it after signing in." class="tzfield"><input type="password" required minlength="8" autocomplete="new-password" value=${f.password} onInput=${(e) => setF({ ...f, password: e.target.value })} /><//>
+        <${Toggle} label="Administrator" help="Can manage users and every site." checked=${f.is_admin} onChange=${(v) => setF({ ...f, is_admin: v })} />
+        <div class="row"><button class="btn primary">Create user</button><button type="button" class="btn" onClick=${() => { setAdding(false); setErr(null); setF(blank); }}>Cancel</button></div></form>`}
+      ${users.length > 0 && html`<ul class="rows" aria-label="Users">${users.map((u) => html`<li class="rowitem">
+        <span class="avatar" aria-hidden="true">${initial(u)}</span>
+        <div class="grow ri-main"><b class="trunc">${u.name} ${u.id === user.id && html`<span class="muted">(you)</span>`}</b><span class="muted trunc">${u.email}</span></div>
+        <span class="muted small nowrap">${u.sites_count} ${u.sites_count === 1 ? 'site' : 'sites'}</span>
+        ${u.is_admin ? html`<span class="pill brand">Admin</span>` : html`<span class="pill">Member</span>`}
+        ${u.id !== user.id ? html`<button class="btn ghost icon sm danger" aria-label=${'Delete ' + u.name} title="Delete user" onClick=${() => setDel(u)}><${Icon} name="trash-2" size=${15} /></button>` : html`<span class="ri-spacer" aria-hidden="true"></span>`}</li>`)}</ul>`}
+    <//>
     ${del && html`<${Confirm} title=${`Delete ${del.name}?`} message="Their account and API keys are removed. Sites they own keep their data." onClose=${() => setDel(null)} onConfirm=${async () => { await api('/admin/users/' + del.id, { method: 'DELETE' }); res.reload(); }} />`}`;
 }
 
@@ -558,8 +595,9 @@ export function AccountSettings({ tab }) {
   useDocTitle('Settings');
   const { user } = useContext(UserCtx);
   const extra = registry.accountTabs.filter((x) => !x.visible || x.visible(user));
-  const tabs = [['preferences', 'Preferences'], ['security', 'Security'], ['keys', 'API keys'], ...extra.map((x) => [x.key, x.label, !!(x.dot && x.dot(user))]), ...(user.is_admin ? [['users', 'Users'], ...(user.updater_enabled === false ? [] : [['updates', 'Updates', !!user.update]])] : [])];
-  const t = tabs.find((x) => x[0] === tab) ? tab : 'preferences';
-  const Body = { preferences: Preferences, security: Security, keys: ApiKeys, users: Users, updates: Updates, ...Object.fromEntries(extra.map((x) => [x.key, x.component])) }[t];
+  const tabs = [['profile', 'Profile'], ['security', 'Security'], ...extra.map((x) => [x.key, x.label, !!(x.dot && x.dot(user))]), ...(user.is_admin ? [['users', 'Users'], ...(user.updater_enabled === false ? [] : [['updates', 'Updates', !!user.update]])] : [])];
+  const moved = { preferences: 'profile', keys: 'security' }; // older links still land in the right place
+  const t = [tab, moved[tab]].find((k) => tabs.some((x) => x[0] === k)) || 'profile';
+  const Body = { profile: Profile, security: Security, users: Users, updates: Updates, ...Object.fromEntries(extra.map((x) => [x.key, x.component])) }[t];
   return html`<${SettingsShell} title="Account settings" back=${['/sites', 'Your sites']} tabs=${tabs} tab=${t} base="/settings"><${Body} /><//>`;
 }
