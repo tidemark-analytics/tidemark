@@ -248,6 +248,15 @@ export function useApi(path, params, deps = [], { poll = 0, enabled = true, meth
 }
 
 // ----------------------------------------------------------------------------------------- theme
+/** 'light', 'dark', or 'system' (follow the device). */
+export const currentTheme = () => document.documentElement.dataset.theme || 'system';
+export function setTheme(theme) {
+  const root = document.documentElement;
+  try {
+    if (theme === 'system') { delete root.dataset.theme; localStorage.removeItem('tidemark.theme'); }
+    else { root.dataset.theme = theme; localStorage.setItem('tidemark.theme', theme); }
+  } catch (e) { /* private mode */ }
+}
 export function toggleTheme() {
   const root = document.documentElement;
   const cur = root.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');

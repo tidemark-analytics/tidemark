@@ -39,7 +39,7 @@ function TopBar({ user, shared }) {
       : html`<${Link} to=${user ? '/sites' : '/login'} class="brand" aria-label="Tidemark home"><${Lockup} size=${24} /><//>`}
     ${shared && html`<span class="pill">Shared view</span>`}
     <span class="grow"></span>
-    <button class="btn ghost icon" onClick=${toggleTheme} aria-label="Toggle light and dark theme" title="Toggle theme"><${Icon} name="sun" size=${16} class="theme-sun" /><${Icon} name="moon" size=${16} class="theme-moon" /></button>
+    ${!user && html`<button class="btn ghost icon" onClick=${toggleTheme} aria-label="Toggle light and dark theme" title="Toggle theme"><${Icon} name="sun" size=${16} class="theme-sun" /><${Icon} name="moon" size=${16} class="theme-moon" /></button>`}
     ${user ? html`<${AccountMenu} user=${user} />`
       : !shared && html`<${Link} to="/login" class="btn sm">Sign in<//>`}
   </div></header>`;

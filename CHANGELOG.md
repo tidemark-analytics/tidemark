@@ -4,6 +4,18 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [0.27.0] - 2026-11-07
+
+### Changed
+- Site settings are grouped into four tabs: Tracking (snippet, extras and shields), Conversions (goals and funnels), Sharing and access (people, public dashboard, shared links and branding) and Data (reporting timezone, export and import, and the danger zone). Rollups have Sites, Conversions, Sharing and Data. Links to the old tabs still work.
+- Account settings are four tabs: Profile, Security (password, two-factor and API keys), Users and Updates, alongside any tabs your install adds. The light, dark or system theme is chosen under Profile; the toggle is gone from the sidebar, the top bar and the command palette for signed-in users, and stays on public and shared dashboards.
+- Goals, funnels, shared links, people, branding, shields, rollup sites, API keys and users have a new look: inline forms and lists instead of pop-ups and tables, empty states, and a live preview for branding.
+- The filter menu is calmer: after choosing what to filter by, one search box with the operator beside it lists the values with their visitor counts. Tick several, or type to narrow the list and press Enter, then apply. Filters have icons, the Filter button shows how many are active, and Save as segment and Manage segments have a cleaner layout.
+- The sidebar keeps the same Workspace links on every page (Sites, Account, and Users and Updates for administrators) with Community and support under Help. The sites list also shows your busiest sites. The site switcher appears only while you are inside a site, and switching keeps you on the same settings page. The back links on the settings pages are hidden where the sidebar is shown.
+
+### Fixed
+- A long email address no longer gets cut off in the account menu in the sidebar; it wraps onto a second line.
+
 ## [0.26.0] - 2026-11-06
 
 ### Changed

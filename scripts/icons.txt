@@ -51,3 +51,9 @@ sparkles
 trending-up
 house
 chevrons-up-down
+pencil
+file-text
+log-in
+server
+map-pin
+bookmark
