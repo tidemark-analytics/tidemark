@@ -893,3 +893,6 @@ button.fact:hover { border-color: var(--accent); background: var(--surface); }
 .ref + .ref > b { margin-top: 6px; }
 .fields2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px; align-items: start; }
 @media (max-width: 640px) { .fields2 { grid-template-columns: minmax(0, 1fr); } }
+.ri-spacer { flex: none; width: 32px; }
+.rowitem .avatar { flex: none; }
+.mini-select { width: auto; flex: none; }

@@ -315,13 +315,28 @@ function People({ site }) {
   const res = useApi(`/sites/${site.domain}/people`, null, []);
   const [f, setF] = useState({ email: '', role: 'viewer' });
   const [err, setErr] = useState(null);
-  const invite = async (e) => { e.preventDefault(); setErr(null); try { await api(`/sites/${site.domain}/people`, { method: 'POST', body: f }); setF({ ...f, email: '' }); res.reload(); toast('Added'); } catch (x) { setErr(firstError(x)); } };
-  return html`<${Section} title="People" help="Add existing users of this Tidemark install. Viewers can see stats; admins can change settings.">
-    <form class="row wrap" onSubmit=${invite}><input class="grow" type="email" required placeholder="Email address" aria-label="Email" value=${f.email} onInput=${(e) => setF({ ...f, email: e.target.value })} /><select value=${f.role} onChange=${(e) => setF({ ...f, role: e.target.value })} aria-label="Role" style="width:auto"><option value="viewer">Viewer</option><option value="admin">Admin</option></select><button class="btn primary">Add</button></form>
+  const [busy, setBusy] = useState(false);
+  const people = (res.data && res.data.data) || [];
+  const run = async (fn) => { setErr(null); try { await fn(); res.reload(); } catch (x) { setErr(firstError(x)); } };
+  const invite = async (e) => {
+    e.preventDefault(); setErr(null); setBusy(true);
+    try { await api(`/sites/${site.domain}/people`, { method: 'POST', body: f }); setF({ ...f, email: '' }); res.reload(); toast('Added'); } catch (x) { setErr(firstError(x)); }
+    setBusy(false);
+  };
+  const ROLES = [['viewer', 'Viewer', 'eye'], ['admin', 'Admin', 'settings']];
+  return html`<${Section} title="People" help="Add existing users of this Tidemark install to this site.">
+    <form class="goal-add" onSubmit=${invite}>
+      <div class="seg" role="radiogroup" aria-label="Role">${ROLES.map(([k, l, i]) => html`<button type="button" role="radio" aria-checked=${f.role === k} class=${f.role === k ? 'on' : ''} onClick=${() => setF({ ...f, role: k })}><${Icon} name=${i} size=${14} />${l}</button>`)}</div>
+      <div class="goal-add-row"><input class="grow" type="email" required placeholder="Email address of an existing user" aria-label="Email" value=${f.email} onInput=${(e) => setF({ ...f, email: e.target.value })} /><button class="btn primary" disabled=${!f.email || busy}>Add person</button></div>
+      <span class="muted small">${f.role === 'admin' ? 'Admins can see stats and change this site\'s settings.' : 'Viewers can see stats but not change anything.'}</span>
+    </form>
     ${err && html`<div class="alert">${err}</div>`}
-    ${res.data && html`<div class="tscroll"><table class="t"><thead><tr><th>Person</th><th>Role</th><th></th></tr></thead><tbody>${res.data.data.map((u) => html`<tr><td><b>${u.name}</b><div class="muted">${u.email}</div></td>
-      <td>${u.role === 'owner' ? html`<span class="pill brand">Owner</span>` : html`<select value=${u.role} aria-label="Role" style="width:auto" onChange=${async (e) => { await api(`/sites/${site.domain}/people/${u.id}`, { method: 'PATCH', body: { role: e.target.value } }); res.reload(); }}><option value="viewer" selected=${u.role === 'viewer'}>Viewer</option><option value="admin" selected=${u.role === 'admin'}>Admin</option></select>`}</td>
-      <td class="right">${u.role !== 'owner' && html`<button class="btn sm ghost danger" onClick=${async () => { await api(`/sites/${site.domain}/people/${u.id}`, { method: 'DELETE' }); res.reload(); }}>Remove</button>`}</td></tr>`)}</tbody></table></div>`}<//>`;
+    ${people.length > 0 && html`<ul class="rows" aria-label="People with access">${people.map((u) => html`<li class="rowitem">
+      <span class="avatar" aria-hidden="true">${(u.name || u.email || '?').slice(0, 1).toUpperCase()}</span>
+      <div class="grow ri-main"><b class="trunc">${u.name}</b><span class="muted trunc">${u.email}</span></div>
+      ${u.role === 'owner' ? html`<span class="pill brand">Owner</span>` : html`<select class="mini-select" value=${u.role} aria-label=${'Role of ' + u.name} onChange=${(e) => run(() => api(`/sites/${site.domain}/people/${u.id}`, { method: 'PATCH', body: { role: e.target.value } }))}><option value="viewer" selected=${u.role === 'viewer'}>Viewer</option><option value="admin" selected=${u.role === 'admin'}>Admin</option></select>`}
+      ${u.role !== 'owner' ? html`<button class="btn ghost icon sm danger" aria-label=${'Remove ' + u.name} title="Remove from this site" onClick=${() => run(() => api(`/sites/${site.domain}/people/${u.id}`, { method: 'DELETE' }))}><${Icon} name="trash-2" size=${15} /></button>` : html`<span class="ri-spacer" aria-hidden="true"></span>`}</li>`)}</ul>`}
+  <//>`;
 }
 
 const SHIELDS = [['ip', 'IP address', '203.0.113.7 or 203.0.113.0/24'], ['country', 'Country', 'Two-letter code, e.g. DE'], ['page', 'Page', '/admin/* '], ['hostname', 'Hostname', 'example.com — only count these hostnames']];
