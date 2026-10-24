@@ -1,5 +1,5 @@
 // Site settings (General, Visibility, Branding, Goals, People, Shields) and account settings (Preferences, Security, API keys, Users).
-import { html, useState, useEffect, useApi, api, navigate, Link, Icon, toast, copy, toggleTheme, UserCtx, useContext, useDocTitle, ago, countryName, BASE } from './lib.js';
+import { html, useState, useEffect, useApi, api, navigate, Link, Icon, toast, copy, toggleTheme, UserCtx, useContext, useDocTitle, ago, countryName, flag, BASE } from './lib.js';
 import { Loading, Empty, ErrorBox, Field, Confirm, Modal, Toggle, CodeBlock } from './ui.js';
 import { Snippet } from './dashboard.js';
 import { registry } from './extensions.js';
@@ -358,21 +358,36 @@ function People({ site }) {
   <//>`;
 }
 
-const SHIELDS = [['ip', 'IP address', '203.0.113.7 or 203.0.113.0/24'], ['country', 'Country', 'Two-letter code, e.g. DE'], ['page', 'Page', '/admin/* '], ['hostname', 'Hostname', 'example.com — only count these hostnames']];
+const SHIELDS = [
+  ['ip', 'IP address', '203.0.113.7 or 203.0.113.0/24', 'monitor', 'Visits from this address or range are not counted. Add your own to keep your visits out.'],
+  ['country', 'Country', 'Two-letter code, e.g. DE', 'globe', 'Visits from this country are not counted.'],
+  ['page', 'Page', '/admin/*', 'link', 'Views of matching pages are not counted. Use * as a wildcard.'],
+  ['hostname', 'Hostname', 'example.com', 'shield-check', 'Only visits on these hostnames are counted, which helps if someone copies your script onto another site.'],
+];
 function Shields({ site }) {
   const res = useApi(`/sites/${site.domain}/shields`, null, []);
   const [type, setType] = useState('ip');
   const [value, setValue] = useState('');
   const [err, setErr] = useState(null);
-  const add = async (e) => { e.preventDefault(); setErr(null); try { await api(`/sites/${site.domain}/shields`, { method: 'POST', body: { type, value } }); setValue(''); res.reload(); } catch (x) { setErr(firstError(x)); } };
+  const [busy, setBusy] = useState(false);
+  const add = async (e) => { e.preventDefault(); setErr(null); setBusy(true); try { await api(`/sites/${site.domain}/shields`, { method: 'POST', body: { type, value } }); setValue(''); res.reload(); } catch (x) { setErr(firstError(x)); } setBusy(false); };
+  const remove = async (r) => { setErr(null); try { await api(`/sites/${site.domain}/shields/${r.id}`, { method: 'DELETE' }); res.reload(); } catch (x) { setErr(firstError(x)); } };
   const rows = res.data ? res.data.data : [];
-  return html`<${Section} title="Shields" help="Block traffic you don't want counted: your own IP, a country, a path — or only allow specific hostnames. Hits that match are dropped before they're stored.">
-    <form class="row wrap" onSubmit=${add}><select value=${type} onChange=${(e) => setType(e.target.value)} aria-label="Type" style="width:auto">${SHIELDS.map(([k, l]) => html`<option value=${k}>${l}</option>`)}</select>
-      <input class="grow" required placeholder=${SHIELDS.find((s) => s[0] === type)[2]} value=${value} onInput=${(e) => setValue(e.target.value)} aria-label="Value" /><button class="btn primary">Add rule</button></form>
+  const kind = (t) => SHIELDS.find((x) => x[0] === t) || [t, t, '', 'shield', ''];
+  const cur = kind(type);
+  return html`<${Section} title="Shields" help="Keep traffic you don't want out of your numbers. Matching hits are dropped before they're stored.">
+    <form class="goal-add" onSubmit=${add}>
+      <div class="seg wrapseg" role="radiogroup" aria-label="Rule type">${SHIELDS.map(([k, l, , i]) => html`<button type="button" role="radio" aria-checked=${type === k} class=${type === k ? 'on' : ''} onClick=${() => setType(k)}><${Icon} name=${i} size=${14} />${l}</button>`)}</div>
+      <div class="goal-add-row"><input class="grow" required placeholder=${cur[2]} value=${value} onInput=${(e) => setValue(e.target.value)} aria-label=${cur[1]} /><button class="btn primary" disabled=${!value.trim() || busy}>Add rule</button></div>
+      <span class="muted small">${cur[4]}</span>
+    </form>
     ${err && html`<div class="alert">${err}</div>`}
-    ${res.data && !rows.length && html`<p class="muted">No rules yet.</p>`}
-    ${rows.length > 0 && html`<div class="tscroll"><table class="t"><thead><tr><th>Type</th><th>Value</th><th></th></tr></thead><tbody>${rows.map((r) => html`<tr><td>${(SHIELDS.find((s) => s[0] === r.type) || [0, r.type])[1]}</td><td class="mono">${r.type === 'country' ? `${r.value} · ${countryName(r.value)}` : r.value}</td>
-      <td class="right"><button class="btn sm ghost danger" onClick=${async () => { await api(`/sites/${site.domain}/shields/${r.id}`, { method: 'DELETE' }); res.reload(); }}>Delete</button></td></tr>`)}</tbody></table></div>`}<//>`;
+    ${res.data && !rows.length && html`<div class="empty-inline"><${Icon} name="shield" size=${18} /><div><b>No rules yet</b><span>Your site counts every visit. Add your own IP address to keep your visits out, or block a path like /admin/*.</span></div></div>`}
+    ${rows.length > 0 && html`<ul class="rows" aria-label="Shield rules">${rows.map((r) => { const k = kind(r.type); return html`<li class="rowitem">
+      <span class="ri-ico" aria-hidden="true"><${Icon} name=${k[3]} size=${16} /></span>
+      <div class="grow ri-main"><b class="mono trunc">${r.type === 'country' ? `${flag(r.value)} ${countryName(r.value)} · ${r.value}` : r.value}</b><span class="muted">${r.type === 'hostname' ? 'Only count this hostname' : 'Blocked ' + k[1].toLowerCase()}</span></div>
+      <button class="btn ghost icon sm danger" aria-label=${'Delete rule ' + r.value} title="Delete rule" onClick=${() => remove(r)}><${Icon} name="trash-2" size=${15} /></button></li>`; })}</ul>`}
+  <//>`;
 }
 
 export function SiteSettings({ domain, tab }) {

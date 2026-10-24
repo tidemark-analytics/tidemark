@@ -926,3 +926,4 @@ button.fact:hover { border-color: var(--accent); background: var(--surface); }
 .bp svg .a { fill: color-mix(in srgb, var(--bc) 16%, transparent); }
 .bp svg .l { fill: none; stroke: var(--bc); stroke-width: 2; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
 .bp-foot { padding: 7px 12px; border-top: 1px solid var(--line); font-size: 10.5px; color: var(--ink-3); text-align: center; }
+.seg.wrapseg { flex-wrap: wrap; }
