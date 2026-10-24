@@ -42,6 +42,45 @@ function useScrollSpy(ids) {
   return active;
 }
 
+/** Vercel-style picker: the open site on top, a searchable list underneath. */
+function SiteSwitcher({ list, current, onPick }) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState('');
+  const [sel, setSel] = useState(0);
+  const wrap = useRef();
+  const input = useRef();
+  const shown = list.filter((s) => s.domain.toLowerCase().includes(q.trim().toLowerCase()));
+  useEffect(() => {
+    if (!open) return;
+    setQ(''); setSel(Math.max(0, list.findIndex((s) => current && s.domain === current.domain)));
+    setTimeout(() => input.current && input.current.focus(), 0);
+    const out = (e) => wrap.current && !wrap.current.contains(e.target) && setOpen(false);
+    document.addEventListener('mousedown', out);
+    return () => document.removeEventListener('mousedown', out);
+  }, [open]);
+  useEffect(() => setSel(0), [q]);
+  const pick = (s) => { setOpen(false); onPick(s); };
+  const onKey = (e) => {
+    if (e.key === 'Escape') { setOpen(false); }
+    else if (e.key === 'ArrowDown') { e.preventDefault(); setSel((n) => Math.min(shown.length - 1, n + 1)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setSel((n) => Math.max(0, n - 1)); }
+    else if (e.key === 'Enter' && shown[sel]) { e.preventDefault(); pick(shown[sel]); }
+  };
+  const icon = (s) => (s && s.rollup ? 'layers' : 'globe');
+  return html`<div class="side-switch" ref=${wrap}>
+    <button class=${'side-switch-btn' + (open ? ' open' : '')} aria-haspopup="listbox" aria-expanded=${open} onClick=${() => setOpen(!open)}>
+      <${Icon} name=${current ? icon(current) : 'layout-dashboard'} size=${16} /><span class="trunc">${current ? current.domain : 'Select a site'}</span><${Icon} name="chevrons-up-down" size=${14} class="chev" />
+    </button>
+    ${open && html`<div class="side-pop" role="dialog" aria-label="Switch site">
+      <div class="side-pop-in"><${Icon} name="search" size=${14} /><input ref=${input} value=${q} placeholder="Find site…" aria-label="Find site" onInput=${(e) => setQ(e.target.value)} onKeyDown=${onKey} /><kbd>esc</kbd></div>
+      <div class="side-pop-list" role="listbox">${shown.length === 0 ? html`<div class="side-pop-empty">No site matches “${q}”</div>` : shown.map((s, n) => html`<button role="option" aria-selected=${current && s.domain === current.domain} class=${'side-pop-item ' + (n === sel ? 'on' : '')} onMouseMove=${() => setSel(n)} onClick=${() => pick(s)}>
+        <${Icon} name=${icon(s)} size=${14} /><span class="trunc">${s.domain}</span>${s.rollup && html`<em>rollup</em>`}${current && s.domain === current.domain && html`<${Icon} name="check" size=${14} class="tick" />`}</button>`)}</div>
+      <div class="side-pop-foot"><button class="side-pop-item" onClick=${() => { setOpen(false); navigate('/sites'); }}><${Icon} name="layout-dashboard" size=${14} /><span>All sites</span></button>
+        <button class="side-pop-item" onClick=${() => { setOpen(false); navigate('/sites/new'); }}><${Icon} name="plus" size=${14} /><span>Add a site</span></button></div>
+    </div>`}
+  </div>`;
+}
+
 export function Sidebar({ user, path }) {
   const sites = useApi('/sites', null, [path.startsWith('/sites') ? path : '']);
   const [sections, setSections] = useState([]);
@@ -61,15 +100,13 @@ export function Sidebar({ user, path }) {
   const onSite = (p) => path === p || path.startsWith(p + '/');
   return html`<aside class="side" aria-label="Main">
     <${Link} to="/sites" class="side-brand" aria-label="Tidemark home"><${Lockup} size=${22} /><//>
+    <${SiteSwitcher} list=${list} current=${current} onPick=${(s) => navigate('/' + s.domain)} />
     <button class="side-search" onClick=${() => window.dispatchEvent(new CustomEvent('tdm:palette'))}><${Icon} name="search" size=${14} /><span>Search or jump to…</span><kbd>⌘K</kbd></button>
     <nav class="side-nav">
       <${Link} to="/sites" class=${'side-link ' + (path === '/sites' ? 'on' : '')}><${Icon} name="layout-dashboard" size=${16} /><span>All sites</span><//>
-      ${current && sections.length > 0 && html`<div class="side-grp">${current.domain}</div>
+      ${current && sections.length > 0 && html`<div class="side-grp">On this site</div>
         ${sections.map((s) => html`<button class=${'side-link ' + (active === s.id && !onSite('/' + domain + '/settings') ? 'on' : '')} onClick=${() => jump(s.id)}><${Icon} name=${s.icon} size=${16} /><span>${s.label}</span></button>`)}`}
       ${current && html`${canManage && html`<${Link} to=${'/' + domain + '/settings'} class=${'side-link ' + (onSite('/' + domain + '/settings') ? 'on' : '')}><${Icon} name="settings" size=${16} /><span>Site settings</span><//>`}`}
-      <div class="side-grp">Your sites</div>
-      <div class="side-sites">${list.map((s) => html`<${Link} to=${'/' + s.domain} class=${'side-site ' + (s.domain === domain ? 'on' : '')} title=${s.domain}><${Icon} name=${s.rollup ? 'layers' : 'globe'} size=${14} /><span class="trunc">${s.domain}</span>${s.rollup && html`<em>rollup</em>`}<//>`)}
-        <${Link} to="/sites/new" class="side-site add"><${Icon} name="plus" size=${14} /><span>Add a site</span><//></div>
     </nav>
     <div class="side-foot">
       <button class="side-link" onClick=${toggleTheme}><${Icon} name="sun" size=${16} class="theme-sun" /><${Icon} name="moon" size=${16} class="theme-moon" /><span>Light / dark</span></button>
