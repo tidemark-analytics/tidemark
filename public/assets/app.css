@@ -658,3 +658,19 @@ td > .pill { vertical-align: middle; }
 .metric .cmp { display: flex; flex-direction: column; gap: 2px; font-variant-numeric: tabular-nums; }
 .metric .cmp .range { font-size: 11.5px; color: var(--ink-3); font-weight: 450; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .metric .cmp .pv { font-size: 15px; font-weight: 560; color: var(--ink-2); letter-spacing: -0.02em; margin-top: 4px; }
+
+/* journeys */
+.explore { display: flex; flex-direction: column; gap: 12px; }
+.explore-h { display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
+.jcols { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(230px, 1fr); gap: 12px; overflow-x: auto; padding-bottom: 4px; }
+.jcol { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); display: flex; flex-direction: column; min-height: 280px; min-width: 0; }
+.jcol-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px 6px; font-size: 12.5px; color: var(--ink-3); }
+.jcol-h b { font-weight: 560; color: var(--ink-2); }
+.jtoggle { background: none; border: 0; cursor: pointer; color: var(--ink-2); font-weight: 560; font-size: 12.5px; display: inline-flex; gap: 4px; align-items: center; padding: 0; }
+.jtoggle:hover { color: var(--accent-ink); }
+.jsearch { width: 90px; height: 26px; font-size: 12.5px; padding: 0 8px; }
+.jlist { display: flex; flex-direction: column; gap: 2px; padding: 4px 6px 8px; overflow-y: auto; max-height: 380px; }
+.jlist.stale { opacity: 0.6; }
+.jlist .mrow.sel { box-shadow: inset 0 0 0 1.5px var(--accent); }
+.jlist .mrow:disabled { cursor: default; }
+.jcol.idle .panel-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; }

@@ -184,7 +184,7 @@ export const FILTER_DIMS = [
   ['Behavior', [['goal', 'Goal']]],
 ];
 export const DIM_LABEL = Object.fromEntries(FILTER_DIMS.flatMap(([, l]) => l));
-export const dimLabel = (d) => (d.startsWith('prop:') ? d.slice(5) : DIM_LABEL[d] || d);
+export const dimLabel = (d) => (d.startsWith('prop:') ? d.slice(5) : d === 'segment' ? 'Segment' : DIM_LABEL[d] || d);
 
 export const parseFilters = (q) => { try { const f = JSON.parse(q.filters || '[]'); return Array.isArray(f) ? f : []; } catch (e) { return []; } };
 export const setFilters = (list) => setQuery({ filters: list.length ? JSON.stringify(list) : null });

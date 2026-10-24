@@ -190,13 +190,42 @@ function FunnelsBody({ site, scope, poll }) {
     ${res.data ? html`<${FunnelChart} funnel=${res.data} loading=${res.loading} />` : res.error ? html`<div class="panel-empty"><b>Couldn't load this funnel</b><p class="muted">${res.error.message}</p><button class="btn sm" onClick=${res.reload}>Try again</button></div>` : html`<div class="skeleton" style="height:240px"></div>`}`;
 }
 
+/** One column of the journeys explorer: what visitors did at this step, given the steps chosen before it. */
+function JourneyColumn({ i, site, scope, steps, dir, picked, onPick, onToggle }) {
+  const [q, setQ] = useState('');
+  const search = useDebounced(q);
+  const res = useApi(`/sites/${site.domain}/stats/journeys`, { ...scope.params, steps: JSON.stringify(steps.map((x) => [x.type, x.value])), direction: dir, search: search || undefined, limit: 20 }, [], {});
+  const items = res.data && res.data.items;
+  const max = Math.max(1, ...(items || []).map((x) => x.visitors));
+  const title = i === 0 ? (dir === 'start' ? 'Starting point' : 'Ending point') : `${i} step${i > 1 ? 's' : ''} ${dir === 'start' ? 'after' : 'before'}`;
+  return html`<div class="jcol"><div class="jcol-h">${i === 0 ? html`<button class="jtoggle" onClick=${onToggle} title="Switch between where visits start and where they end">${title} <${Icon} name="arrow-up-down" size=${12} /></button>` : html`<b>${title}</b>`}
+      <input class="jsearch" placeholder="Search" aria-label=${'Search ' + title} value=${q} onInput=${(e) => setQ(e.target.value)} /></div>
+    <div class=${'jlist ' + (res.loading ? 'stale' : '')}>${res.error ? html`<div class="panel-empty"><span class="muted">${res.error.message}</span></div>` : !items ? html`<div class="skeleton" style="height:120px"></div>` : !items.length ? html`<div class="panel-empty"><span class="muted">${i === 0 ? 'No visits in this period' : 'Nothing here'}</span></div>`
+      : items.map((x) => html`<button class=${'mrow ' + (picked && picked.type === x.type && picked.value === x.value ? 'sel' : '')} onClick=${() => (x.type === 'none' ? null : onPick(x))} disabled=${x.type === 'none'}><span class="bar" style=${`width:${(x.visitors / max) * 100}%`}></span>
+        <span class="l">${x.type === 'group' && html`<${Icon} name="folder" size=${13} class="muted" />`}<span class="t" title=${x.value}>${x.type === 'none' ? 'No further action' : x.type === 'group' ? x.value + '/*' : x.value}</span></span><span class="r">${fmtShort(x.visitors)}</span></button>`)}</div></div>`;
+}
+
+function ExploreBody({ site, scope }) {
+  const [dir, setDir] = useState('start');
+  const [steps, setSteps] = useState([]);
+  const probe = useApi(`/sites/${site.domain}/stats/journeys`, { ...scope.params, steps: '[]', limit: 1 }, [], {});
+  if (probe.data && probe.data.allowed === false) return html`<div class="panel-empty"><b>Journeys come with Pro</b><p class="muted">See the routes visitors take through your site, step by step.</p>${site.can_manage && html`<${Link} to="/settings" class="btn sm">Upgrade<//>`}</div>`;
+  const shown = Math.max(3, Math.min(steps.length + 1, 5));
+  const pick = (i, x) => setSteps([...steps.slice(0, i), x]);
+  return html`<div class="explore"><div class="explore-h"><b>Explore user journeys</b>${steps.length > 0 && html`<button class="btn sm ghost" onClick=${() => setSteps([])} title="Start again"><${Icon} name="refresh-cw" size=${13} /> Reset</button>`}</div>
+    <div class="jcols">${Array.from({ length: shown }, (_, i) => (i <= steps.length
+      ? html`<${JourneyColumn} key=${dir + i + JSON.stringify(steps.slice(0, i))} i=${i} site=${site} scope=${scope} steps=${steps.slice(0, i)} dir=${dir} picked=${steps[i]} onPick=${(x) => pick(i, x)} onToggle=${() => { setDir(dir === 'start' ? 'end' : 'start'); setSteps([]); }} />`
+      : html`<div class="jcol idle"><div class="jcol-h"><b>${i} step${i > 1 ? 's' : ''} ${dir === 'start' ? 'after' : 'before'}</b></div><div class="panel-empty"><${Icon} name="mouse-pointer-click" size=${16} class="muted" /><span class="muted">${i === 1 ? 'Select a starting point to continue' : 'Select an event to continue'}</span></div></div>`))}</div></div>`;
+}
+
 export function Behaviors({ site, scope, poll }) {
   const detail = scope.goal ? GOAL_DETAIL[scope.goal] : null;
   const f = site.features || {};
   const showFunnels = f.funnels ? true : !!site.can_manage;
-  const tabs = [...(detail ? [{ key: 'detail', label: detail.label }] : []), { key: 'goals', label: 'Goals' }, { key: 'props', label: 'Properties' }, ...(showFunnels ? [{ key: 'funnels', label: 'Funnels' }] : [])];
+  const tabs = [...(detail ? [{ key: 'detail', label: detail.label }] : []), { key: 'goals', label: 'Goals' }, { key: 'props', label: 'Properties' }, ...(showFunnels ? [{ key: 'funnels', label: 'Funnels' }] : []), ...(f.journeys ? true : !!site.can_manage) ? [{ key: 'explore', label: 'Explore' }] : []];
   return html`<${Panel} id="behaviors" wide title="Behaviors" tabs=${tabs} prefer=${detail ? 'detail' : undefined}>
     ${(t) => t.key === 'detail' ? html`<${PropsBody} key=${detail.prop} site=${site} scope=${scope} poll=${poll} fixed=${detail.prop} linkOut=${detail.linkOut} />`
       : t.key === 'goals' ? html`<${GoalsBody} site=${site} scope=${scope} poll=${poll} />`
-      : t.key === 'funnels' ? html`<${FunnelsBody} site=${site} scope=${scope} poll=${poll} />` : html`<${PropsBody} site=${site} scope=${scope} poll=${poll} />`}<//>`;
+      : t.key === 'funnels' ? html`<${FunnelsBody} site=${site} scope=${scope} poll=${poll} />`
+      : t.key === 'explore' ? html`<${ExploreBody} site=${site} scope=${scope} />` : html`<${PropsBody} site=${site} scope=${scope} poll=${poll} />`}<//>`;
 }

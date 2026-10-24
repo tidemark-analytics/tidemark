@@ -91,7 +91,7 @@ function countryCode(text) {
   return countryIdx.get(t.toLowerCase()) || t;
 }
 
-function FilterMenu({ site, scope, initial, onClose }) {
+function FilterMenu({ site, scope, initial, onClose, segs, onSave, onManage }) {
   const editing = initial && initial.index !== undefined;
   const [dim, setDim] = useState(initial ? initial.rule[1] : null);
   const [op, setOp] = useState(initial ? initial.rule[0] : 'is');
@@ -119,7 +119,11 @@ function FilterMenu({ site, scope, initial, onClose }) {
   return html`<div class="pop filter-pop left" role="dialog" aria-label="Filter">
     <div class="fp-head">${dim && !editing ? html`<button class="btn ghost icon sm" aria-label="Back" onClick=${() => { setDim(null); setValues([]); setText(''); }}><${Icon} name="chevron-left" size=${15} /></button>` : null}<b>${dim ? (editing ? 'Edit filter' : dimLabel(dim)) : 'Filter by'}</b></div>
     ${!dim ? html`<div class="searchbox"><${Icon} name="search" size=${14} /><input placeholder="Search filters" aria-label="Search filters" value=${find} onInput=${(e) => setFind(e.target.value)} autofocus /></div>
-      <div class="filter-groups">${groups.map(([g, list]) => {
+      <div class="filter-groups">${segs && segs.allowed && html`<div><div class="grp">Segments</div>
+        ${segs.list.filter((x) => x.name.toLowerCase().includes(find.toLowerCase())).map((x) => html`<button class="item" onClick=${() => { setFilters([...parseFilters(scope.query).filter((r) => r[1] !== 'segment'), ['is', 'segment', [x.id]]]); onClose(); }}><span>${x.name}</span>${x.type === 'site' && html`<span class="muted">Shared</span>`}</button>`)}
+        ${scope.filters.some((r) => r[1] !== 'segment') && site.role && html`<button class="item" onClick=${() => { onClose(); onSave(); }}><span>Save current filters as segment…</span></button>`}
+        ${site.role && html`<button class="item" onClick=${() => { onClose(); onManage(); }}><span>Manage segments…</span></button>`}</div>`}
+      ${groups.map(([g, list]) => {
         const shown = list.filter(([, l]) => l.toLowerCase().includes(find.toLowerCase()));
         return shown.length ? html`<div><div class="grp">${g}</div>${shown.map(([k, l]) => html`<button class="item" onClick=${() => { setDim(k); setOp(k === 'goal' ? 'is' : 'is'); }}>${l}</button>`)}</div>` : null;
       })}</div>`
@@ -133,7 +137,7 @@ function FilterMenu({ site, scope, initial, onClose }) {
   </div>`;
 }
 
-function FilterButton({ site, scope, filter, setFilter }) {
+function FilterButton({ site, scope, filter, setFilter, segs, onSave, onManage }) {
   const ref = useRef();
   useEffect(() => {
     if (!filter) return;
@@ -145,17 +149,54 @@ function FilterButton({ site, scope, filter, setFilter }) {
   }, [!!filter]);
   return html`<div class="pop-wrap" ref=${ref}>
     <button class="btn" aria-haspopup="dialog" aria-expanded=${!!filter} onClick=${() => setFilter(filter ? null : {})}><${Icon} name="funnel" size=${14} /> Filter</button>
-    ${filter && html`<${FilterMenu} key=${filter.index ?? 'new'} site=${site} scope=${scope} initial=${filter.rule ? filter : null} onClose=${() => setFilter(null)} />`}
+    ${filter && html`<${FilterMenu} key=${filter.index ?? 'new'} site=${site} scope=${scope} initial=${filter.rule ? filter : null} onClose=${() => setFilter(null)} segs=${segs} onSave=${onSave} onManage=${onManage} />`}
   </div>`;
 }
 
-function FilterChips({ scope, edit }) {
+function FilterChips({ scope, edit, segs, onSave, site }) {
   const list = parseFilters(scope.query);
   if (!list.length) return null;
+  const valueLabel = (dim, v) => (dim === 'country' ? countryName(v) : dim === 'segment' ? ((segs && segs.list.find((x) => x.id === v)) || { name: 'Unknown segment' }).name : v);
   return html`<div class="chips filter-chips" aria-label="Active filters">${list.map(([op, dim, vals], i) => html`<span class="chip">
-    <button class="chip-edit" onClick=${() => edit({ index: i, rule: [op, dim, vals] })} title="Edit filter"><span>${dimLabel(dim)}</span><em>${opLabel(op)}</em><b>${vals.map((v) => (dim === 'country' ? countryName(v) : v)).join(' or ')}</b></button>
+    <button class="chip-edit" onClick=${() => dim !== 'segment' && edit({ index: i, rule: [op, dim, vals] })} title=${dim === 'segment' ? 'Segment' : 'Edit filter'}><span>${dimLabel(dim)}</span><em>${opLabel(op)}</em><b>${vals.map((v) => valueLabel(dim, v)).join(' or ')}</b></button>
     <button aria-label=${'Remove filter ' + dimLabel(dim)} onClick=${() => setFilters(list.filter((_, j) => j !== i))}><${Icon} name="x" size=${12} /></button></span>`)}
-    ${list.length > 1 && html`<button class="more" onClick=${() => setFilters([])}>Clear all</button>`}</div>`;
+    ${list.length > 1 && html`<button class="more" onClick=${() => setFilters([])}>Clear all</button>`}
+    ${segs && segs.allowed && site.role && list.some((r) => r[1] !== 'segment') && html`<button class="more" onClick=${onSave}>Save as segment</button>`}</div>`;
+}
+
+/** Name the current filters and keep them, for yourself or (owners and admins) for everyone who can see the site. */
+function SaveSegment({ site, scope, segs, onClose }) {
+  const [name, setName] = useState('');
+  const [type, setType] = useState('personal');
+  const [err, setErr] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const save = async () => {
+    setBusy(true); setErr(null);
+    try {
+      const r = await api(`/sites/${site.domain}/segments`, { method: 'POST', body: { name, type, filters: parseFilters(scope.query).filter((x) => x[1] !== 'segment') } });
+      segs.reload(); setFilters([['is', 'segment', [r.data.id]]]); toast('Segment saved'); onClose();
+    } catch (x) { setErr((x.body && x.body.errors && Object.values(x.body.errors)[0][0]) || x.message); setBusy(false); }
+  };
+  return html`<${Modal} title="Save as segment" onClose=${onClose} footer=${html`<button class="btn" onClick=${onClose}>Cancel</button><button class="btn primary" disabled=${!name.trim() || busy} onClick=${save}>Save segment</button>`}>
+    <div class="form">${err && html`<div class="alert">${err}</div>`}
+      <${Field} label="Name"><input autofocus maxlength="100" value=${name} onInput=${(e) => setName(e.target.value)} placeholder="Visitors from Germany" /><//>
+      <${Field} label="Who can use it"><select value=${type} onChange=${(e) => setType(e.target.value)}><option value="personal">Only me</option>${site.can_manage && html`<option value="site">Everyone who can see this site</option>`}</select><//>
+      <p class="muted small">It saves ${scope.filters.filter((r) => r[1] !== 'segment').length} filter${scope.filters.filter((r) => r[1] !== 'segment').length === 1 ? '' : 's'}. Pick it from the Filter menu any time.</p></div><//>`;
+}
+
+function ManageSegments({ site, scope, segs, onClose }) {
+  const [err, setErr] = useState(null);
+  const [names, setNames] = useState({});
+  const current = parseFilters(scope.query).filter((x) => x[1] !== 'segment');
+  const run = async (fn) => { setErr(null); try { await fn(); segs.reload(); } catch (x) { setErr(x.message); } };
+  const can = (x) => x.type === 'site' ? site.can_manage : x.mine;
+  return html`<${Modal} title="Segments" onClose=${onClose} wide footer=${html`<button class="btn" onClick=${onClose}>Done</button>`}>
+    ${err && html`<div class="alert">${err}</div>`}
+    ${!segs.list.length && html`<p class="muted">No segments yet. Add some filters, then choose Save as segment.</p>`}
+    ${segs.list.length > 0 && html`<div class="tscroll"><table class="t"><thead><tr><th>Name</th><th>Shared</th><th></th></tr></thead><tbody>${segs.list.map((x) => html`<tr><td>
+        <input aria-label=${'Name of ' + x.name} value=${names[x.id] ?? x.name} disabled=${!can(x)} maxlength="100" onInput=${(e) => setNames({ ...names, [x.id]: e.target.value })} onBlur=${() => names[x.id] && names[x.id] !== x.name && run(() => api(`/sites/${site.domain}/segments/${x.id}`, { method: 'PATCH', body: { name: names[x.id] } }))} /></td>
+      <td class="muted">${x.type === 'site' ? 'Everyone' : 'Only you'}</td>
+      <td class="right">${can(x) && html`<button class="btn sm ghost" disabled=${!current.length} title=${current.length ? 'Replace the saved filters with the ones on screen' : 'Apply some filters first'} onClick=${() => run(() => api(`/sites/${site.domain}/segments/${x.id}`, { method: 'PATCH', body: { filters: current } }).then(() => toast('Segment updated')))}>Use current filters</button><button class="btn sm ghost danger" onClick=${() => run(() => api(`/sites/${site.domain}/segments/${x.id}`, { method: 'DELETE' }))}>Delete</button>`}</td></tr>`)}</tbody></table></div>`}<//>`;
 }
 
 // ------------------------------------------------------------------------------------------- date picker
@@ -286,8 +327,12 @@ export function Dashboard({ domain, shared }) {
   const [rev, setRev] = useState(0);
   const [intervals, setIntervals] = useState(null);
   const [filter, setFilter] = useState(null);
+  const [segmentDialog, setSegmentDialog] = useState(null);
   const s = site.data && site.data.data;
   const scope = useScope(s);
+  const segmentsOn = !!(s && s.features && s.features.segments);
+  const segData = useApi(segmentsOn ? `/sites/${domain}/segments` : null, null, [domain, segmentsOn], { enabled: segmentsOn });
+  const segs = segmentsOn ? { allowed: !segData.data || segData.data.allowed !== false, list: (segData.data && segData.data.data) || [], reload: segData.reload } : null;
   useDocTitle(domain);
   // visitors to a public or shared dashboard see the site's own branding; signed-in members keep the normal look
   const brand = !user && s ? s.brand : null;
@@ -307,11 +352,13 @@ export function Dashboard({ domain, shared }) {
       <${SiteSwitcher} site=${s} linkable=${!shared && !!user} />
       <${CurrentVisitors} site=${s} scope=${scope} />
       <span class="grow"></span>
-      <${FilterButton} site=${s} scope=${scope} filter=${filter} setFilter=${setFilter} />
+      <${FilterButton} site=${s} scope=${scope} filter=${filter} setFilter=${setFilter} segs=${segs} onSave=${() => setSegmentDialog('save')} onManage=${() => setSegmentDialog('manage')} />
       <${DatePicker} site=${s} scope=${scope} />
       <${MoreMenu} site=${s} scope=${scope} intervals=${intervals} />
     </div>
-    <${FilterChips} scope=${scope} edit=${(f) => setFilter(f)} />
+    <${FilterChips} scope=${scope} edit=${(f) => setFilter(f)} segs=${segs} site=${s} onSave=${() => setSegmentDialog('save')} />
+    ${segmentDialog === 'save' && html`<${SaveSegment} site=${s} scope=${scope} segs=${segs} onClose=${() => setSegmentDialog(null)} />`}
+    ${segmentDialog === 'manage' && html`<${ManageSegments} site=${s} scope=${scope} segs=${segs} onClose=${() => setSegmentDialog(null)} />`}
     ${s.imported && scope.filters.length > 0 && html`<p class="muted small imported-note">Data imported from Plausible (${s.imported.start} to ${s.imported.end}) is left out while a filter is applied.</p>`}
     ${!s.has_data && !live && html`<${Waiting} site=${s} onData=${() => { site.reload(); setRev((r) => r + 1); }} />`}
     <${TopGraph} site=${s} scope=${scope} live=${live} onIntervals=${setIntervals} />

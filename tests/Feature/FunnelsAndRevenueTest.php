@@ -182,7 +182,7 @@ class FunnelsAndRevenueTest extends TestCase
             }
         });
 
-        $this->getJson('/api/sites/example.com')->assertJsonPath('data.features', ['funnels' => false, 'revenue' => false]);
+        $this->getJson('/api/sites/example.com')->assertJsonPath('data.features', ['funnels' => false, 'revenue' => false, 'segments' => true, 'journeys' => true]);
         $this->postJson('/api/sites/example.com/funnels', ['name' => 'X', 'steps' => [$goal->id, $other->id]])->assertForbidden();
         $this->getJson($this->url('funnels'))->assertOk()->assertJsonPath('allowed', false)->assertJsonPath('results', []);
         $this->patchJson("/api/sites/example.com/goals/{$other->id}", ['currency' => 'EUR'])->assertUnprocessable();

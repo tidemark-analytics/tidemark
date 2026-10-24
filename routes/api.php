@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BrandingController;
 use App\Http\Controllers\Api\DataController;
 use App\Http\Controllers\Api\PlausibleImportController;
+use App\Http\Controllers\Api\SegmentController;
 use App\Http\Controllers\Api\SettingsController as S;
 use App\Http\Controllers\Api\SiteController;
 use App\Http\Controllers\Api\StatsApiController;
@@ -39,6 +40,8 @@ Route::middleware('api.auth:optional')->group(function () {
         Route::get('/stats/graph', [StatsController::class, 'graph']);
         Route::get('/stats/breakdown/{dim}', [StatsController::class, 'breakdown']);
         Route::get('/stats/goals', [StatsController::class, 'goals']);
+        Route::get('/segments', [SegmentController::class, 'index']);
+        Route::get('/stats/journeys', [StatsController::class, 'journeys']);
         Route::get('/stats/funnels', [StatsController::class, 'funnels']);
         Route::get('/stats/funnels/{funnel}', [StatsController::class, 'funnel']);
         Route::get('/stats/props', [StatsController::class, 'props']);
@@ -63,6 +66,13 @@ Route::middleware('api.auth')->group(function () {
 
     Route::get('/sites', [SiteController::class, 'index']);
     Route::post('/sites', [SiteController::class, 'store']);
+
+    // Anyone with access to a site (viewers included) may keep personal segments; owners and admins may also share them with everyone.
+    Route::middleware('site:view')->prefix('/sites/{site}')->group(function () {
+        Route::post('/segments', [SegmentController::class, 'store']);
+        Route::patch('/segments/{segment}', [SegmentController::class, 'update']);
+        Route::delete('/segments/{segment}', [SegmentController::class, 'destroy']);
+    });
 
     Route::middleware('site:manage')->prefix('/sites/{site}')->group(function () {
         Route::patch('/', [SiteController::class, 'update']);

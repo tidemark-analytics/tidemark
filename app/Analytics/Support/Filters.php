@@ -2,9 +2,11 @@
 
 namespace App\Analytics\Support;
 
+use App\Models\Segment;
 use App\Models\Site;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 /**
  * Dashboard filters, Plausible v2 style: [["is", "country", ["US"]], ["contains", "page", ["/blog"]], ...]
@@ -35,7 +37,7 @@ class Filters
         $raw = $r->input('filters');
         $list = is_string($raw) ? json_decode($raw, true) : (is_array($raw) ? $raw : []);
 
-        return new self(self::sanitize(is_array($list) ? $list : []), $site);
+        return new self(self::expandSegments(self::sanitize(is_array($list) ? $list : []), $site), $site);
     }
 
     public static function sanitize(array $list): array
@@ -47,9 +49,38 @@ class Filters
             }
             [$op, $dim, $values] = $r;
             $values = array_values(array_filter(array_map(fn ($v) => is_scalar($v) ? mb_substr((string) $v, 0, 300) : null, (array) $values), fn ($v) => $v !== null && $v !== ''));
-            $known = isset(self::VISIT_DIMS[$dim]) || isset(self::EVENT_DIMS[$dim]) || $dim === 'goal' || str_starts_with((string) $dim, 'prop:');
+            $known = isset(self::VISIT_DIMS[$dim]) || ($dim === 'segment' && $op === 'is') || isset(self::EVENT_DIMS[$dim]) || $dim === 'goal' || str_starts_with((string) $dim, 'prop:');
             if (in_array($op, ['is', 'is_not', 'contains', 'contains_not'], true) && $known && $values) {
                 $out[] = [$op, $dim, $values];
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * `segment is <id>` stands for the filters saved in that segment. Only segments the viewer may use are accepted (a site's segments, or
+     * their own personal ones), and a segment can't contain another, so a missing or private one is an error rather than "no filter".
+     *
+     * @param  array<int,array{0:string,1:string,2:array<int,string>}>  $rules
+     * @return array<int,array{0:string,1:string,2:array<int,string>}>
+     */
+    public static function expandSegments(array $rules, ?Site $site): array
+    {
+        $out = [];
+        foreach ($rules as $rule) {
+            if ($rule[1] !== 'segment') {
+                $out[] = $rule;
+
+                continue;
+            }
+            abort_unless($site && $site->segmentsAllowed(), 403, 'Segments are not available on this plan.');
+            $segment = Segment::where('site_id', $site->id)->visibleTo(Auth::user())->whereKey($rule[2][0])->first();
+            abort_unless($segment, 422, 'That segment no longer exists.');
+            foreach (self::sanitize((array) $segment->filters) as $saved) {
+                if ($saved[1] !== 'segment') {
+                    $out[] = $saved;
+                }
             }
         }
 

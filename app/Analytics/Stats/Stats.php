@@ -579,6 +579,109 @@ class Stats
         return fn (string $name, string $path) => $name === 'pageview' && preg_match($regex, $path) === 1;
     }
 
+    /**
+     * The journeys explorer: where visits go from a starting point (or, with `end`, what led to an ending point). Each visit is the
+     * ordered list of its pageviews and custom events, with immediate repeats of one page collapsed. `$steps` is the chain chosen so
+     * far, as [type, value] pairs (`page`, `group` for a path prefix, or `event`); the result lists what visits did next, with how many
+     * visitors took each route. Visit-level filters narrow the visits; page, goal and property filters do not apply.
+     *
+     * @param  array<int,array{0:string,1:string}>  $steps
+     * @return array{total:int,items:array<int,array{type:string,value:string,visitors:int}>,has_more:bool}
+     */
+    public function journeys(Period $p, Filters $f, array $steps, string $direction = 'start', ?string $search = null, int $limit = 12): array
+    {
+        $visitFilters = new Filters(array_values(array_filter($f->rules, fn ($r) => isset(Filters::VISIT_DIMS[$r[1]]))), $this->site);
+        $q = Sql::connection()->table('events as e')->whereIn('e.visit_id', $this->visitsQ($p, $visitFilters)->select('v.id'))->where('e.site_id', $this->site->id)
+            ->orderBy('e.visit_id')->orderBy('e.created_at')->orderBy('e.id')->select('e.visit_id', 'e.visitor_id', 'e.name', 'e.pathname');
+
+        $seen = [];     // item key => [visitor id => true]
+        $matched = [];  // visitors whose route matches the steps chosen so far
+        $deeper = [];   // group paths that have a page below them
+        $depth = count($steps);
+        $visit = null;
+        $seq = [];
+        $visitor = null;
+        $flush = function () use (&$seq, &$visitor, &$seen, &$matched, &$deeper, $steps, $depth, $direction) {
+            if (! $seq) {
+                return;
+            }
+            $route = $direction === 'end' ? array_reverse($seq) : $seq;
+            foreach ($steps as $i => [$type, $value]) {
+                if (! isset($route[$i]) || ! self::nodeMatches($route[$i], $type, $value)) {
+                    return;
+                }
+            }
+            $matched[$visitor] = true;
+            foreach (isset($route[$depth]) ? self::nodeKeys($route[$depth], $deeper) : ($depth > 0 ? ['n:'] : []) as $key) {
+                $seen[$key][$visitor] = true;
+            }
+        };
+        foreach ($q->cursor() as $e) {
+            if ($e->visit_id !== $visit) {
+                $flush();
+                $visit = $e->visit_id;
+                $visitor = $e->visitor_id;
+                $seq = [];
+            }
+            $node = $e->name === 'pageview' ? ['page', (string) $e->pathname] : ['event', (string) $e->name];
+            if (count($seq) < 200 && ! ($seq && end($seq) === $node && $node[0] === 'page')) {
+                $seq[] = $node;
+            }
+        }
+        $flush();
+
+        $items = [];
+        foreach ($seen as $key => $visitors) {
+            [$type, $value] = [match ($key[0]) {
+                'p' => 'page', 'g' => 'group', 'e' => 'event', default => 'none'
+            }, substr($key, 2)];
+            if ($type === 'group' && empty($deeper[$value])) {
+                continue; // a folder with nothing below it would only repeat the page
+            }
+            if ($search !== null && $search !== '' && $type !== 'none' && stripos($value, $search) === false) {
+                continue;
+            }
+            $items[] = ['type' => $type, 'value' => $value, 'visitors' => count($visitors)];
+        }
+        usort($items, fn ($a, $b) => [$a['type'] === 'none' ? 0 : 1, $b['visitors'], $a['value']] <=> [$b['type'] === 'none' ? 0 : 1, $a['visitors'], $b['value']]);
+
+        return ['total' => count($matched), 'items' => array_slice($items, 0, $limit), 'has_more' => count($items) > $limit];
+    }
+
+    /** @param array{0:string,1:string} $node */
+    private static function nodeMatches(array $node, string $type, string $value): bool
+    {
+        return match ($type) {
+            'group' => $node[0] === 'page' && ($node[1] === $value || str_starts_with($node[1], $value.'/')),
+            default => $node[0] === $type && $node[1] === $value,
+        };
+    }
+
+    /**
+     * The list entries a step counts towards: the page or event itself, and for a page its top-level folder.
+     *
+     * @param  array{0:string,1:string}  $node
+     * @param  array<string,bool>  $deeper
+     * @return array<int,string>
+     */
+    private static function nodeKeys(array $node, array &$deeper): array
+    {
+        if ($node[0] === 'event') {
+            return ['e:'.$node[1]];
+        }
+        $keys = ['p:'.$node[1]];
+        $segment = explode('/', trim($node[1], '/'))[0];
+        if ($segment !== '') {
+            $folder = '/'.$segment;
+            $keys[] = 'g:'.$folder;
+            if ($node[1] !== $folder && $node[1] !== $folder.'/') {
+                $deeper[$folder] = true;
+            }
+        }
+
+        return $keys;
+    }
+
     /** Custom property keys seen on events in the window. */
     public function propKeys(Period $p, Filters $f): array
     {

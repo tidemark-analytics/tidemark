@@ -2,6 +2,16 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.22.0] - 2026-11-02
+
+### Added
+- **Segments.** Save the filters on screen as a named segment (Filter → Save current filters as segment) and apply it later from the Filter menu. A personal segment is yours alone; owners and admins can share one with everyone who can see the site, including public and shared dashboards. Rename, update or delete them under Filter → Manage segments.
+- **Journeys.** A new Explore tab in Behaviors follows visits step by step: choose a starting point (or switch to an ending point) and see what visitors did next, then pick a step to go deeper. Pages, folders (`/blog/*`) and custom events are all steps, and visit filters such as country or source narrow who is counted.
+- Extensions can limit both with the new optional `App\Contracts\AllowsExploration`, next to `Entitlements`. Without it every site may use them.
+
+### Fixed
+- Deleting a site now also removes its funnels and segments.
+
 ## [0.21.0] - 2026-11-01
 
 ### Changed

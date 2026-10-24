@@ -8,6 +8,7 @@ use App\Contracts\Entitlements;
 use App\Contracts\LimitsSiteList;
 use App\Events\SiteCreated;
 use App\Http\Controllers\Controller;
+use App\Models\FunnelStep;
 use App\Models\Goal;
 use App\Models\Site;
 use Illuminate\Http\Request;
@@ -104,7 +105,8 @@ class SiteController extends Controller
         $site = $request->attributes->get('site');
         $this->wipe($site->id);
         PlausibleImportController::clear($site);
-        foreach (['goals', 'sharedLinks', 'shields'] as $rel) {
+        FunnelStep::whereIn('funnel_id', $site->funnels()->pluck('id'))->delete();
+        foreach (['funnels', 'segments', 'goals', 'sharedLinks', 'shields'] as $rel) {
             $site->{$rel}()->delete();
         }
         $site->members()->detach();
@@ -145,7 +147,7 @@ class SiteController extends Controller
             'has_data' => $first !== null,
             'first_visit_at' => $first?->toIso8601String(),
             'brand' => $site->brand(),
-            'features' => ['funnels' => $site->funnelsAllowed(), 'revenue' => $site->revenueAllowed()],
+            'features' => ['funnels' => $site->funnelsAllowed(), 'revenue' => $site->revenueAllowed(), 'segments' => $site->segmentsAllowed(), 'journeys' => $site->journeysAllowed()],
             'imported' => $site->imported_from ? ['from' => $site->imported_from, 'start' => $site->imported_start?->toDateString(), 'end' => $site->imported_end?->toDateString()] : null,
         ] + (in_array($role, ['owner', 'admin'], true) ? ['branding' => [
             'allowed' => $site->brandingAllowed(), 'name' => $site->brand_name, 'color' => $site->brand_color, 'has_logo' => (bool) $site->brand_logo,

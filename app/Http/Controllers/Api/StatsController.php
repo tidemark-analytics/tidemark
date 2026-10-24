@@ -98,6 +98,25 @@ class StatsController extends Controller
         return $stats->funnel($s->funnels()->findOrFail($funnel), $p, $f);
     }
 
+    /** One column of the journeys explorer: what visitors did after (or before) the steps chosen so far. */
+    public function journeys(Request $r)
+    {
+        [$site, $stats, $p, $f] = $this->ctx($r);
+        if (! $site->journeysAllowed()) {
+            return ['allowed' => false, 'total' => 0, 'items' => [], 'has_more' => false];
+        }
+        $raw = json_decode((string) $r->input('steps', '[]'), true);
+        $steps = [];
+        foreach (array_slice(is_array($raw) ? $raw : [], 0, 8) as $step) {
+            if (is_array($step) && in_array($step[0] ?? null, ['page', 'group', 'event'], true) && is_string($step[1] ?? null) && $step[1] !== '') {
+                $steps[] = [$step[0], mb_substr($step[1], 0, 500)];
+            }
+        }
+        $direction = $r->input('direction') === 'end' ? 'end' : 'start';
+
+        return ['allowed' => true] + $stats->journeys($p, $f, $steps, $direction, $r->input('search'), min(50, max(1, (int) $r->input('limit', 12))));
+    }
+
     public function props(Request $r)
     {
         [, $stats, $p, $f] = $this->ctx($r);

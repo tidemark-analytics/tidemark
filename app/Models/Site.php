@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Contracts\AllowsBranding;
 use App\Contracts\AllowsConversionReports;
+use App\Contracts\AllowsExploration;
 use App\Contracts\Entitlements;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
@@ -36,6 +37,11 @@ class Site extends Model
     public function funnels(): HasMany
     {
         return $this->hasMany(Funnel::class);
+    }
+
+    public function segments(): HasMany
+    {
+        return $this->hasMany(Segment::class);
     }
 
     public function sharedLinks(): HasMany
@@ -78,6 +84,22 @@ class Site extends Model
         $entitlements = app(Entitlements::class);
 
         return ! ($entitlements instanceof AllowsConversionReports) || $entitlements->allowsRevenue($this);
+    }
+
+    /** Whether this site may save and use segments (always true unless an extension limits it). */
+    public function segmentsAllowed(): bool
+    {
+        $entitlements = app(Entitlements::class);
+
+        return ! ($entitlements instanceof AllowsExploration) || $entitlements->allowsSegments($this);
+    }
+
+    /** Whether this site may use the journeys explorer (always true unless an extension limits it). */
+    public function journeysAllowed(): bool
+    {
+        $entitlements = app(Entitlements::class);
+
+        return ! ($entitlements instanceof AllowsExploration) || $entitlements->allowsJourneys($this);
     }
 
     /** Whether this site may show its own branding on public pages (always true unless an extension limits it). */
