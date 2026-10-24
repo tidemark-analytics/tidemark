@@ -843,3 +843,8 @@ button.fact:hover { border-color: var(--accent); background: var(--surface); }
 .side-pop-item em { margin-left: auto; font-style: normal; font-size: 10.5px; color: var(--harbor-mute); }
 .side-pop-item em + .tick { margin-left: 8px; }
 .side-pop-empty { padding: 16px 10px; text-align: center; font-size: 12.5px; color: var(--harbor-mute); }
+
+/* account menu: keep it inside the sidebar and let a long email wrap instead of being cut off */
+.side .pop { left: 0; right: 0; width: auto; min-width: 0; }
+.side .pop > div { min-width: 0 !important; }
+.who span { overflow-wrap: anywhere; }
