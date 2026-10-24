@@ -849,3 +849,45 @@ button.fact:hover { border-color: var(--accent); background: var(--surface); }
 .side .pop > div { min-width: 0 !important; }
 .who span { overflow-wrap: anywhere; }
 .card.stack > hr { margin: 0; } /* the stack's own gap already spaces a divider evenly */
+
+/* ---- goals and funnels settings ---------------------------------------------------------------------------- */
+.seg { display: inline-flex; padding: 3px; gap: 2px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; align-self: flex-start; }
+.seg button { display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 12px; border: 0; border-radius: 7px; background: none; color: var(--ink-3); font-size: 13px; font-weight: 520; cursor: pointer; }
+.seg button:hover { color: var(--ink); }
+.seg button.on { background: var(--surface); color: var(--ink); box-shadow: 0 0 0 1px var(--line-2); }
+.goal-add { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--surface-2) 55%, transparent); }
+.goal-add-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.goal-add-row .grow { min-width: 200px; }
+.rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--radius-sm); overflow: hidden; }
+.rowitem { display: flex; align-items: center; gap: 12px; padding: 10px 12px; min-height: 56px; }
+.rowitem + .rowitem { border-top: 1px solid var(--line); }
+.rowitem:hover { background: color-mix(in srgb, var(--surface-2) 45%, transparent); }
+.ri-ico { flex: none; width: 32px; height: 32px; display: grid; place-items: center; border-radius: 9px; background: var(--accent-soft); color: var(--accent-ink); }
+.ri-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; line-height: 1.35; }
+.ri-main b { font-weight: 600; font-size: 14px; }
+.ri-main .muted { font-size: 12.5px; }
+.mini-select { height: 30px; padding: 0 28px 0 10px; font-size: 12.5px; border-radius: 8px; background-color: var(--surface-2); }
+.rowitem .btn.icon { flex: none; }
+.btn.ghost.danger:hover { background: var(--bad-soft); color: var(--bad); }
+.empty-inline { display: flex; gap: 12px; align-items: flex-start; padding: 16px; border: 1px dashed var(--line-2); border-radius: var(--radius-sm); color: var(--ink-3); }
+.empty-inline .icon { margin-top: 2px; color: var(--accent); }
+.empty-inline b { display: block; color: var(--ink); font-weight: 600; margin-bottom: 2px; }
+.empty-inline span { font-size: 13.5px; line-height: 1.5; }
+.section-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.funnel-item { align-items: flex-start; padding: 14px 12px; }
+.funnel-item .btn.icon { margin-top: -2px; }
+.chain { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 2px; }
+.chain li { display: inline-flex; align-items: center; gap: 2px; }
+.chain .sep { color: var(--ink-3); }
+.step-chip { display: inline-flex; align-items: center; gap: 7px; height: 26px; padding: 0 10px 0 4px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); font-size: 12.5px; color: var(--ink); }
+.step-chip i { font-style: normal; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent-ink); font-size: 11px; font-weight: 650; }
+.funnel-form { display: flex; flex-direction: column; gap: 14px; padding: 16px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--surface-2) 55%, transparent); }
+.funnel-form > label { max-width: 420px; }
+.steps-edit { display: flex; flex-direction: column; gap: 8px; }
+.steps-edit .lbl { font-size: 13px; font-weight: 560; }
+.step-row { display: flex; align-items: center; gap: 8px; max-width: 520px; }
+.step-n { flex: none; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent-ink); font-size: 12px; font-weight: 650; }
+.ref { display: flex; flex-direction: column; gap: 8px; }
+.ref > b { font-size: 13.5px; font-weight: 600; }
+.ref + .ref { padding-top: 6px; border-top: 1px solid var(--line); margin-top: 4px; }
+.ref + .ref > b { margin-top: 6px; }

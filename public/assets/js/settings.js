@@ -111,7 +111,7 @@ function Tracking({ site, reload }) {
 }
 
 /** What the dashboard counts as a conversion. */
-const Conversions = ({ site }) => html`<${Goals} site=${site} /><${Funnels} site=${site} />`;
+const Conversions = ({ site }) => html`<${Goals} site=${site} /><${Funnels} site=${site} /><${EventDocs} site=${site} />`;
 
 /** Who can see the site, and how it looks to them. */
 const Access = ({ site, reload }) => html`${!site.rollup && html`<${People} site=${site} />`}<${Visibility} site=${site} reload=${reload} /><${Branding} site=${site} reload=${reload} />`;
@@ -197,7 +197,7 @@ function NewLink({ site, onClose, onDone }) {
 }
 
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'NZD', 'CHF', 'JPY', 'CNY', 'HKD', 'SGD', 'INR', 'BRL', 'MXN', 'ZAR', 'SEK', 'NOK', 'DKK', 'PLN', 'CZK'];
-const CurrencySelect = ({ value, onChange, disabled, label = 'Revenue currency' }) => html`<select value=${value || ''} onChange=${(e) => onChange(e.target.value || null)} disabled=${disabled} aria-label=${label} style="width:auto"><option value="" selected=${!value}>No revenue</option>${CURRENCIES.map((c) => html`<option value=${c} selected=${c === value}>${c}</option>`)}</select>`;
+const CurrencySelect = ({ value, onChange, disabled, label = 'Revenue currency', compact }) => html`<select class=${compact ? 'mini-select' : ''} value=${value || ''} onChange=${(e) => onChange(e.target.value || null)} disabled=${disabled} aria-label=${label} style="width:auto"><option value="" selected=${!value}>No revenue</option>${CURRENCIES.map((c) => html`<option value=${c} selected=${c === value}>${c}</option>`)}</select>`;
 
 function Goals({ site }) {
   const res = useApi(`/sites/${site.domain}/goals`, null, []);
@@ -206,27 +206,40 @@ function Goals({ site }) {
   const [currency, setCurrency] = useState(null);
   const [err, setErr] = useState(null);
   const revenue = (site.features || {}).revenue !== false;
+  const goals = (res.data && res.data.data) || [];
   const add = async (e) => {
     e.preventDefault(); setErr(null);
     try { await api(`/sites/${site.domain}/goals`, { method: 'POST', body: { type, value, currency: type === 'event' ? currency : null } }); setValue(''); setCurrency(null); res.reload(); } catch (x) { setErr(firstError(x)); }
   };
   const setGoalCurrency = async (g, c) => { setErr(null); try { await api(`/sites/${site.domain}/goals/${g.id}`, { method: 'PATCH', body: { currency: c } }); res.reload(); } catch (x) { setErr(firstError(x)); } };
+  const remove = async (g) => { setErr(null); try { await api(`/sites/${site.domain}/goals/${g.id}`, { method: 'DELETE' }); res.reload(); } catch (x) { setErr(firstError(x)); } };
   return html`<${Section} title="Goals" help="A goal counts how many visitors did something: triggered a custom event, or visited a page.">
-      <form class="row wrap goalform" onSubmit=${add}><select value=${type} onChange=${(e) => setType(e.target.value)} aria-label="Goal type" style="width:auto"><option value="event">Custom event</option><option value="page">Pageview</option></select>
-        <input class="grow" required placeholder=${type === 'event' ? 'Event name, e.g. Purchase' : 'Page path, e.g. /thanks or /blog/*'} value=${value} onInput=${(e) => setValue(e.target.value)} aria-label="Goal value" />
-        ${type === 'event' && html`<${CurrencySelect} value=${currency} onChange=${setCurrency} disabled=${!revenue} />`}<button class="btn primary">Add goal</button></form>
+      <form class="goal-add" onSubmit=${add}>
+        <div class="seg" role="radiogroup" aria-label="Goal type">${[['event', 'Custom event', 'mouse-pointer-click'], ['page', 'Page visit', 'eye']].map(([k, l, i]) => html`<button type="button" role="radio" aria-checked=${type === k} class=${type === k ? 'on' : ''} onClick=${() => setType(k)}><${Icon} name=${i} size=${14} />${l}</button>`)}</div>
+        <div class="goal-add-row">
+          <input class="grow" required placeholder=${type === 'event' ? 'Event name, e.g. Purchase' : 'Page path, e.g. /thanks or /blog/*'} value=${value} onInput=${(e) => setValue(e.target.value)} aria-label="Goal value" />
+          ${type === 'event' && html`<${CurrencySelect} value=${currency} onChange=${setCurrency} disabled=${!revenue} />`}
+          <button class="btn primary">Add goal</button>
+        </div>
+      </form>
       ${!revenue && html`<div class="notice"><${Icon} name="info" size=${16} /><div>Revenue reporting is included with Pro. <${Link} to="/settings">Open your account settings<//> to upgrade.</div></div>`}
       ${err && html`<div class="alert">${err}</div>`}
-      ${res.data && res.data.data.length === 0 && html`<p class="muted">No goals yet.</p>`}
-      ${res.data && res.data.data.length > 0 && html`<div class="tscroll"><table class="t"><thead><tr><th>Goal</th><th>Type</th><th>Revenue</th><th></th></tr></thead><tbody>${res.data.data.map((g) => html`<tr><td>${g.name}</td><td class="muted">${g.type === 'event' ? 'Custom event' : 'Pageview'}</td>
-        <td>${g.type === 'event' ? html`<${CurrencySelect} value=${g.currency} onChange=${(c) => setGoalCurrency(g, c)} disabled=${!revenue && !g.currency} label=${'Revenue currency for ' + g.name} />` : html`<span class="muted">–</span>`}</td>
-        <td class="right"><button class="btn sm ghost danger" onClick=${async () => { setErr(null); try { await api(`/sites/${site.domain}/goals/${g.id}`, { method: 'DELETE' }); res.reload(); } catch (x) { setErr(firstError(x)); } }}>Delete</button></td></tr>`)}</tbody></table></div>`}
-    <//>
- ${site.rollup ? html`<p class="muted small">Goals in a rollup match events and pages by name in every site it adds up. A goal with a currency adds up only the amounts the sites sent in that currency.</p>` : html`<${Section} title="Sending custom events" help="Call this from your site's code to record a goal conversion.">
-      <${CodeBlock} text="window.plausible('Signup', { props: { plan: 'pro' } })" /><p class="muted">Or tag an element without code: add <code>class="plausible-event-name=Signup"</code>, with the <code>tagged-events</code> script variant.</p><//>
-    <${Section} title="Reporting revenue" help="Choose a currency for a custom-event goal, then send an amount with the event. Totals and averages appear when you filter by that goal.">
-      <${CodeBlock} text="window.plausible('Purchase', { revenue: { amount: 29.99, currency: 'USD' } })" /><p class="muted">With the tag method, add <code>plausible-revenue-amount=29.99</code> and <code>plausible-revenue-currency=USD</code> to the class. Amounts sent in another currency are converted into the goal's currency with the European Central Bank's daily rates.</p><//>`}`;
+      ${res.data && goals.length === 0 && html`<div class="empty-inline"><${Icon} name="target" size=${18} /><div><b>No goals yet</b><span>Add the first one above. Outbound links, downloads and forms add their own when you turn them on under Tracking.</span></div></div>`}
+      ${goals.length > 0 && html`<ul class="rows" aria-label="Goals">${goals.map((g) => html`<li class="rowitem">
+        <span class="ri-ico" aria-hidden="true"><${Icon} name=${g.type === 'event' ? 'mouse-pointer-click' : 'eye'} size=${16} /></span>
+        <div class="grow ri-main"><b class="trunc">${g.name}</b><span class="muted">${g.type === 'event' ? 'Custom event' : 'Page visit'}</span></div>
+        ${g.type === 'event' && html`<${CurrencySelect} value=${g.currency} onChange=${(c) => setGoalCurrency(g, c)} disabled=${!revenue && !g.currency} label=${'Revenue currency for ' + g.name} compact />`}
+        <button class="btn ghost icon sm danger" aria-label=${'Delete goal ' + g.name} title="Delete goal" onClick=${() => remove(g)}><${Icon} name="trash-2" size=${15} /></button></li>`)}</ul>`}
+      ${site.rollup && html`<p class="muted small">Goals in a rollup match events and pages by name in every site it adds up. A goal with a currency adds up only the amounts the sites sent in that currency.</p>`}
+    <//>`;
 }
+
+/** How to send events from your own code; sits under the goals it feeds. */
+const EventDocs = ({ site }) => (site.rollup ? null : html`<${Section} title="Sending events from your code" help="Goals for custom events count when your site calls the script. Revenue goals also take an amount.">
+    <div class="ref"><b>Record a conversion</b><${CodeBlock} text="window.plausible('Signup', { props: { plan: 'pro' } })" />
+      <p class="muted small">Or tag an element without code: add <code>class="plausible-event-name=Signup"</code>, with the <code>tagged-events</code> script variant.</p></div>
+    <div class="ref"><b>Report revenue</b><${CodeBlock} text="window.plausible('Purchase', { revenue: { amount: 29.99, currency: 'USD' } })" />
+      <p class="muted small">Choose a currency for the goal above, then send an amount with the event; totals and averages appear when you filter by that goal. With the tag method, add <code>plausible-revenue-amount=29.99</code> and <code>plausible-revenue-currency=USD</code> to the class. Amounts in another currency are converted with the European Central Bank's daily rates.</p></div><//>`);
 
 function Funnels({ site }) {
   const goals = useApi(`/sites/${site.domain}/goals`, null, []);
@@ -235,6 +248,7 @@ function Funnels({ site }) {
   const [form, setForm] = useState(null);
   const [err, setErr] = useState(null);
   const list = (goals.data && goals.data.data) || [];
+  const funnels = (res.data && res.data.data) || [];
   const goalName = (id) => (list.find((g) => g.id === id) || { name: '(deleted goal)' }).name;
   const open = (f) => { setErr(null); setForm(f ? { id: f.id, name: f.name, steps: f.steps.map((s) => s.goal_id) } : { name: '', steps: ['', ''] }); };
   const save = async (e) => {
@@ -245,22 +259,27 @@ function Funnels({ site }) {
     } catch (x) { setErr(firstError(x)); }
   };
   const setStep = (i, v) => setForm({ ...form, steps: form.steps.map((s, j) => (j === i ? v : s)) });
-  return html`<${Section} title="Funnels" help="A funnel follows visitors through a series of goals, in order, and shows where they drop off. Add the goals first, then chain two to eight of them here.">
+  const needGoals = allowed && goals.data && list.length < 2;
+  return html`<${Section} title="Funnels" help="A funnel follows visitors through a series of goals, in order, and shows where they drop off. Chain two to eight goals.">
+      ${!form && html`<div class="section-actions"><button class="btn primary" disabled=${!allowed || list.length < 2} onClick=${() => open(null)}><${Icon} name="plus" size=${14} /> New funnel</button>${needGoals && html`<span class="muted small">Add at least two goals first.</span>`}</div>`}
       ${!allowed && html`<div class="notice"><${Icon} name="info" size=${16} /><div>Funnels are included with Pro. <${Link} to="/settings">Open your account settings<//> to upgrade.</div></div>`}
       ${err && !form && html`<div class="alert">${err}</div>`}
-      ${!form && html`<div><button class="btn primary" disabled=${!allowed || list.length < 2} onClick=${() => open(null)}>New funnel</button>${allowed && goals.data && list.length < 2 && html`<span class="muted" style="margin-left:10px">Add at least two goals first.</span>`}</div>`}
-      ${form && html`<form class="form" onSubmit=${save}>
+      ${form && html`<form class="funnel-form" onSubmit=${save}>
         ${err && html`<div class="alert">${err}</div>`}
         <${Field} label="Name"><input required maxlength="100" autofocus value=${form.name} onInput=${(e) => setForm({ ...form, name: e.target.value })} placeholder="Signup to purchase" /><//>
-        <${Field} label="Steps" help="A visitor completes a step when its goal happens after the previous step. Other activity in between is fine.">
-          <div class="stack sm">${form.steps.map((id, i) => html`<div class="row"><span class="muted" style="width:20px">${i + 1}.</span>
+        <div class="steps-edit"><span class="lbl">Steps</span>
+          ${form.steps.map((id, i) => html`<div class="step-row"><span class="step-n" aria-hidden="true">${i + 1}</span>
             <select required class="grow" value=${id} onChange=${(e) => setStep(i, e.target.value)} aria-label=${'Step ' + (i + 1)}><option value="">Choose a goal</option>${list.map((g) => html`<option value=${g.id} selected=${g.id === id}>${g.name}</option>`)}</select>
-            <button type="button" class="btn sm ghost" disabled=${form.steps.length <= 2} aria-label=${'Remove step ' + (i + 1)} onClick=${() => setForm({ ...form, steps: form.steps.filter((_, j) => j !== i) })}>Remove</button></div>`)}
-          <div><button type="button" class="btn sm" disabled=${form.steps.length >= 8} onClick=${() => setForm({ ...form, steps: [...form.steps, ''] })}>Add step</button></div></div><//>
-        <div class="row"><button class="btn primary" disabled=${!form.name || form.steps.some((s) => !s)}>Save funnel</button><button type="button" class="btn" onClick=${() => setForm(null)}>Cancel</button></div></form>`}
-      ${res.data && res.data.data.length === 0 && !form && html`<p class="muted">No funnels yet.</p>`}
-      ${res.data && res.data.data.length > 0 && html`<div class="tscroll"><table class="t"><thead><tr><th>Funnel</th><th>Steps</th><th></th></tr></thead><tbody>${res.data.data.map((f) => html`<tr><td><b>${f.name}</b></td><td class="muted">${f.steps.map((s) => goalName(s.goal_id)).join(' → ')}</td>
-        <td class="right"><button class="btn sm ghost" disabled=${!allowed} onClick=${() => open(f)}>Edit</button><button class="btn sm ghost danger" onClick=${async () => { await api(`/sites/${site.domain}/funnels/${f.id}`, { method: 'DELETE' }); res.reload(); }}>Delete</button></td></tr>`)}</tbody></table></div>`}
+            <button type="button" class="btn ghost icon sm" disabled=${form.steps.length <= 2} aria-label=${'Remove step ' + (i + 1)} title="Remove step" onClick=${() => setForm({ ...form, steps: form.steps.filter((_, j) => j !== i) })}><${Icon} name="x" size=${15} /></button></div>`)}
+          <div class="row spread wrap"><button type="button" class="btn sm" disabled=${form.steps.length >= 8} onClick=${() => setForm({ ...form, steps: [...form.steps, ''] })}><${Icon} name="plus" size=${13} /> Add step</button>
+            <span class="muted small">A step counts when its goal happens after the one before; other activity in between is fine.</span></div></div>
+        <div class="row"><button class="btn primary" disabled=${!form.name || form.steps.some((x) => !x)}>Save funnel</button><button type="button" class="btn" onClick=${() => setForm(null)}>Cancel</button></div></form>`}
+      ${res.data && funnels.length === 0 && !form && html`<div class="empty-inline"><${Icon} name="funnel" size=${18} /><div><b>No funnels yet</b><span>Pick goals in the order visitors reach them, such as a pricing visit, a signup and a purchase, to see where they drop off.</span></div></div>`}
+      ${funnels.length > 0 && html`<ul class="rows" aria-label="Funnels">${funnels.map((f) => html`<li class="rowitem funnel-item">
+        <div class="grow ri-main"><b class="trunc">${f.name}</b>
+          <ol class="chain">${f.steps.map((st, i) => html`<li>${i > 0 && html`<${Icon} name="chevron-right" size=${13} class="sep" />`}<span class="step-chip"><i>${i + 1}</i>${goalName(st.goal_id)}</span></li>`)}</ol></div>
+        <button class="btn ghost icon sm" disabled=${!allowed} aria-label=${'Edit funnel ' + f.name} title="Edit funnel" onClick=${() => open(f)}><${Icon} name="pencil" size=${15} /></button>
+        <button class="btn ghost icon sm danger" aria-label=${'Delete funnel ' + f.name} title="Delete funnel" onClick=${async () => { await api(`/sites/${site.domain}/funnels/${f.id}`, { method: 'DELETE' }); res.reload(); }}><${Icon} name="trash-2" size=${15} /></button></li>`)}</ul>`}
     <//>`;
 }
 

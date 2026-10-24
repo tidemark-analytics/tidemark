@@ -51,3 +51,4 @@ sparkles
 trending-up
 house
 chevrons-up-down
+pencil
