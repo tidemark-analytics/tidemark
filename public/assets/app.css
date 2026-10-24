@@ -966,3 +966,29 @@ button.fact:hover { border-color: var(--accent); background: var(--surface); }
 .rowitem.pick label { display: flex; flex-direction: row; align-items: center; gap: 12px; padding: 10px 12px; min-height: 56px; cursor: pointer; margin: 0; }
 .rowitem.pick input { flex: none; width: 16px; height: 16px; margin: 0; }
 .rowitem.pick b { font-weight: 600; font-size: 14px; }
+
+/* filter menu */
+.fp-head .fp-ico { color: var(--accent-ink); }
+.filter-pop .item-l { display: inline-flex; align-items: center; gap: 10px; min-width: 0; }
+.filter-pop .item-l .icon { color: var(--ink-3); flex: none; }
+.filter-pop .item:hover .item-l .icon { color: var(--accent-ink); }
+.fp-links { border-top: 1px solid var(--line); padding: 6px; margin-top: 4px; display: flex; flex-direction: column; }
+.fp-links .item { width: 100%; }
+.fp-form { gap: 12px; }
+.fp-form .seg { align-self: stretch; }
+.fp-form .seg button { flex: 1; justify-content: center; padding: 0 6px; }
+.fp-form .chips { gap: 6px; }
+.filter-pop .sugg { max-height: none; overflow: visible; border: 1px solid var(--line); border-radius: 8px; padding: 3px; }
+.filter-pop .sugg button { align-items: center; gap: 10px; padding: 7px 9px; border-radius: 6px; font-size: 13.5px; }
+.filter-pop .sugg button.on { background: var(--accent-soft); color: var(--accent-ink); }
+.filter-pop .sugg em { font-style: normal; font-size: 12px; color: var(--ink-3); font-variant-numeric: tabular-nums; flex: none; }
+.fp-foot { gap: 8px; }
+.sugg-cap { margin: -4px 0 -6px; }
+.count-badge { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--accent); color: var(--on-accent); font-size: 11px; font-weight: 650; display: inline-grid; place-items: center; line-height: 1; }
+.chip-edit .chip-ico { color: var(--accent-ink); }
+.seg-sum { display: flex; flex-direction: column; gap: 8px; }
+.chip.static { padding: 0 11px 0 9px; gap: 6px; }
+.chip.static em { font-style: normal; color: var(--ink-3); }
+.seg-name { height: 30px; font-weight: 600; font-size: 14px; padding: 0 8px; margin-left: -8px; border-color: transparent; background: transparent; width: 100%; }
+.seg-name:hover:not(:disabled), .seg-name:focus { border-color: var(--line-2); background: var(--surface); }
+.seg-name:disabled { opacity: 1; cursor: default; }
