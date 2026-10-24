@@ -5,6 +5,9 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 ## [Unreleased]
 
 ### Changed
+- The sidebar keeps the same Workspace links on every page (Sites, Account, and Users and Updates for administrators) with Community and support under Help. On the sites list it also shows your busiest sites for a quick jump, and the account menu at the bottom is down to signing out.
+
+### Changed
 - The light and dark toggle is gone from the sidebar, the top bar and the command palette for signed-in users. Choose Light, Dark or System under Account settings → Profile. Public and shared dashboards keep a toggle for visitors.
 
 ### Changed

@@ -1,5 +1,5 @@
 // The signed-in app shell: the harbor sidebar (sites, sections of the open dashboard, account) and the ⌘K command palette.
-import { html, useState, useEffect, useMemo, useRef, useApi, api, navigate, Link, Icon, setQuery, PERIODS, UserCtx, useContext } from './lib.js';
+import { html, useState, useEffect, useMemo, useRef, useApi, api, navigate, Link, Icon, fmtShort, setQuery, PERIODS, UserCtx, useContext } from './lib.js';
 import { Pop } from './ui.js';
 import { Lockup } from './logo.js';
 import { registry } from './extensions.js';
@@ -15,15 +15,16 @@ export const scrollToSection = (id) => { const el = document.getElementById('sec
 /** Tell the open dashboard to do something (change the period, toggle the comparison). */
 export const command = (detail) => window.dispatchEvent(new CustomEvent('tdm:cmd', { detail }));
 
-export function AccountMenu({ user, align = 'right', btnClass = 'btn ghost avatar-btn', named }) {
+/** `compact` is for the sidebar, which already has these links; the top bar on narrow screens shows them all. */
+export function AccountMenu({ user, align = 'right', btnClass = 'btn ghost avatar-btn', named, compact }) {
   return html`<${Pop} align=${align} ariaLabel="Account menu" btnClass=${btnClass} label=${html`<span class="avatar" aria-hidden="true">${(user.name || '?').slice(0, 1).toUpperCase()}</span>${named && html`<span class="who-name"><b>${user.name}</b><span>${user.email}</span></span>`}${user.update && html`<span class="notif on-avatar" aria-hidden="true"></span><span class="sr-only">Update available</span>`}`}>
     ${(close) => html`<div style="min-width:220px"><div class="who"><b>${user.name}</b><span class="muted">${user.email}</span></div><hr />
-      <${Link} to="/sites" class="item" onClick=${close}><span>Your sites</span><${Icon} name="globe" size=${14} /><//>
+      ${!compact && html`<div>      <${Link} to="/sites" class="item" onClick=${close}><span>Your sites</span><${Icon} name="globe" size=${14} /><//>
       <${Link} to="/settings" class="item" onClick=${close}><span>Account settings${user.update && html`<span class="notif inline" aria-hidden="true"></span><span class="sr-only"> (update available)</span>`}</span><${Icon} name="settings" size=${14} /><//>
       <a class="item" href="https://discord.gg/sCkHD3PPZh" target="_blank" rel="noopener" onClick=${close}><span>Community (Discord)</span><${Icon} name="users" size=${14} /></a>
       ${registry.menuItems.filter((m) => !m.visible || m.visible(user)).map((m) => (m.onClick
         ? html`<button class="item" onClick=${() => { close(); m.onClick(); }}><span>${m.label}</span><${Icon} name=${m.icon || 'external-link'} size=${14} /></button>`
-        : html`<a class="item" href=${m.href} target=${m.external ? '_blank' : null} rel=${m.external ? 'noopener' : null} onClick=${close}><span>${m.label}</span><${Icon} name=${m.icon || 'external-link'} size=${14} /></a>`))}
+        : html`<a class="item" href=${m.href} target=${m.external ? '_blank' : null} rel=${m.external ? 'noopener' : null} onClick=${close}><span>${m.label}</span><${Icon} name=${m.icon || 'external-link'} size=${14} /></a>`))}</div>`}
       <button class="item" onClick=${async () => { close(); await api('/auth/logout', { method: 'POST' }); window.location.assign(window.SD.base + '/login'); }}><span>Sign out</span><${Icon} name="log-out" size=${14} /></button></div>`}<//>`;
 }
 
@@ -95,6 +96,7 @@ export function Sidebar({ user, path }) {
   const domain = siteFromPath(path);
   const list = ((sites.data && sites.data.data) || []).slice().sort((a, b) => (a.rollup !== b.rollup ? (a.rollup ? -1 : 1) : a.domain.localeCompare(b.domain)));
   const current = domain && list.find((s) => s.domain === domain);
+  const recent = list.filter((s) => !s.rollup).sort((a, b) => (b.visitors || 0) - (a.visitors || 0)).slice(0, 5);
   const onDash = !!domain && path === '/' + domain;
   const active = useScrollSpy(onDash ? SECTIONS.map((x) => x.id) : []);
   const jump = (id) => { if (onDash) scrollToSection(id); else { window.__tdmJump = id; navigate('/' + domain); } };
@@ -106,11 +108,23 @@ export function Sidebar({ user, path }) {
     <${SiteSwitcher} list=${list} current=${current} onPick=${(s) => navigate('/' + s.domain)} />
     <nav class="side-nav">
       ${current && html`<div class="side-grp">On this site</div>
-        ${SECTIONS.map((s) => html`<button class=${'side-link ' + (onDash && active === s.id ? 'on' : '')} onClick=${() => jump(s.id)}><${Icon} name=${s.icon} size=${16} /><span>${s.label}</span></button>`)}`}
-      ${current && html`${canManage && html`<${Link} to=${'/' + domain + '/settings'} class=${'side-link ' + (onSite('/' + domain + '/settings') ? 'on' : '')}><${Icon} name="settings" size=${16} /><span>Site settings</span><//>`}`}
+        ${SECTIONS.map((s) => html`<button class=${'side-link ' + (onDash && active === s.id ? 'on' : '')} onClick=${() => jump(s.id)}><${Icon} name=${s.icon} size=${16} /><span>${s.label}</span></button>`)}
+        ${canManage && html`<${Link} to=${'/' + domain + '/settings'} class=${'side-link ' + (onSite('/' + domain + '/settings') ? 'on' : '')}><${Icon} name="settings" size=${16} /><span>Site settings</span><//>`}`}
+      <div class="side-grp">Workspace</div>
+      <${Link} to="/sites" class=${'side-link ' + (path === '/sites' || path.startsWith('/sites/') ? 'on' : '')}><${Icon} name="layout-dashboard" size=${16} /><span>Sites</span>${list.length > 0 && html`<em class="side-count">${list.length}</em>`}<//>
+      <${Link} to="/settings" class=${'side-link ' + (path === '/settings' || (path.startsWith('/settings/') && !/^\/settings\/(users|updates)/.test(path)) ? 'on' : '')}><${Icon} name="user" size=${16} /><span>Account</span><//>
+      ${user.is_admin && html`<${Link} to="/settings/users" class=${'side-link ' + (path.startsWith('/settings/users') ? 'on' : '')}><${Icon} name="users" size=${16} /><span>Users</span><//>`}
+      ${user.is_admin && user.updater_enabled !== false && html`<${Link} to="/settings/updates" class=${'side-link ' + (path.startsWith('/settings/updates') ? 'on' : '')}><${Icon} name="refresh-cw" size=${16} /><span>Updates</span>${user.update && html`<span class="notif inline" aria-hidden="true"></span><span class="sr-only"> (update available)</span>`}<//>`}
+      ${!current && recent.length > 0 && html`<div class="side-grp">Busiest sites</div>
+        ${recent.map((s) => html`<${Link} to=${'/' + s.domain} class="side-site" title=${s.domain}><${Icon} name=${s.rollup ? 'layers' : 'globe'} size=${14} /><span class="trunc">${s.domain}</span><em>${fmtShort(s.visitors)}</em><//>`)}`}
+      <div class="side-grp">Help</div>
+      <a class="side-link" href="https://discord.gg/sCkHD3PPZh" target="_blank" rel="noopener"><${Icon} name="users" size=${16} /><span>Community</span><${Icon} name="external-link" size=${12} class="side-ext" /></a>
+      ${registry.menuItems.filter((m) => !m.visible || m.visible(user)).map((m) => (m.onClick
+        ? html`<button class="side-link" onClick=${m.onClick}><${Icon} name=${m.icon || 'life-buoy'} size=${16} /><span>${m.label}</span></button>`
+        : html`<a class="side-link" href=${m.href} target=${m.external ? '_blank' : null} rel=${m.external ? 'noopener' : null}><${Icon} name=${m.icon || 'external-link'} size=${16} /><span>${m.label}</span>${m.external && html`<${Icon} name="external-link" size=${12} class="side-ext" />`}</a>`))}
     </nav>
     <div class="side-foot">
-      <${AccountMenu} user=${user} align="left" btnClass="side-account" named />
+      <${AccountMenu} user=${user} align="left" btnClass="side-account" named compact />
     </div>
   </aside>`;
 }

@@ -1010,3 +1010,8 @@ button.fact:hover { border-color: var(--accent); background: var(--surface); }
 .fb-row.sel .fb-box { background: var(--accent); border-color: var(--accent); }
 .fb-empty { padding: 14px 8px; font-size: 13px; color: var(--ink-3); }
 .fp-foot { justify-content: space-between; align-items: center; }
+
+.side-count, .side-site em { margin-left: auto; font-style: normal; font-size: 11.5px; color: var(--harbor-mute); font-variant-numeric: tabular-nums; }
+.side-ext { margin-left: auto; color: var(--harbor-mute); }
+.side-link .notif.inline { margin-left: auto; }
+.side-nav { overflow-y: auto; }
