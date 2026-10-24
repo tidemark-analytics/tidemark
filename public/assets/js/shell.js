@@ -7,8 +7,11 @@ import { registry } from './extensions.js';
 const NOT_A_SITE = new Set(['', 'sites', 'settings', 'login', 'register', 'forgot-password', 'reset-password', 'share']);
 export const siteFromPath = (path) => { const seg = path.split('/')[1] || ''; return NOT_A_SITE.has(seg) ? null : decodeURIComponent(seg); };
 
-/** The dashboard announces its sections here so the sidebar can list them. */
-export const announceSections = (list) => window.dispatchEvent(new CustomEvent('tdm:sections', { detail: list }));
+/** The sections of a site's dashboard. They stay in the sidebar on every page of the site, so the menu doesn't change under you. */
+const SECTIONS = [{ id: 'overview', label: 'Overview', icon: 'chart-column' }, { id: 'traffic', label: 'Traffic', icon: 'compass' }, { id: 'audience', label: 'Audience', icon: 'users' }, { id: 'conversions', label: 'Conversions', icon: 'target' }];
+const smooth = () => (window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth');
+/** Scroll the dashboard to a section; from another page of the site, open the dashboard and let it do the scrolling. */
+export const scrollToSection = (id) => { const el = document.getElementById('sec-' + id); if (el) el.scrollIntoView({ behavior: smooth(), block: 'start' }); };
 /** Tell the open dashboard to do something (change the period, toggle the comparison). */
 export const command = (detail) => window.dispatchEvent(new CustomEvent('tdm:cmd', { detail }));
 
@@ -30,46 +33,81 @@ function useScrollSpy(ids) {
   useEffect(() => {
     if (!ids.length) return;
     const on = () => {
-      let cur = ids[0];
-      for (const id of ids) { const el = document.getElementById('sec-' + id); if (el && el.getBoundingClientRect().top <= 120) cur = id; }
-      if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4) cur = ids[ids.length - 1];
+      const els = ids.map((id) => [id, document.getElementById('sec-' + id)]).filter(([, el]) => el);
+      if (!els.length) { setActive(ids[0]); return; } // the page hasn't rendered its sections yet
+      let cur = els[0][0];
+      for (const [id, el] of els) if (el.getBoundingClientRect().top <= 120) cur = id;
+      const scrollable = document.documentElement.scrollHeight > window.innerHeight + 80;
+      if (scrollable && window.scrollY > 0 && window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4) cur = els[els.length - 1][0];
       setActive(cur);
     };
     on();
     window.addEventListener('scroll', on, { passive: true });
-    return () => window.removeEventListener('scroll', on);
+    // the sections appear and grow as their data loads; follow that too
+    const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(on) : null;
+    if (ro) ro.observe(document.body);
+    return () => { window.removeEventListener('scroll', on); if (ro) ro.disconnect(); };
   }, [ids.join()]);
   return active;
 }
 
+/** Vercel-style picker: the open site on top, a searchable list underneath. */
+function SiteSwitcher({ list, current, onPick }) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState('');
+  const [sel, setSel] = useState(0);
+  const wrap = useRef();
+  const input = useRef();
+  const shown = list.filter((s) => s.domain.toLowerCase().includes(q.trim().toLowerCase()));
+  useEffect(() => {
+    if (!open) return;
+    setQ(''); setSel(Math.max(0, list.findIndex((s) => current && s.domain === current.domain)));
+    setTimeout(() => input.current && input.current.focus(), 0);
+    const out = (e) => wrap.current && !wrap.current.contains(e.target) && setOpen(false);
+    document.addEventListener('mousedown', out);
+    return () => document.removeEventListener('mousedown', out);
+  }, [open]);
+  useEffect(() => setSel(0), [q]);
+  const pick = (s) => { setOpen(false); onPick(s); };
+  const onKey = (e) => {
+    if (e.key === 'Escape') { setOpen(false); }
+    else if (e.key === 'ArrowDown') { e.preventDefault(); setSel((n) => Math.min(shown.length - 1, n + 1)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setSel((n) => Math.max(0, n - 1)); }
+    else if (e.key === 'Enter' && shown[sel]) { e.preventDefault(); pick(shown[sel]); }
+  };
+  const icon = (s) => (s && s.rollup ? 'layers' : 'globe');
+  return html`<div class="side-switch" ref=${wrap}>
+    <button class=${'side-switch-btn' + (open ? ' open' : '')} aria-haspopup="listbox" aria-expanded=${open} onClick=${() => setOpen(!open)}>
+      <${Icon} name=${current ? icon(current) : 'layout-dashboard'} size=${16} /><span class="trunc">${current ? current.domain : 'Select a site'}</span><${Icon} name="chevrons-up-down" size=${14} class="chev" />
+    </button>
+    ${open && html`<div class="side-pop" role="dialog" aria-label="Switch site">
+      <div class="side-pop-in"><${Icon} name="search" size=${14} /><input ref=${input} value=${q} placeholder="Find site…" aria-label="Find site" onInput=${(e) => setQ(e.target.value)} onKeyDown=${onKey} /><kbd>esc</kbd></div>
+      <div class="side-pop-list" role="listbox">${shown.length === 0 ? html`<div class="side-pop-empty">No site matches “${q}”</div>` : shown.map((s, n) => html`<button role="option" aria-selected=${current && s.domain === current.domain} class=${'side-pop-item ' + (n === sel ? 'on' : '')} onMouseMove=${() => setSel(n)} onClick=${() => pick(s)}>
+        <${Icon} name=${icon(s)} size=${14} /><span class="trunc">${s.domain}</span>${s.rollup && html`<em>rollup</em>`}${current && s.domain === current.domain && html`<${Icon} name="check" size=${14} class="tick" />`}</button>`)}</div>
+      <div class="side-pop-foot"><button class="side-pop-item" onClick=${() => { setOpen(false); navigate('/sites'); }}><${Icon} name="layout-dashboard" size=${14} /><span>All sites</span></button>
+        <button class="side-pop-item" onClick=${() => { setOpen(false); navigate('/sites/new'); }}><${Icon} name="plus" size=${14} /><span>Add a site</span></button></div>
+    </div>`}
+  </div>`;
+}
+
 export function Sidebar({ user, path }) {
   const sites = useApi('/sites', null, [path.startsWith('/sites') ? path : '']);
-  const [sections, setSections] = useState([]);
   const domain = siteFromPath(path);
-  useEffect(() => {
-    const h = (e) => setSections(e.detail || []);
-    window.addEventListener('tdm:sections', h);
-    return () => window.removeEventListener('tdm:sections', h);
-  }, []);
-  useEffect(() => { if (!domain) setSections([]); }, [domain]);
   const list = ((sites.data && sites.data.data) || []).slice().sort((a, b) => (a.rollup !== b.rollup ? (a.rollup ? -1 : 1) : a.domain.localeCompare(b.domain)));
   const current = domain && list.find((s) => s.domain === domain);
-  const ids = domain ? sections.map((s) => s.id) : [];
-  const active = useScrollSpy(ids);
-  const jump = (id) => { const el = document.getElementById('sec-' + id); if (el) el.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }); };
+  const onDash = !!domain && path === '/' + domain;
+  const active = useScrollSpy(onDash ? SECTIONS.map((x) => x.id) : []);
+  const jump = (id) => { if (onDash) scrollToSection(id); else { window.__tdmJump = id; navigate('/' + domain); } };
   const canManage = current && (current.role === 'owner' || current.role === 'admin');
   const onSite = (p) => path === p || path.startsWith(p + '/');
   return html`<aside class="side" aria-label="Main">
     <${Link} to="/sites" class="side-brand" aria-label="Tidemark home"><${Lockup} size=${22} /><//>
     <button class="side-search" onClick=${() => window.dispatchEvent(new CustomEvent('tdm:palette'))}><${Icon} name="search" size=${14} /><span>Search or jump to…</span><kbd>⌘K</kbd></button>
+    <${SiteSwitcher} list=${list} current=${current} onPick=${(s) => navigate('/' + s.domain)} />
     <nav class="side-nav">
-      <${Link} to="/sites" class=${'side-link ' + (path === '/sites' ? 'on' : '')}><${Icon} name="layout-dashboard" size=${16} /><span>All sites</span><//>
-      ${current && sections.length > 0 && html`<div class="side-grp">${current.domain}</div>
-        ${sections.map((s) => html`<button class=${'side-link ' + (active === s.id && !onSite('/' + domain + '/settings') ? 'on' : '')} onClick=${() => jump(s.id)}><${Icon} name=${s.icon} size=${16} /><span>${s.label}</span></button>`)}`}
+      ${current && html`<div class="side-grp">On this site</div>
+        ${SECTIONS.map((s) => html`<button class=${'side-link ' + (onDash && active === s.id ? 'on' : '')} onClick=${() => jump(s.id)}><${Icon} name=${s.icon} size=${16} /><span>${s.label}</span></button>`)}`}
       ${current && html`${canManage && html`<${Link} to=${'/' + domain + '/settings'} class=${'side-link ' + (onSite('/' + domain + '/settings') ? 'on' : '')}><${Icon} name="settings" size=${16} /><span>Site settings</span><//>`}`}
-      <div class="side-grp">Your sites</div>
-      <div class="side-sites">${list.map((s) => html`<${Link} to=${'/' + s.domain} class=${'side-site ' + (s.domain === domain ? 'on' : '')} title=${s.domain}><${Icon} name=${s.rollup ? 'layers' : 'globe'} size=${14} /><span class="trunc">${s.domain}</span>${s.rollup && html`<em>rollup</em>`}<//>`)}
-        <${Link} to="/sites/new" class="side-site add"><${Icon} name="plus" size=${14} /><span>Add a site</span><//></div>
     </nav>
     <div class="side-foot">
       <button class="side-link" onClick=${toggleTheme}><${Icon} name="sun" size=${16} class="theme-sun" /><${Icon} name="moon" size=${16} class="theme-moon" /><span>Light / dark</span></button>

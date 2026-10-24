@@ -50,3 +50,4 @@ command
 sparkles
 trending-up
 house
+chevrons-up-down
