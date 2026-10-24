@@ -39,15 +39,17 @@ class Period
         $now = CarbonImmutable::now($tz);
         $date = $date->setTimezone($tz);
         $endOfToday = $now->endOfDay();
+        // like Plausible, "last N days" stop at the end of yesterday (today is still partial) unless the window is anchored on an earlier date
+        $lastFullDay = $date->startOfDay()->gte($now->startOfDay()) ? $now->subDay()->endOfDay() : $date->endOfDay();
 
         [$start, $end, $default] = match ($key) {
             'realtime' => [$now->subMinutes(30)->startOfMinute(), $now, 'minute'],
             '24h' => [$now->subHours(24)->startOfHour(), $now, 'hour'],
             'day' => [$date->startOfDay(), min($date->endOfDay(), $endOfToday), 'hour'],
-            '7d' => [$date->subDays(6)->startOfDay(), min($date->endOfDay(), $endOfToday), 'day'],
-            '28d' => [$date->subDays(27)->startOfDay(), min($date->endOfDay(), $endOfToday), 'day'],
-            '30d' => [$date->subDays(29)->startOfDay(), min($date->endOfDay(), $endOfToday), 'day'],
-            '91d' => [$date->subDays(90)->startOfDay(), min($date->endOfDay(), $endOfToday), 'day'],
+            '7d' => [$lastFullDay->subDays(6)->startOfDay(), $lastFullDay, 'day'],
+            '28d' => [$lastFullDay->subDays(27)->startOfDay(), $lastFullDay, 'day'],
+            '30d' => [$lastFullDay->subDays(29)->startOfDay(), $lastFullDay, 'day'],
+            '91d' => [$lastFullDay->subDays(90)->startOfDay(), $lastFullDay, 'day'],
             'month' => [$date->startOfMonth(), min($date->endOfMonth(), $endOfToday), 'day'],
             '6mo' => [$date->startOfMonth()->subMonths(5), min($date->endOfMonth(), $endOfToday), 'month'],
             '12mo' => [$date->startOfMonth()->subMonths(11), min($date->endOfMonth(), $endOfToday), 'month'],

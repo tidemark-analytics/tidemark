@@ -168,9 +168,11 @@ export function bucketLabel(x, unit, long = false) {
 }
 
 // ------------------------------------------------------------------------------------- dashboard scope
+// The date menu, in Plausible's order and with its keyboard shortcuts. "yesterday" and "last_month" are not periods of their own: choosing
+// them selects `day` or `month` with an earlier date. The older 30d and 6mo windows are no longer offered but still open from a link.
 export const PERIODS = [
-  ['day', 'Today', 'D'], ['realtime', 'Realtime', 'R'], ['24h', 'Last 24 hours', ''], ['7d', 'Last 7 days', 'W'], ['28d', 'Last 28 days', ''], ['30d', 'Last 30 days', 'T'],
-  ['91d', 'Last 91 days', 'Q'], ['month', 'Month to date', 'M'], ['6mo', 'Last 6 months', 'S'], ['12mo', 'Last 12 months', 'L'], ['year', 'Year to date', 'Y'], ['all', 'All time', 'A'], ['custom', 'Custom range', 'C'],
+  ['day', 'Today', 'D'], ['yesterday', 'Yesterday', 'E'], ['realtime', 'Realtime', 'R'], ['24h', 'Last 24 hours', 'H'], ['7d', 'Last 7 days', 'W'], ['28d', 'Last 28 days', 'F'],
+  ['91d', 'Last 91 days', 'N'], ['month', 'Month to date', 'M'], ['last_month', 'Last month', 'P'], ['year', 'Year to date', 'Y'], ['12mo', 'Last 12 months', 'L'], ['all', 'All time', 'A'], ['custom', 'Custom range', 'C'],
 ];
 export const DEFAULT_PERIOD = '28d';
 export const FILTER_OPS = [['is', 'is'], ['is_not', 'is not'], ['contains', 'contains'], ['contains_not', 'does not contain']];
@@ -203,9 +205,15 @@ export function shiftDate(dateStr, period, dir) {
 }
 
 /** API params derived from the URL: period, date, custom range, comparison, interval and filters. */
+const storedPeriodKey = (site) => 'tidemark.period.' + (site ? site.domain : '');
+export const storedPeriod = (site) => { try { return localStorage.getItem(storedPeriodKey(site)) || null; } catch (e) { return null; } };
+export const rememberPeriod = (site, period) => { try { period ? localStorage.setItem(storedPeriodKey(site), period) : localStorage.removeItem(storedPeriodKey(site)); } catch (e) { /* private mode */ } };
+
 export function useScope(site, extra = {}) {
   const { query } = useLocation();
-  const period = query.period || DEFAULT_PERIOD;
+  // like Plausible, the period last chosen on a site is remembered in this browser
+  const remembered = !query.period && !query.date && !query.from && site ? storedPeriod(site) : null;
+  const period = query.period || (PERIODS.some((p) => p[0] === remembered) || ['30d', '6mo'].includes(remembered) ? remembered : null) || DEFAULT_PERIOD;
   const params = { period };
   for (const k of ['date', 'from', 'to', 'interval']) if (query[k]) params[k] = query[k];
   if (query.comparison && !['realtime', 'all'].includes(period)) params.comparison = query.comparison;

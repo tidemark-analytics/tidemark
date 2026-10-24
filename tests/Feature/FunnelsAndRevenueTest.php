@@ -59,7 +59,7 @@ class FunnelsAndRevenueTest extends TestCase
 
     private function url(string $path, array $q = []): string
     {
-        return "/api/sites/example.com/stats/{$path}?".http_build_query($q + ['period' => '7d']);
+        return "/api/sites/example.com/stats/{$path}?".http_build_query($q + ['period' => 'day']);
     }
 
     public function test_events_keep_the_revenue_they_carry(): void

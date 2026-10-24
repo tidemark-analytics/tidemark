@@ -2,6 +2,14 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.21.0] - 2026-11-01
+
+### Changed
+- Dashboard behaviour now follows Plausible's more closely. "Last 7 / 28 / 91 days" end with yesterday, because today is still partial (Month to date and Year to date still include today). The date menu has Yesterday, Last month and Plausible's keyboard shortcuts (D, E, R, H, W, F, N, M, P, Y, L, A, C, X); Last 30 days and Last 6 months are no longer offered but old links keep working, and the filter shortcut `F` is gone because `F` now picks Last 28 days.
+- Comparison has its own control next to the date ("vs Previous period"), and the top stats show each metric's date range with the previous value underneath.
+- The period you last chose on a site is remembered in your browser.
+- The Campaigns tab lists UTM mediums, sources, campaigns, contents and terms in Plausible's order.
+
 ## [0.20.0] - 2026-11-01
 
 ### Added

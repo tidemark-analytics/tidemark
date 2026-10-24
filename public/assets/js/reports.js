@@ -86,13 +86,13 @@ function DimBody({ dim, label, title, site, scope, poll, limit = 7, extra }) {
     ${more && html`<${DetailsModal} title=${title || label} label=${label} dim=${dim} site=${site} scope=${scope} onClose=${() => setMore(false)} />`}`;
 }
 
-const UTM = [['utm_campaign', 'Campaign'], ['utm_medium', 'Medium'], ['utm_source', 'Source'], ['utm_content', 'Content'], ['utm_term', 'Term']];
+const UTM = [['utm_medium', 'UTM medium'], ['utm_source', 'UTM source'], ['utm_campaign', 'UTM campaign'], ['utm_content', 'UTM content'], ['utm_term', 'UTM term']];
 
 export function Sources({ site, scope, poll }) {
   const [utm, setUtm] = useState('utm_campaign');
   return html`<${Panel} id="sources" title="Sources" tabs=${[{ key: 'channel', label: 'Channels' }, { key: 'source', label: 'Sources' }, { key: 'utm', label: 'Campaigns' }]}>
     ${(t) => t.key === 'utm'
-      ? html`<div class="subselect"><label class="sr-only" for="utm-dim">UTM parameter</label><select id="utm-dim" value=${utm} onChange=${(e) => setUtm(e.target.value)}>${UTM.map(([k, l]) => html`<option value=${k}>${l}</option>`)}</select></div>
+      ? html`<div class="subselect"><label class="sr-only" for="utm-dim">UTM parameter</label><select id="utm-dim" value=${utm} onChange=${(e) => setUtm(e.target.value)}>${UTM.map(([k, l]) => html`<option value=${k}>${l}s</option>`)}</select></div>
         <${DimBody} key=${utm} dim=${utm} label=${UTM.find((u) => u[0] === utm)[1]} title=${'Campaigns: ' + UTM.find((u) => u[0] === utm)[1]} site=${site} scope=${scope} poll=${poll} limit=${6} />`
       : html`<${DimBody} key=${t.key} dim=${t.key} label=${t.label.replace(/s$/, '')} title=${t.label} site=${site} scope=${scope} poll=${poll} />`}<//>`;
 }

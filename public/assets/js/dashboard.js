@@ -1,5 +1,5 @@
 // The site dashboard: toolbar (site, filters, date), top stats + graph, then the report panels.
-import { setBrand, html, useState, useEffect, useMemo, useRef, useApi, api, useLocation, setQuery, setFilters, parseFilters, navigate, Link, Icon, toast, PERIODS, FILTER_OPS, FILTER_DIMS, dimLabel, todayStr, shiftDate, fmt, fmtShort, moneyShort, dur, countryName, shareAuth, share, useDocTitle, useScope, BASE, UserCtx, useContext } from './lib.js';
+import { setBrand, html, useState, useEffect, useMemo, useRef, useApi, api, useLocation, setQuery, setFilters, parseFilters, navigate, Link, Icon, toast, PERIODS, FILTER_OPS, FILTER_DIMS, dimLabel, todayStr, shiftDate, rememberPeriod, fmt, fmtShort, moneyShort, dur, countryName, shareAuth, share, useDocTitle, useScope, BASE, UserCtx, useContext } from './lib.js';
 import { Pop, Modal, Loading, Empty, Field, CodeBlock, useDebounced } from './ui.js';
 import { LineChart, ChartTable, bucketText } from './chart.js';
 import { Sources, Pages, Locations, Devices, Behaviors } from './reports.js';
@@ -30,6 +30,14 @@ function Delta({ metric, change }) {
   return html`<span class=${'delta ' + (flat ? 'flat' : good ? 'up' : 'down')}>${!flat && html`<${Icon} name=${change > 0 ? 'arrow-up' : 'arrow-down'} size=${11} />`}${Math.abs(change) >= 1000 ? '999%+' : Math.abs(change).toFixed(change % 1 === 0 ? 0 : 1) + '%'}</span>`;
 }
 
+/** "26 Sep - 23 Oct", or with the year when the window crosses years. */
+function rangeLabel(p) {
+  const a = p.from.slice(0, 10), b = p.to.slice(0, 10);
+  const f = (d, y) => new Date(d + 'T12:00:00Z').toLocaleDateString(undefined, { timeZone: 'UTC', day: 'numeric', month: 'short', ...(y ? { year: 'numeric' } : {}) });
+  const y = a.slice(0, 4) !== b.slice(0, 4) || a.slice(0, 4) !== new Date().getFullYear().toString();
+  return a === b ? f(a, y) : `${f(a, y)} - ${f(b, y)}`;
+}
+
 function TopGraph({ site, scope, live, onIntervals }) {
   const [metric, setMetric] = useState('visitors');
   const [asTable, setAsTable] = useState(false);
@@ -52,7 +60,8 @@ function TopGraph({ site, scope, live, onIntervals }) {
       return html`<button role="tab" aria-selected=${k === current} title=${HELP[k]} class=${'metric ' + (k === current ? 'on' : '')} onClick=${() => setMetric(k)}>
         <span class="k">${label}</span>
         <span class="vd"><span class="v">${s ? fmtv(s.value) : html`<span class="skeleton" style="display:inline-block;width:64px;height:26px"></span>`}</span>
-        ${s && comparing && !(s.value === 0 && !s.previous) ? html`<span class="d" title=${s.previous !== null && s.previous !== undefined ? 'Previous: ' + fmtv(s.previous) : ''}><${Delta} metric=${k} change=${s.change} /></span>` : ''}</span></button>`;
+        ${s && comparing && !(s.value === 0 && !s.previous) ? html`<span class="d" title=${s.previous !== null && s.previous !== undefined ? 'Previous: ' + fmtv(s.previous) : ''}><${Delta} metric=${k} change=${s.change} /></span>` : ''}</span>
+        ${s && comparing && top.data.comparison_period ? html`<span class="cmp"><span class="range">${rangeLabel(top.data.period)}</span><span class="pv">${s.previous === null || s.previous === undefined ? '–' : fmtv(s.previous)}</span><span class="range">${rangeLabel(top.data.comparison_period)}</span></span>` : ''}</button>`;
     })}</div>
     <div class=${'graph-b ' + (busy && g ? 'stale' : '')}>
       ${graph.error && !g ? html`<div class="panel-empty" style="min-height:300px"><b>Couldn't load the graph</b><p class="muted">${graph.error.message}</p><button class="btn sm" onClick=${() => { graph.reload(); top.reload(); }}>Try again</button></div>` : !g ? html`<div class="skeleton" style="height:300px"></div>` : asTable
@@ -135,7 +144,7 @@ function FilterButton({ site, scope, filter, setFilter }) {
     return () => { document.removeEventListener('mousedown', out); document.removeEventListener('keydown', esc); };
   }, [!!filter]);
   return html`<div class="pop-wrap" ref=${ref}>
-    <button class="btn" aria-haspopup="dialog" aria-expanded=${!!filter} aria-keyshortcuts="F" onClick=${() => setFilter(filter ? null : {})}><${Icon} name="funnel" size=${14} /> Filter</button>
+    <button class="btn" aria-haspopup="dialog" aria-expanded=${!!filter} onClick=${() => setFilter(filter ? null : {})}><${Icon} name="funnel" size=${14} /> Filter</button>
     ${filter && html`<${FilterMenu} key=${filter.index ?? 'new'} site=${site} scope=${scope} initial=${filter.rule ? filter : null} onClose=${() => setFilter(null)} />`}
   </div>`;
 }
@@ -155,11 +164,11 @@ function periodLabel(scope, site) {
   const today = todayStr(site.timezone);
   const date = query.date || today;
   const fmtDay = (d, o) => new Date(d + 'T12:00:00Z').toLocaleDateString(undefined, { timeZone: 'UTC', ...o });
-  if (period === 'day') return date === today ? 'Today' : fmtDay(date, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
-  if (period === 'month') return date.slice(0, 7) === today.slice(0, 7) ? 'Month to date' : fmtDay(date, { month: 'long', year: 'numeric' });
+  if (period === 'day') return date === today ? 'Today' : date === shiftDate(today, 'day', -1) ? 'Yesterday' : fmtDay(date, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+  if (period === 'month') return date.slice(0, 7) === today.slice(0, 7) ? 'Month to date' : date.slice(0, 7) === shiftDate(today.slice(0, 8) + '01', 'month', -1).slice(0, 7) ? 'Last month' : fmtDay(date, { month: 'long', year: 'numeric' });
   if (period === 'year') return date.slice(0, 4) === today.slice(0, 4) ? 'Year to date' : date.slice(0, 4);
   if (period === 'custom') return query.from && query.to ? `${fmtDay(query.from, { month: 'short', day: 'numeric' })} – ${fmtDay(query.to, { month: 'short', day: 'numeric', year: 'numeric' })}` : 'Custom range';
-  return (PERIODS.find((p) => p[0] === period) || [0, 'Last 28 days'])[1];
+  return (PERIODS.find((p) => p[0] === period) || [0, { '30d': 'Last 30 days', '6mo': 'Last 6 months' }[period] || 'Last 28 days'])[1];
 }
 
 function DatePicker({ site, scope }) {
@@ -172,7 +181,16 @@ function DatePicker({ site, scope }) {
   const today = todayStr(site.timezone);
   const date = query.date || today;
   const shift = (dir) => { const d = shiftDate(date, period, dir); if (d > today) return; setQuery({ date: d === today ? null : d }); };
-  const choose = (p) => { setQuery({ period: p === '28d' ? null : p, date: null, from: null, to: null, interval: null }); setOpen(false); };
+  const yesterday = shiftDate(today, 'day', -1);
+  const lastMonth = shiftDate(today.slice(0, 8) + '01', 'month', -1);
+  const choose = (p) => {
+    const q = { period: p, date: null, from: null, to: null, interval: null };
+    if (p === 'yesterday') Object.assign(q, { period: 'day', date: yesterday });
+    else if (p === 'last_month') Object.assign(q, { period: 'month', date: lastMonth });
+    if (!['yesterday', 'last_month', 'realtime'].includes(p)) rememberPeriod(site, p); // a past day or month is not worth remembering
+    setQuery(q); setOpen(false);
+  };
+  const isOn = (k) => (k === 'day' ? period === 'day' && date === today : k === 'yesterday' ? period === 'day' && date === yesterday : k === 'month' ? period === 'month' && date.slice(0, 7) === today.slice(0, 7) : k === 'last_month' ? period === 'month' && date.slice(0, 7) === lastMonth.slice(0, 7) : k === period);
   const comparison = query.comparison || '';
   const canCompare = !['realtime', 'all'].includes(period);
   useEffect(() => {
@@ -190,16 +208,18 @@ function DatePicker({ site, scope }) {
   });
   return html`<div class="row" style="gap:4px">
     ${navigable && html`<button class="btn icon" aria-label="Previous" onClick=${() => shift(-1)}><${Icon} name="chevron-left" size=${15} /></button>`}
-    <${Pop} open=${open} setOpen=${setOpen} align="right" ariaLabel="Date range" btnClass="btn" label=${html`<${Icon} name="calendar" size=${14} /><span>${periodLabel(scope, site)}</span>${comparison && canCompare ? html`<span class="muted">vs ${comparison === 'year_over_year' ? 'last year' : 'previous'}</span>` : ''}<${Icon} name="chevron-down" size=${13} class="muted" />`}>
+    <${Pop} open=${open} setOpen=${setOpen} align="right" ariaLabel="Date range" btnClass="btn" label=${html`<${Icon} name="calendar" size=${14} /><span>${periodLabel(scope, site)}</span><${Icon} name="chevron-down" size=${13} class="muted" />`}>
       ${() => html`<div style="min-width:240px">
-        ${PERIODS.filter((p) => p[0] !== 'custom').map(([k, l, key]) => html`<button class=${'item ' + (k === period && !(k === 'day' && date !== today) ? 'on' : '')} onClick=${() => choose(k)}><span>${l}</span>${key ? html`<span class="kbd">${key}</span>` : null}</button>`)}
+        ${PERIODS.filter((p) => p[0] !== 'custom').map(([k, l, key]) => html`<button class=${'item ' + (isOn(k) ? 'on' : '')} onClick=${() => choose(k)}><span>${l}</span>${key ? html`<span class="kbd">${key}</span>` : null}</button>`)}
         ${!custom ? html`<button class=${'item ' + (period === 'custom' ? 'on' : '')} onClick=${() => setCustom(true)}><span>Custom range</span><span class="kbd">C</span></button>`
           : html`<div class="form" style="width:240px"><label>From<input type="date" max=${today} value=${from} onInput=${(e) => setFrom(e.target.value)} /></label><label>To<input type="date" max=${today} value=${to} onInput=${(e) => setTo(e.target.value)} /></label>
             <button class="btn primary" disabled=${!from || !to || from > to} onClick=${() => { setQuery({ period: 'custom', from, to, date: null, interval: null }); setOpen(false); }}>Apply</button></div>`}
-        ${canCompare && html`<hr /><button class="item" onClick=${() => setQuery({ comparison: comparison ? null : 'previous_period' })}><span>Compare</span><span class="row" style="gap:8px">${comparison && html`<${Icon} name="check" size=${14} class="check" />`}<span class="kbd">X</span></span></button>
-          ${comparison && html`<button class=${'item ' + (comparison === 'previous_period' ? 'on' : '')} onClick=${() => setQuery({ comparison: 'previous_period' })}>Previous period</button><button class=${'item ' + (comparison === 'year_over_year' ? 'on' : '')} onClick=${() => setQuery({ comparison: 'year_over_year' })}>Year over year</button>`}`}
+        ${canCompare && html`<hr /><button class="item" onClick=${() => { setQuery({ comparison: comparison ? null : 'previous_period' }); setOpen(false); }}><span>${comparison ? 'Disable comparison' : 'Compare'}</span><span class="kbd">X</span></button>`}
       </div>`}
     <//>
+    ${comparison && canCompare && html`<span class="muted vs">vs</span><${Pop} align="right" ariaLabel="Comparison period" btnClass="btn" label=${html`<${Icon} name="calendar" size=${14} /><span>${comparison === 'year_over_year' ? 'Year over year' : 'Previous period'}</span><${Icon} name="chevron-down" size=${13} class="muted" />`}>
+      ${(close) => html`<div style="min-width:200px"><button class=${'item ' + (comparison === 'previous_period' ? 'on' : '')} onClick=${() => { setQuery({ comparison: 'previous_period' }); close(); }}>Previous period</button>
+        <button class=${'item ' + (comparison === 'year_over_year' ? 'on' : '')} onClick=${() => { setQuery({ comparison: 'year_over_year' }); close(); }}>Year over year</button></div>`}<//>`}
     ${navigable && html`<button class="btn icon" aria-label="Next" disabled=${date >= today} onClick=${() => shift(1)}><${Icon} name="chevron-right" size=${15} /></button>`}
   </div>`;
 }
@@ -276,11 +296,6 @@ export function Dashboard({ domain, shared }) {
     const onScroll = () => { const t = document.querySelector('.toolbar.sticky'); if (t) t.classList.toggle('raised', window.scrollY > 8); };
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
-  }, []);
-  useEffect(() => {
-    const k = (e) => { if (e.key.toUpperCase() === 'F' && !e.metaKey && !e.ctrlKey && !/input|textarea|select/i.test(e.target.tagName || '') && !document.querySelector('.overlay')) { e.preventDefault(); setFilter({}); } };
-    document.addEventListener('keydown', k);
-    return () => document.removeEventListener('keydown', k);
   }, []);
   if (site.error && site.error.body && site.error.body.error === 'password_required') return html`<${SharePassword} domain=${domain} onDone=${() => site.reload()} />`;
   if (site.error) return html`<main class="main"><${Empty} title=${site.error.status === 404 ? 'Site not found' : 'No access'} icon="lock">${site.error.status === 404 ? 'There is no site with this address.' : "You don't have access to this dashboard."}<${Link} to="/sites" class="btn" style="margin-top:8px">Back to your sites<//><//></main>`;

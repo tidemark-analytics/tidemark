@@ -35,6 +35,18 @@ class StatsTest extends TestCase
         $this->assertGreaterThan(0, $res->json('stats.visitors.value'));
     }
 
+    public function test_last_n_days_end_yesterday_like_plausible(): void
+    {
+        $yesterday = now('America/New_York')->subDay()->toDateString();
+        foreach (['7d' => 7, '28d' => 28, '91d' => 91] as $period => $days) {
+            $p = $this->getJson($this->url('top', ['period' => $period]))->assertOk()->json('period');
+            $this->assertSame($yesterday, substr($p['to'], 0, 10), $period);
+            $this->assertSame(now('America/New_York')->subDays($days)->toDateString(), substr($p['from'], 0, 10), $period);
+        }
+        $today = $this->getJson($this->url('top', ['period' => 'month']))->json('period');
+        $this->assertSame(now('America/New_York')->toDateString(), substr($today['to'], 0, 10));
+    }
+
     public function test_graph_returns_a_bucket_per_interval(): void
     {
         $res = $this->getJson($this->url('graph', ['metric' => 'visitors', 'interval' => 'day']))->assertOk();

@@ -38,14 +38,15 @@ class StatsController extends Controller
         [, $stats, $p, $f] = $this->ctx($r);
         $mode = $r->input('comparison') === 'year_over_year' ? 'year_over_year' : 'previous_period';
         $cur = $stats->topStats($p, $f);
-        $prev = in_array($p->key, ['all', 'realtime'], true) ? null : $stats->topStats($p->comparison($mode), $f);
+        $before = in_array($p->key, ['all', 'realtime'], true) ? null : $p->comparison($mode);
+        $prev = $before ? $stats->topStats($before, $f) : null;
 
         $out = [];
         foreach ($cur as $k => $v) {
             $out[$k] = ['value' => $v, 'previous' => $prev[$k] ?? null, 'change' => $prev ? self::change($v, $prev[$k] ?? null) : null];
         }
 
-        return ['period' => $p->toArray(), 'kind' => $f->goalName() ? 'goal' : 'visitors', 'currency' => $stats->goalCurrency($f), 'stats' => $out, 'comparing' => $prev !== null];
+        return ['period' => $p->toArray(), 'kind' => $f->goalName() ? 'goal' : 'visitors', 'currency' => $stats->goalCurrency($f), 'stats' => $out, 'comparing' => $prev !== null, 'comparison_period' => $before?->toArray()];
     }
 
     public function graph(Request $r)
