@@ -4,6 +4,9 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Changed
+- Site settings are grouped into four tabs: Tracking (snippet, extras and shields), Conversions (goals and funnels), Sharing and access (people, public dashboard, shared links and branding) and Data (reporting timezone, export and import, and the danger zone). Rollups have Sites, Conversions, Sharing and Data. Older links to the previous tabs still work.
+
 ### Fixed
 - A long email address no longer gets cut off in the account menu in the sidebar; it wraps onto a second line.
 

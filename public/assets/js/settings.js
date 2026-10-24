@@ -99,19 +99,31 @@ function ImportPlausible({ site, reload }) {
     ${confirm && html`<${Confirm} title="Remove imported data?" message="The days imported from Plausible will be removed from this dashboard. What Tidemark collected itself is not touched." confirmLabel="Remove" onClose=${() => setConfirm(false)} onConfirm=${async () => { await removeImported(site.domain); setState(null); reload(); toast('Imported data removed'); }} />`}<//>`;
 }
 
-function General({ site, reload }) {
+/** How visits get in: the snippet, its extensions and the rules that drop traffic you don't want counted. */
+function Tracking({ site, reload }) {
+  const patch = async (body) => { try { await api(`/sites/${site.domain}`, { method: 'PATCH', body }); reload(); toast('Saved'); } catch (x) { toast(firstError(x), 'err'); } };
+  return html`<${Section} title="Tracking snippet" help="Place this in the <head> of every page."><${Snippet} site=${site} /><//>
+    <${Section} title="Tracking extras" help="Each one adds a small extension to the script and a matching goal.">
+      <${Toggle} label="Outbound link clicks" checked=${site.track_outbound} onChange=${(v) => patch({ track_outbound: v })} />
+      <${Toggle} label="File downloads" checked=${site.track_downloads} onChange=${(v) => patch({ track_downloads: v })} />
+      <${Toggle} label="Form submissions" checked=${site.track_forms} onChange=${(v) => patch({ track_forms: v })} /><//>
+    <${Shields} site=${site} />`;
+}
+
+/** What the dashboard counts as a conversion. */
+const Conversions = ({ site }) => html`<${Goals} site=${site} /><${Funnels} site=${site} />`;
+
+/** Who can see the site, and how it looks to them. */
+const Access = ({ site, reload }) => html`${!site.rollup && html`<${People} site=${site} />`}<${Visibility} site=${site} reload=${reload} /><${Branding} site=${site} reload=${reload} />`;
+
+function DataTab({ site, reload }) {
   const [tz, setTz] = useState(site.timezone);
   const [confirm, setConfirm] = useState(null);
   const patch = async (body) => { try { await api(`/sites/${site.domain}`, { method: 'PATCH', body }); reload(); toast('Saved'); } catch (x) { toast(firstError(x), 'err'); } };
  if (site.rollup) return html`<${Section} title="Reporting timezone" help="Days start and end at midnight in this timezone. It starts as the timezone most of the rollup's sites use."><div class="row"><select value=${tz} onChange=${(e) => setTz(e.target.value)} style="max-width:320px">${zones().map((z) => html`<option value=${z} selected=${z === tz}>${z}</option>`)}</select><button class="btn" disabled=${tz === site.timezone} onClick=${() => patch({ timezone: tz })}>Save</button></div><//>
     ${site.is_owner && html`<${Section} danger title="Danger zone"><div class="row spread wrap"><div><b>Delete rollup</b><div class="muted">Removes this dashboard and its goals. Your sites and their data are not touched.</div></div><button class="btn danger" onClick=${() => setConfirm('delete')}>Delete rollup</button></div><//>`}
     ${confirm === 'delete' && html`<${Confirm} title=${`Delete ${site.domain}?`} message="The rollup and its goals will be deleted. The sites it adds up are not affected." onClose=${() => setConfirm(null)} onConfirm=${async () => { await api(`/sites/${site.domain}`, { method: 'DELETE' }); navigate('/sites'); }} />`}`;
-  return html`<${Section} title="Tracking snippet" help="Place this in the <head> of every page."><${Snippet} site=${site} /><//>
-    <${Section} title="Tracking extras" help="Each one adds a small extension to the script and a matching goal.">
-      <${Toggle} label="Outbound link clicks" checked=${site.track_outbound} onChange=${(v) => patch({ track_outbound: v })} />
-      <${Toggle} label="File downloads" checked=${site.track_downloads} onChange=${(v) => patch({ track_downloads: v })} />
-      <${Toggle} label="Form submissions" checked=${site.track_forms} onChange=${(v) => patch({ track_forms: v })} /><//>
-    <${Section} title="Reporting timezone" help="Days start and end at midnight in this timezone."><div class="row"><select value=${tz} onChange=${(e) => setTz(e.target.value)} style="max-width:320px">${zones().map((z) => html`<option value=${z} selected=${z === tz}>${z}</option>`)}</select><button class="btn" disabled=${tz === site.timezone} onClick=${() => patch({ timezone: tz })}>Save</button></div><//>
+  return html`<${Section} title="Reporting timezone" help="Days start and end at midnight in this timezone."><div class="row"><select value=${tz} onChange=${(e) => setTz(e.target.value)} style="max-width:320px">${zones().map((z) => html`<option value=${z} selected=${z === tz}>${z}</option>`)}</select><button class="btn" disabled=${tz === site.timezone} onClick=${() => patch({ timezone: tz })}>Save</button></div><//>
     ${site.can_manage && html`<${MoveData} site=${site} reload=${reload} />`}
     ${site.can_manage && html`<${ImportPlausible} site=${site} reload=${reload} />`}
     ${site.is_owner && html`<${Section} danger title="Danger zone"><div class="row spread wrap"><div><b>Reset statistics</b><div class="muted">Deletes all collected data but keeps the site.</div></div><button class="btn danger" onClick=${() => setConfirm('reset')}>Reset</button></div>
@@ -307,9 +319,11 @@ export function SiteSettings({ domain, tab }) {
   if (res.error) return html`<main class="main"><${ErrorBox} error=${res.error} /></main>`;
   if (!s) return html`<main class="main"><${Loading} /></main>`;
   if (!s.can_manage) return html`<main class="main"><${Empty} title="No access" icon="lock">Only site owners and admins can change settings.<//></main>`;
-  const tabs = s.rollup ? [['general', 'General'], ['sites', 'Sites'], ['visibility', 'Visibility'], ['branding', 'Branding'], ['goals', 'Goals'], ['funnels', 'Funnels']] : [['general', 'General'], ['visibility', 'Visibility'], ['branding', 'Branding'], ['goals', 'Goals'], ['funnels', 'Funnels'], ['people', 'People'], ['shields', 'Shields']];
-  const t = tabs.find((x) => x[0] === tab) ? tab : 'general';
-  const Body = { general: General, visibility: Visibility, branding: Branding, goals: Goals, funnels: Funnels, sites: RollupSites, people: People, shields: Shields }[t];
+  // a few sections moved between tabs; older links and bookmarks still land in the right place
+  const tabs = s.rollup ? [['sites', 'Sites'], ['conversions', 'Conversions'], ['access', 'Sharing'], ['data', 'Data']] : [['tracking', 'Tracking'], ['conversions', 'Conversions'], ['access', 'Sharing and access'], ['data', 'Data']];
+  const moved = { general: s.rollup ? 'data' : 'tracking', shields: 'tracking', goals: 'conversions', funnels: 'conversions', visibility: 'access', branding: 'access', people: 'access' };
+  const t = [tab, moved[tab]].find((k) => tabs.some((x) => x[0] === k)) || tabs[0][0];
+  const Body = { tracking: Tracking, conversions: Conversions, access: Access, data: DataTab, sites: RollupSites }[t];
   return html`<${SettingsShell} title=${`${domain} settings`} back=${[`/${domain}`, 'Dashboard']} tabs=${tabs} tab=${t} base=${`/${domain}/settings`}><${Body} site=${s} reload=${res.reload} /><//>`;
 }
 
