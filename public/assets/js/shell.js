@@ -33,14 +33,20 @@ function useScrollSpy(ids) {
   useEffect(() => {
     if (!ids.length) return;
     const on = () => {
-      let cur = ids[0];
-      for (const id of ids) { const el = document.getElementById('sec-' + id); if (el && el.getBoundingClientRect().top <= 120) cur = id; }
-      if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4) cur = ids[ids.length - 1];
+      const els = ids.map((id) => [id, document.getElementById('sec-' + id)]).filter(([, el]) => el);
+      if (!els.length) { setActive(ids[0]); return; } // the page hasn't rendered its sections yet
+      let cur = els[0][0];
+      for (const [id, el] of els) if (el.getBoundingClientRect().top <= 120) cur = id;
+      const scrollable = document.documentElement.scrollHeight > window.innerHeight + 80;
+      if (scrollable && window.scrollY > 0 && window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4) cur = els[els.length - 1][0];
       setActive(cur);
     };
     on();
     window.addEventListener('scroll', on, { passive: true });
-    return () => window.removeEventListener('scroll', on);
+    // the sections appear and grow as their data loads; follow that too
+    const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(on) : null;
+    if (ro) ro.observe(document.body);
+    return () => { window.removeEventListener('scroll', on); if (ro) ro.disconnect(); };
   }, [ids.join()]);
   return active;
 }
