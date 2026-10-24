@@ -4,6 +4,9 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Changed
+- The sidebar's list of sites is now a searchable dropdown at the top, so it stays tidy with many sites. Open it, type to filter, and press Enter to jump to a site.
+
 ## [0.25.0] - 2026-11-05
 
 ### Changed

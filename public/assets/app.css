@@ -821,3 +821,24 @@ button.fact:hover { border-color: var(--accent); background: var(--surface); }
 @media (max-width: 800px) { .subnav { -webkit-mask-image: none; mask-image: none; padding-right: 0; } }
 .card.pad > div > h2 { font-size: 15.5px; }
 .subnav a .notif { margin-left: 7px; vertical-align: 1px; }
+
+/* site switcher in the sidebar */
+.side-switch { position: relative; }
+.side-switch-btn { display: flex; align-items: center; gap: 9px; width: 100%; height: 40px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--harbor-line); background: var(--harbor-2); color: #fff; cursor: pointer; font-size: 13.5px; font-weight: 600; text-align: left; }
+.side-switch-btn:hover, .side-switch-btn.open { border-color: #2b4a55; }
+.side-switch-btn > .icon { color: var(--harbor-accent); }
+.side-switch-btn .trunc { flex: 1; min-width: 0; }
+.side-switch-btn .chev { color: var(--harbor-mute); }
+.side-pop { position: absolute; z-index: 40; top: calc(100% + 6px); left: 0; right: 0; background: var(--harbor); border: 1px solid #2b4a55; border-radius: 12px; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55); overflow: hidden; animation: pop 0.14s var(--ease); transform-origin: top; }
+.side-pop-in { display: flex; align-items: center; gap: 8px; padding: 0 10px; height: 40px; border-bottom: 1px solid var(--harbor-line); color: var(--harbor-mute); }
+.side-pop-in input { flex: 1; min-width: 0; border: 0; background: none; outline: none; box-shadow: none; color: #fff; font-size: 13px; height: 100%; }
+.side-pop-in kbd { background: transparent; border-color: var(--harbor-line); color: var(--harbor-mute); }
+.side-pop-list { max-height: 260px; overflow-y: auto; padding: 5px; }
+.side-pop-foot { border-top: 1px solid var(--harbor-line); padding: 5px; }
+.side-pop-item { display: flex; align-items: center; gap: 9px; width: 100%; height: 34px; padding: 0 9px; border: 0; border-radius: 8px; background: none; color: var(--harbor-ink); cursor: pointer; font-size: 13px; text-align: left; }
+.side-pop-item.on, .side-pop-foot .side-pop-item:hover { background: var(--harbor-2); color: #fff; }
+.side-pop-item .icon { color: var(--harbor-mute); flex: none; }
+.side-pop-item .tick { margin-left: auto; color: var(--harbor-accent); }
+.side-pop-item em { margin-left: auto; font-style: normal; font-size: 10.5px; color: var(--harbor-mute); }
+.side-pop-item em + .tick { margin-left: 8px; }
+.side-pop-empty { padding: 16px 10px; text-align: center; font-size: 12.5px; color: var(--harbor-mute); }

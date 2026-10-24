@@ -1,7 +1,7 @@
 // The site dashboard: toolbar (site, filters, date), top stats + graph, then the report panels.
 import { setBrand, html, useState, useEffect, useMemo, useRef, useApi, api, useLocation, setQuery, setFilters, parseFilters, navigate, Link, Icon, toast, PERIODS, FILTER_OPS, FILTER_DIMS, dimLabel, todayStr, shiftDate, rememberPeriod, fmt, fmtShort, moneyShort, dur, countryName, flag, addFilter, shareAuth, share, useDocTitle, useScope, BASE, UserCtx, useContext } from './lib.js';
 import { Pop, Modal, Loading, Empty, Field, CodeBlock, useDebounced, Sparkline } from './ui.js';
-import { announceSections } from './shell.js';
+import { scrollToSection } from './shell.js';
 import { LineChart, ChartTable, bucketText } from './chart.js';
 import { Sources, Pages, Locations, Devices, Behaviors } from './reports.js';
 
@@ -388,9 +388,11 @@ export function Dashboard({ domain, shared }) {
   const brand = !user && s ? s.brand : null;
   useEffect(() => { setBrand(brand); return () => setBrand(null); }, [brand && brand.color, brand && brand.name, brand && brand.has_logo, brand && brand.logo && brand.logo.length]);
   useEffect(() => {
-    if (!s) return;
-    announceSections([{ id: 'overview', label: 'Overview', icon: 'chart-column' }, { id: 'traffic', label: 'Traffic', icon: 'compass' }, { id: 'audience', label: 'Audience', icon: 'users' }, { id: 'conversions', label: 'Conversions', icon: 'target' }]);
-    return () => announceSections([]);
+    // arriving from another page of the site via a sidebar section link
+    if (!s || !window.__tdmJump) return;
+    const id = window.__tdmJump;
+    window.__tdmJump = null;
+    setTimeout(() => scrollToSection(id), 250);
   }, [s && s.domain]);
   useEffect(() => {
     const h = (e) => {
