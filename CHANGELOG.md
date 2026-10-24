@@ -2,6 +2,14 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.20.0] - 2026-11-01
+
+### Added
+- **Funnels.** Chain two to eight goals into a funnel (Site settings → Funnels) and see how many visitors complete each step, in order, with the drop-off between steps, in the Behaviors panel. Visit-level filters such as country or source narrow who is counted.
+- **Revenue.** Give a custom-event goal a currency (Site settings → Goals) and send an amount with the event: `plausible('Purchase', { revenue: { amount: 29.99, currency: 'USD' } })`, the Events API's `revenue` field, or the `plausible-revenue-amount` and `plausible-revenue-currency` classes with `tagged-events`. Filtering by that goal shows total and average revenue in the top stats, the graph, the Goals list and every report. Revenue sent in another currency is converted with the European Central Bank's daily rates (`tidemark:refresh-rates`, fetched only when a goal reports revenue; turn off with `TIDEMARK_EXCHANGE_RATES=false`).
+- The Stats API accepts `events`, `conversion_rate`, `total_revenue` and `average_revenue` metrics with a goal filter. Site exports and imports carry funnels, goal currencies and event revenue. The CSV export gains revenue columns and `funnels.csv`.
+- Extensions can limit these with the new optional `App\Contracts\AllowsConversionReports`, next to `Entitlements`. Without it every site may use them.
+
 ## [0.19.1] - 2026-10-24
 
 ### Fixed

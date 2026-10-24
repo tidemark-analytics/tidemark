@@ -56,7 +56,7 @@ class DatabaseSink implements EventSink
         $eventId = $db->table('events')->insertGetId([
             'site_id' => $hit['site_id'], 'visit_id' => $visitId, 'visitor_id' => $hit['visitor_id'],
             'name' => $hit['name'], 'pathname' => $hit['pathname'], 'hostname' => $hit['hostname'], 'created_at' => $now,
-        ]);
+        ] + (empty($hit['revenue']) ? [] : ['revenue' => $hit['revenue']['amount'], 'currency' => $hit['revenue']['currency'], 'revenue_reporting' => $hit['revenue']['reporting']])); // only events with revenue need the columns, so an update still collects until it has migrated
         if ($hit['props']) {
             $rows = [];
             foreach ($hit['props'] as $k => $v) {

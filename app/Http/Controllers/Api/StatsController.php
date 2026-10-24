@@ -6,6 +6,7 @@ use App\Analytics\Stats\Stats;
 use App\Analytics\Support\Filters;
 use App\Analytics\Support\Period;
 use App\Http\Controllers\Controller;
+use App\Models\Funnel;
 use App\Models\Site;
 use Illuminate\Http\Request;
 
@@ -44,7 +45,7 @@ class StatsController extends Controller
             $out[$k] = ['value' => $v, 'previous' => $prev[$k] ?? null, 'change' => $prev ? self::change($v, $prev[$k] ?? null) : null];
         }
 
-        return ['period' => $p->toArray(), 'kind' => $f->goalName() ? 'goal' : 'visitors', 'stats' => $out, 'comparing' => $prev !== null];
+        return ['period' => $p->toArray(), 'kind' => $f->goalName() ? 'goal' : 'visitors', 'currency' => $stats->goalCurrency($f), 'stats' => $out, 'comparing' => $prev !== null];
     }
 
     public function graph(Request $r)
@@ -59,7 +60,7 @@ class StatsController extends Controller
             $comparison = $stats->timeseries($cp, $f);
         }
 
-        return $series + ['period' => $p->toArray(), 'interval' => $p->interval, 'intervals' => $p->allowedIntervals(), 'comparison' => $comparison, 'kind' => $f->goalName() ? 'goal' : 'visitors'];
+        return $series + ['period' => $p->toArray(), 'interval' => $p->interval, 'intervals' => $p->allowedIntervals(), 'comparison' => $comparison, 'kind' => $f->goalName() ? 'goal' : 'visitors', 'currency' => $stats->goalCurrency($f)];
     }
 
     public function breakdown(Request $r, string $site, string $dim)
@@ -67,7 +68,7 @@ class StatsController extends Controller
         [, $stats, $p, $f] = $this->ctx($r);
         $data = $stats->breakdown($dim, $p, $f, ['limit' => $r->input('limit', 9), 'page' => $r->input('page', 1), 'search' => $r->input('search')]);
 
-        return $data + ['mode' => $f->goalName() ? 'conversions' : 'visitors'];
+        return $data + ['mode' => $f->goalName() ? 'conversions' : 'visitors', 'currency' => $stats->goalCurrency($f)];
     }
 
     public function goals(Request $r)
@@ -75,6 +76,25 @@ class StatsController extends Controller
         [, $stats, $p, $f] = $this->ctx($r);
 
         return ['results' => $stats->goals($p, $f)];
+    }
+
+    /** The site's funnels (name and number of steps), for the dashboard's funnel picker. */
+    public function funnels(Request $r)
+    {
+        [$site] = $this->ctx($r);
+        if (! $site->funnelsAllowed()) {
+            return ['allowed' => false, 'results' => []];
+        }
+
+        return ['allowed' => true, 'results' => $site->funnels()->withCount('steps')->orderBy('created_at')->get()->map(fn ($f) => ['id' => $f->id, 'name' => $f->name, 'steps' => $f->steps_count])->all()];
+    }
+
+    public function funnel(Request $r, string $site, string $funnel)
+    {
+        [$s, $stats, $p, $f] = $this->ctx($r);
+        abort_unless($s->funnelsAllowed(), 403, 'Funnels are not available on this plan.');
+
+        return $stats->funnel($s->funnels()->findOrFail($funnel), $p, $f);
     }
 
     public function props(Request $r)
@@ -126,7 +146,19 @@ class StatsController extends Controller
             $res = $stats->breakdown($dim, $p, $f, ['limit' => 1000])['results'];
             $files[$name.'.csv'] = $csv(['name', 'visitors', 'visits', 'pageviews', 'bounce_rate', 'visit_duration'], array_map(fn ($x) => [$x['name'], $x['visitors'], $x['visits'] ?? '', $x['pageviews'] ?? '', $x['bounce_rate'] ?? '', $x['visit_duration'] ?? ''], $res));
         }
-        $files['goals.csv'] = $csv(['name', 'unique_conversions', 'total_conversions', 'conversion_rate'], array_map(fn ($g) => [$g['name'], $g['visitors'], $g['events'], $g['conversion_rate']], $stats->goals($p, $f)));
+        $goals = $stats->goals($p, $f);
+        $files['goals.csv'] = $csv(['name', 'unique_conversions', 'total_conversions', 'conversion_rate', 'currency', 'revenue', 'average_revenue'], array_map(fn ($g) => [$g['name'], $g['visitors'], $g['events'], $g['conversion_rate'], $g['currency'] ?? '', $g['revenue'] ?? '', $g['average_revenue'] ?? ''], $goals));
+        if ($site->funnelsAllowed()) {
+            $rows = [];
+            foreach ($site->funnels()->orderBy('created_at')->get() as $funnel) {
+                foreach ($stats->funnel($funnel, $p, $f)['steps'] as $i => $step) {
+                    $rows[] = [$funnel->name, $i + 1, $step['name'], $step['visitors'], $step['conversion_rate'], $step['conversion_rate_step'], $step['dropoff']];
+                }
+            }
+            if ($rows) {
+                $files['funnels.csv'] = $csv(['funnel', 'step', 'goal', 'visitors', 'conversion_rate', 'conversion_rate_from_previous', 'dropoff'], $rows);
+            }
+        }
 
         $fileName = $site->domain.'_'.$p->start->format('Ymd').'_to_'.$p->end->format('Ymd');
         if (! class_exists(\ZipArchive::class)) {

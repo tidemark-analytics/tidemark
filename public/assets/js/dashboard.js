@@ -1,5 +1,5 @@
 // The site dashboard: toolbar (site, filters, date), top stats + graph, then the report panels.
-import { setBrand, html, useState, useEffect, useMemo, useRef, useApi, api, useLocation, setQuery, setFilters, parseFilters, navigate, Link, Icon, toast, PERIODS, FILTER_OPS, FILTER_DIMS, dimLabel, todayStr, shiftDate, fmt, fmtShort, dur, countryName, shareAuth, share, useDocTitle, useScope, BASE, UserCtx, useContext } from './lib.js';
+import { setBrand, html, useState, useEffect, useMemo, useRef, useApi, api, useLocation, setQuery, setFilters, parseFilters, navigate, Link, Icon, toast, PERIODS, FILTER_OPS, FILTER_DIMS, dimLabel, todayStr, shiftDate, fmt, fmtShort, moneyShort, dur, countryName, shareAuth, share, useDocTitle, useScope, BASE, UserCtx, useContext } from './lib.js';
 import { Pop, Modal, Loading, Empty, Field, CodeBlock, useDebounced } from './ui.js';
 import { LineChart, ChartTable, bucketText } from './chart.js';
 import { Sources, Pages, Locations, Devices, Behaviors } from './reports.js';
@@ -9,11 +9,17 @@ const METRICS = {
   visitors: ['Unique visitors', fmtShort], visits: ['Total visits', fmtShort], pageviews: ['Total pageviews', fmtShort],
   views_per_visit: ['Views per visit', (v) => fmt(v)], bounce_rate: ['Bounce rate', (v) => v + '%'], visit_duration: ['Visit duration', dur],
 };
-const GOAL_METRICS = { unique_conversions: ['Unique conversions', fmtShort], total_conversions: ['Total conversions', fmtShort], conversion_rate: ['Conversion rate', (v) => v + '%'] };
+/** The top stats of a goal; a goal that reports revenue also gets its total and average, in the goal's currency. */
+const goalMetrics = (currency) => ({
+  unique_conversions: ['Unique conversions', fmtShort], total_conversions: ['Total conversions', fmtShort],
+  ...(currency ? { total_revenue: ['Total revenue', (v) => moneyShort(v, currency)], average_revenue: ['Average revenue', (v) => moneyShort(v, currency)] } : {}),
+  conversion_rate: ['Conversion rate', (v) => v + '%'],
+});
 const HELP = {
   visitors: 'People who visited, counted once per day', visits: 'Sessions: a visit ends after 30 minutes of inactivity', pageviews: 'Every page loaded or navigated to', views_per_visit: 'Average pageviews per visit',
   bounce_rate: 'Visits that left after a single page', visit_duration: 'Average time between the first and last activity of a visit',
   unique_conversions: 'Visitors who completed the goal', total_conversions: 'How many times the goal was completed', conversion_rate: 'Unique conversions as a share of visitors',
+  total_revenue: 'Revenue from the goal\'s conversions', average_revenue: 'Revenue per conversion',
 };
 const LOWER_IS_BETTER = new Set(['bounce_rate']);
 
@@ -31,7 +37,7 @@ function TopGraph({ site, scope, live, onIntervals }) {
   const poll = live ? 5000 : 0;
   const top = useApi(`${base}/top`, scope.params, [], { poll });
   const graph = useApi(`${base}/graph`, scope.params, [], { poll });
-  const defs = scope.goal ? GOAL_METRICS : METRICS;
+  const defs = scope.goal ? goalMetrics(top.data && top.data.currency) : METRICS;
   const current = defs[metric] ? metric : Object.keys(defs)[0];
   const [name, format] = defs[current];
   // while the filter changes, the previous response may use the other set of metrics; treat that as still loading

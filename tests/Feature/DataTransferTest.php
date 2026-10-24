@@ -45,6 +45,33 @@ class DataTransferTest extends TestCase
         return ['format' => 'tidemark-export', 'version' => 1, 'domain' => 'old.example.com', 'goals' => [['type' => 'event', 'value' => 'Signup']]];
     }
 
+    public function test_revenue_goal_currencies_and_funnels_travel_with_an_export(): void
+    {
+        $user = $this->user();
+        $this->siteFor($user, 'old.example.com');
+        $to = $this->siteFor($user, 'new.example.com');
+        $visit = $this->visit((string) Str::uuid());
+        $visit['events'][1] = ['name' => 'Purchase', 'pathname' => '/', 'created_at' => '2026-03-01 10:00:00', 'revenue' => '19.5', 'currency' => 'usd', 'revenue_reporting' => '19.5', 'props' => new \stdClass];
+        $header = ['format' => 'tidemark-export', 'version' => 1, 'domain' => 'old.example.com',
+            'goals' => [['type' => 'page', 'value' => '/pricing', 'currency' => null], ['type' => 'event', 'value' => 'Purchase', 'currency' => 'USD']],
+            'funnels' => [['name' => 'Buy', 'steps' => [['type' => 'page', 'value' => '/pricing'], ['type' => 'event', 'value' => 'Purchase']]], ['name' => 'Broken', 'steps' => [['type' => 'page', 'value' => '/nope'], ['type' => 'event', 'value' => 'Purchase']]]]];
+
+        $this->actingAs($user)->postJson('/api/sites/new.example.com/import', ['header' => $header, 'visits' => [$visit]])->assertOk();
+
+        $this->assertSame('USD', $to->goals()->where('value', 'Purchase')->value('currency'));
+        $this->assertSame(['Buy'], $to->funnels()->pluck('name')->all());
+        $this->assertSame(2, $to->funnels()->first()->steps()->count());
+        $event = DB::table('events')->where('site_id', $to->id)->where('name', 'Purchase')->first();
+        $this->assertSame(['USD', 19.5, 19.5], [$event->currency, (float) $event->revenue, (float) $event->revenue_reporting]);
+
+        $export = $this->actingAs($user)->get('/api/sites/new.example.com/export/data')->streamedContent();
+        $export = function_exists('gzdecode') && str_starts_with($export, "\x1f\x8b") ? gzdecode($export) : $export;
+        $lines = array_map(fn ($l) => json_decode($l, true), array_filter(explode("\n", $export)));
+        $this->assertSame('USD', collect($lines[0]['goals'])->firstWhere('value', 'Purchase')['currency']);
+        $this->assertSame('Buy', $lines[0]['funnels'][0]['name']);
+        $this->assertSame(19.5, (float) collect($lines[1]['events'])->firstWhere('name', 'Purchase')['revenue']);
+    }
+
     public function test_an_export_can_be_imported_into_another_site_and_stats_match(): void
     {
         $user = $this->user();

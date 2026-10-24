@@ -6,6 +6,8 @@ use App\Analytics\Support\Sql;
 use App\Contracts\Entitlements;
 use App\Contracts\LimitsImportedHistory;
 use App\Http\Controllers\Controller;
+use App\Models\Funnel;
+use App\Models\FunnelStep;
 use App\Models\Goal;
 use App\Models\Site;
 use Carbon\CarbonImmutable;
@@ -50,7 +52,8 @@ class DataController extends Controller
 
             $write($line([
                 'format' => self::FORMAT, 'version' => 1, 'domain' => $site->domain, 'timezone' => $site->timezone, 'exported_at' => now()->toIso8601String(),
-                'goals' => $site->goals()->get(['type', 'value'])->map->only(['type', 'value'])->all(),
+                'goals' => $site->goals()->get(['id', 'type', 'value', 'currency'])->map->only(['type', 'value', 'currency'])->all(),
+                'funnels' => $site->funnels()->with('steps.goal')->get()->map(fn ($f) => ['name' => $f->name, 'steps' => $f->steps->filter(fn ($s) => $s->goal)->map(fn ($s) => ['type' => $s->goal->type, 'value' => $s->goal->value])->values()->all()])->all(),
             ]));
 
             $db = Sql::connection();
@@ -65,6 +68,7 @@ class DataController extends Controller
                     $row['is_bounce'] = (bool) $row['is_bounce'];
                     $out .= $line(['visit' => $row, 'events' => ($events[$v->id] ?? collect())->map(fn ($e) => [
                         'name' => $e->name, 'pathname' => $e->pathname, 'hostname' => $e->hostname, 'created_at' => $e->created_at,
+                    ] + ($e->revenue !== null ? ['revenue' => $e->revenue, 'currency' => $e->currency, 'revenue_reporting' => $e->revenue_reporting] : []) + [
                         'props' => ($props[$e->id] ?? collect())->pluck('value', 'key')->all() ?: new \stdClass,
                     ])->values()->all()]);
                 }
@@ -96,7 +100,13 @@ class DataController extends Controller
             }
             foreach (array_slice((array) ($data['header']['goals'] ?? []), 0, 100) as $g) {
                 if (in_array($g['type'] ?? null, ['event', 'page'], true) && is_string($g['value'] ?? null) && $g['value'] !== '') {
-                    Goal::firstOrCreate(['site_id' => $site->id, 'type' => $g['type'], 'value' => Str::limit($g['value'], 500, '')]);
+                    $currency = is_string($g['currency'] ?? null) && preg_match('/^[A-Za-z]{3}$/', $g['currency']) && $g['type'] === 'event' && $site->revenueAllowed() ? strtoupper($g['currency']) : null;
+                    Goal::firstOrCreate(['site_id' => $site->id, 'type' => $g['type'], 'value' => Str::limit($g['value'], 500, '')], ['currency' => $currency]);
+                }
+            }
+            if ($site->funnelsAllowed()) {
+                foreach (array_slice((array) ($data['header']['funnels'] ?? []), 0, 50) as $f) {
+                    $this->importFunnel($site, $f);
                 }
             }
         }
@@ -175,6 +185,29 @@ class DataController extends Controller
         return ['imported' => $imported, 'events' => $importedEvents, 'skipped' => $skipped, 'outdated' => $outdated, 'invalid' => $invalid];
     }
 
+    /** Recreates a funnel from the header of an export file, skipping it when a step's goal is not among the site's goals. */
+    private function importFunnel(Site $site, mixed $f): void
+    {
+        if (! is_array($f) || ! is_string($f['name'] ?? null) || $f['name'] === '' || $site->funnels()->where('name', $f['name'])->exists()) {
+            return;
+        }
+        $goalIds = [];
+        foreach (array_slice((array) ($f['steps'] ?? []), 0, Funnel::MAX_STEPS) as $step) {
+            $goal = is_array($step) ? $site->goals()->where('type', $step['type'] ?? '')->where('value', $step['value'] ?? '')->first() : null;
+            if (! $goal) {
+                return;
+            }
+            $goalIds[] = $goal->id;
+        }
+        if (count($goalIds) < Funnel::MIN_STEPS) {
+            return;
+        }
+        $funnel = Funnel::create(['site_id' => $site->id, 'name' => mb_substr($f['name'], 0, 100)]);
+        foreach ($goalIds as $i => $id) {
+            FunnelStep::create(['funnel_id' => $funnel->id, 'goal_id' => $id, 'position' => $i + 1]);
+        }
+    }
+
     /** @return array<string,mixed>|null */
     private function visitRow(Site $site, mixed $v, CarbonImmutable $now): ?array
     {
@@ -217,8 +250,13 @@ class DataController extends Controller
             return null;
         }
 
+        $revenue = is_numeric($e['revenue'] ?? null) && abs((float) $e['revenue']) < 1.0E+13 && is_string($e['currency'] ?? null) && preg_match('/^[A-Za-z]{3}$/', $e['currency']);
+
         return [
             'site_id' => $site->id, 'visit_id' => $visit['id'], 'visitor_id' => $visit['visitor_id'],
+            'revenue' => $revenue ? round((float) $e['revenue'], 4) : null,
+            'currency' => $revenue ? strtoupper($e['currency']) : null,
+            'revenue_reporting' => $revenue && is_numeric($e['revenue_reporting'] ?? null) && abs((float) $e['revenue_reporting']) < 1.0E+13 ? round((float) $e['revenue_reporting'], 4) : null,
             'name' => mb_substr($e['name'], 0, 120),
             'pathname' => is_string($e['pathname'] ?? null) ? mb_substr($e['pathname'], 0, 500) : null,
             'hostname' => is_string($e['hostname'] ?? null) ? mb_substr($e['hostname'], 0, 100) : null,

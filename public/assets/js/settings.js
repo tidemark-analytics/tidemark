@@ -181,25 +181,72 @@ function NewLink({ site, onClose, onDone }) {
     <${Field} label="Password (optional)"><input type="password" autocomplete="new-password" value=${f.password} onInput=${(e) => setF({ ...f, password: e.target.value })} /><//></div><//>`;
 }
 
+const CURRENCIES = ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'NZD', 'CHF', 'JPY', 'CNY', 'HKD', 'SGD', 'INR', 'BRL', 'MXN', 'ZAR', 'SEK', 'NOK', 'DKK', 'PLN', 'CZK'];
+const CurrencySelect = ({ value, onChange, disabled, label = 'Revenue currency' }) => html`<select value=${value || ''} onChange=${(e) => onChange(e.target.value || null)} disabled=${disabled} aria-label=${label} style="width:auto"><option value="" selected=${!value}>No revenue</option>${CURRENCIES.map((c) => html`<option value=${c} selected=${c === value}>${c}</option>`)}</select>`;
+
 function Goals({ site }) {
   const res = useApi(`/sites/${site.domain}/goals`, null, []);
   const [type, setType] = useState('event');
   const [value, setValue] = useState('');
+  const [currency, setCurrency] = useState(null);
   const [err, setErr] = useState(null);
+  const revenue = (site.features || {}).revenue !== false;
   const add = async (e) => {
     e.preventDefault(); setErr(null);
-    try { await api(`/sites/${site.domain}/goals`, { method: 'POST', body: { type, value } }); setValue(''); res.reload(); } catch (x) { setErr(firstError(x)); }
+    try { await api(`/sites/${site.domain}/goals`, { method: 'POST', body: { type, value, currency: type === 'event' ? currency : null } }); setValue(''); setCurrency(null); res.reload(); } catch (x) { setErr(firstError(x)); }
   };
+  const setGoalCurrency = async (g, c) => { setErr(null); try { await api(`/sites/${site.domain}/goals/${g.id}`, { method: 'PATCH', body: { currency: c } }); res.reload(); } catch (x) { setErr(firstError(x)); } };
   return html`<${Section} title="Goals" help="A goal counts how many visitors did something: triggered a custom event, or visited a page.">
       <form class="row wrap goalform" onSubmit=${add}><select value=${type} onChange=${(e) => setType(e.target.value)} aria-label="Goal type" style="width:auto"><option value="event">Custom event</option><option value="page">Pageview</option></select>
-        <input class="grow" required placeholder=${type === 'event' ? 'Event name, e.g. Signup' : 'Page path, e.g. /thanks or /blog/*'} value=${value} onInput=${(e) => setValue(e.target.value)} aria-label="Goal value" /><button class="btn primary">Add goal</button></form>
+        <input class="grow" required placeholder=${type === 'event' ? 'Event name, e.g. Purchase' : 'Page path, e.g. /thanks or /blog/*'} value=${value} onInput=${(e) => setValue(e.target.value)} aria-label="Goal value" />
+        ${type === 'event' && html`<${CurrencySelect} value=${currency} onChange=${setCurrency} disabled=${!revenue} />`}<button class="btn primary">Add goal</button></form>
+      ${!revenue && html`<div class="notice"><${Icon} name="info" size=${16} /><div>Revenue reporting is included with Pro. <${Link} to="/settings">Open your account settings<//> to upgrade.</div></div>`}
       ${err && html`<div class="alert">${err}</div>`}
       ${res.data && res.data.data.length === 0 && html`<p class="muted">No goals yet.</p>`}
-      ${res.data && res.data.data.length > 0 && html`<div class="tscroll"><table class="t"><thead><tr><th>Goal</th><th>Type</th><th></th></tr></thead><tbody>${res.data.data.map((g) => html`<tr><td>${g.name}</td><td class="muted">${g.type === 'event' ? 'Custom event' : 'Pageview'}</td>
-        <td class="right"><button class="btn sm ghost danger" onClick=${async () => { await api(`/sites/${site.domain}/goals/${g.id}`, { method: 'DELETE' }); res.reload(); }}>Delete</button></td></tr>`)}</tbody></table></div>`}
+      ${res.data && res.data.data.length > 0 && html`<div class="tscroll"><table class="t"><thead><tr><th>Goal</th><th>Type</th><th>Revenue</th><th></th></tr></thead><tbody>${res.data.data.map((g) => html`<tr><td>${g.name}</td><td class="muted">${g.type === 'event' ? 'Custom event' : 'Pageview'}</td>
+        <td>${g.type === 'event' ? html`<${CurrencySelect} value=${g.currency} onChange=${(c) => setGoalCurrency(g, c)} disabled=${!revenue && !g.currency} label=${'Revenue currency for ' + g.name} />` : html`<span class="muted">–</span>`}</td>
+        <td class="right"><button class="btn sm ghost danger" onClick=${async () => { setErr(null); try { await api(`/sites/${site.domain}/goals/${g.id}`, { method: 'DELETE' }); res.reload(); } catch (x) { setErr(firstError(x)); } }}>Delete</button></td></tr>`)}</tbody></table></div>`}
     <//>
     <${Section} title="Sending custom events" help="Call this from your site's code to record a goal conversion.">
-      <${CodeBlock} text="window.plausible('Signup', { props: { plan: 'pro' } })" /><p class="muted">Or tag an element without code: add <code>class="plausible-event-name=Signup"</code>, with the <code>tagged-events</code> script variant.</p><//>`;
+      <${CodeBlock} text="window.plausible('Signup', { props: { plan: 'pro' } })" /><p class="muted">Or tag an element without code: add <code>class="plausible-event-name=Signup"</code>, with the <code>tagged-events</code> script variant.</p><//>
+    <${Section} title="Reporting revenue" help="Choose a currency for a custom-event goal, then send an amount with the event. Totals and averages appear when you filter by that goal.">
+      <${CodeBlock} text="window.plausible('Purchase', { revenue: { amount: 29.99, currency: 'USD' } })" /><p class="muted">With the tag method, add <code>plausible-revenue-amount=29.99</code> and <code>plausible-revenue-currency=USD</code> to the class. Amounts sent in another currency are converted into the goal's currency with the European Central Bank's daily rates.</p><//>`;
+}
+
+function Funnels({ site }) {
+  const goals = useApi(`/sites/${site.domain}/goals`, null, []);
+  const res = useApi(`/sites/${site.domain}/funnels`, null, []);
+  const allowed = (site.features || {}).funnels !== false;
+  const [form, setForm] = useState(null);
+  const [err, setErr] = useState(null);
+  const list = (goals.data && goals.data.data) || [];
+  const goalName = (id) => (list.find((g) => g.id === id) || { name: '(deleted goal)' }).name;
+  const open = (f) => { setErr(null); setForm(f ? { id: f.id, name: f.name, steps: f.steps.map((s) => s.goal_id) } : { name: '', steps: ['', ''] }); };
+  const save = async (e) => {
+    e.preventDefault(); setErr(null);
+    try {
+      await api(`/sites/${site.domain}/funnels${form.id ? '/' + form.id : ''}`, { method: form.id ? 'PUT' : 'POST', body: { name: form.name, steps: form.steps } });
+      setForm(null); res.reload(); toast('Funnel saved');
+    } catch (x) { setErr(firstError(x)); }
+  };
+  const setStep = (i, v) => setForm({ ...form, steps: form.steps.map((s, j) => (j === i ? v : s)) });
+  return html`<${Section} title="Funnels" help="A funnel follows visitors through a series of goals, in order, and shows where they drop off. Add the goals first, then chain two to eight of them here.">
+      ${!allowed && html`<div class="notice"><${Icon} name="info" size=${16} /><div>Funnels are included with Pro. <${Link} to="/settings">Open your account settings<//> to upgrade.</div></div>`}
+      ${err && !form && html`<div class="alert">${err}</div>`}
+      ${!form && html`<div><button class="btn primary" disabled=${!allowed || list.length < 2} onClick=${() => open(null)}>New funnel</button>${allowed && goals.data && list.length < 2 && html`<span class="muted" style="margin-left:10px">Add at least two goals first.</span>`}</div>`}
+      ${form && html`<form class="form" onSubmit=${save}>
+        ${err && html`<div class="alert">${err}</div>`}
+        <${Field} label="Name"><input required maxlength="100" autofocus value=${form.name} onInput=${(e) => setForm({ ...form, name: e.target.value })} placeholder="Signup to purchase" /><//>
+        <${Field} label="Steps" help="A visitor completes a step when its goal happens after the previous step. Other activity in between is fine.">
+          <div class="stack sm">${form.steps.map((id, i) => html`<div class="row"><span class="muted" style="width:20px">${i + 1}.</span>
+            <select required class="grow" value=${id} onChange=${(e) => setStep(i, e.target.value)} aria-label=${'Step ' + (i + 1)}><option value="">Choose a goal</option>${list.map((g) => html`<option value=${g.id} selected=${g.id === id}>${g.name}</option>`)}</select>
+            <button type="button" class="btn sm ghost" disabled=${form.steps.length <= 2} aria-label=${'Remove step ' + (i + 1)} onClick=${() => setForm({ ...form, steps: form.steps.filter((_, j) => j !== i) })}>Remove</button></div>`)}
+          <div><button type="button" class="btn sm" disabled=${form.steps.length >= 8} onClick=${() => setForm({ ...form, steps: [...form.steps, ''] })}>Add step</button></div></div><//>
+        <div class="row"><button class="btn primary" disabled=${!form.name || form.steps.some((s) => !s)}>Save funnel</button><button type="button" class="btn" onClick=${() => setForm(null)}>Cancel</button></div></form>`}
+      ${res.data && res.data.data.length === 0 && !form && html`<p class="muted">No funnels yet.</p>`}
+      ${res.data && res.data.data.length > 0 && html`<div class="tscroll"><table class="t"><thead><tr><th>Funnel</th><th>Steps</th><th></th></tr></thead><tbody>${res.data.data.map((f) => html`<tr><td><b>${f.name}</b></td><td class="muted">${f.steps.map((s) => goalName(s.goal_id)).join(' → ')}</td>
+        <td class="right"><button class="btn sm ghost" disabled=${!allowed} onClick=${() => open(f)}>Edit</button><button class="btn sm ghost danger" onClick=${async () => { await api(`/sites/${site.domain}/funnels/${f.id}`, { method: 'DELETE' }); res.reload(); }}>Delete</button></td></tr>`)}</tbody></table></div>`}
+    <//>`;
 }
 
 function People({ site }) {
@@ -239,9 +286,9 @@ export function SiteSettings({ domain, tab }) {
   if (res.error) return html`<main class="main"><${ErrorBox} error=${res.error} /></main>`;
   if (!s) return html`<main class="main"><${Loading} /></main>`;
   if (!s.can_manage) return html`<main class="main"><${Empty} title="No access" icon="lock">Only site owners and admins can change settings.<//></main>`;
-  const tabs = [['general', 'General'], ['visibility', 'Visibility'], ['branding', 'Branding'], ['goals', 'Goals'], ['people', 'People'], ['shields', 'Shields']];
+  const tabs = [['general', 'General'], ['visibility', 'Visibility'], ['branding', 'Branding'], ['goals', 'Goals'], ['funnels', 'Funnels'], ['people', 'People'], ['shields', 'Shields']];
   const t = tabs.find((x) => x[0] === tab) ? tab : 'general';
-  const Body = { general: General, visibility: Visibility, branding: Branding, goals: Goals, people: People, shields: Shields }[t];
+  const Body = { general: General, visibility: Visibility, branding: Branding, goals: Goals, funnels: Funnels, people: People, shields: Shields }[t];
   return html`<${SettingsShell} title=${`${domain} settings`} back=${[`/${domain}`, 'Dashboard']} tabs=${tabs} tab=${t} base=${`/${domain}/settings`}><${Body} site=${s} reload=${res.reload} /><//>`;
 }
 

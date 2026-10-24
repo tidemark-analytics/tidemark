@@ -4,6 +4,8 @@ namespace App\Console\Commands;
 
 use App\Analytics\Support\Sources;
 use App\Analytics\Support\Sql;
+use App\Models\Funnel;
+use App\Models\FunnelStep;
 use App\Models\Goal;
 use App\Models\Site;
 use App\Models\User;
@@ -23,8 +25,14 @@ class DemoData extends Command
         if (! $site->members()->where('users.id', $user->id)->exists()) {
             $site->members()->attach($user->id, ['role' => 'owner', 'id' => (string) Str::uuid()]);
         }
-        foreach ([['event', 'Signup'], ['page', '/pricing'], ['event', 'Outbound Link: Click'], ['event', 'File Download']] as [$type, $value]) {
-            Goal::firstOrCreate(['site_id' => $site->id, 'type' => $type, 'value' => $value]);
+        foreach ([['event', 'Signup'], ['page', '/pricing'], ['event', 'Outbound Link: Click'], ['event', 'File Download'], ['event', 'Purchase']] as [$type, $value]) {
+            Goal::firstOrCreate(['site_id' => $site->id, 'type' => $type, 'value' => $value], ['currency' => $value === 'Purchase' ? 'USD' : null]);
+        }
+        $funnel = Funnel::firstOrCreate(['site_id' => $site->id, 'name' => 'Pricing to purchase']);
+        if (! $funnel->steps()->exists()) {
+            foreach (['/pricing', 'Signup', 'Purchase'] as $i => $value) {
+                FunnelStep::create(['funnel_id' => $funnel->id, 'goal_id' => Goal::where('site_id', $site->id)->where('value', $value)->value('id'), 'position' => $i + 1]);
+            }
         }
         $db = Sql::connection();
         foreach (['event_props', 'events', 'visits'] as $t) {
@@ -86,6 +94,10 @@ class DemoData extends Command
                     $t = $t->addSeconds(mt_rand(3, 40));
                     $row[] = ['visit_id' => $vid, 'name' => 'Signup', 'pathname' => $path, 'at' => $t, 'props' => ['plan' => ['Starter', 'Pro', 'Team'][mt_rand(0, 2)], 'method' => ['email', 'github'][mt_rand(0, 1)]]];
                 }
+                if (mt_rand(1, 100) <= 38 && end($row)['name'] === 'Signup') {
+                    $t = $t->addSeconds(mt_rand(20, 240));
+                    $row[] = ['visit_id' => $vid, 'name' => 'Purchase', 'pathname' => '/checkout', 'at' => $t, 'props' => ['plan' => end($row)['props']['plan']], 'revenue' => [9, 29, 99][mt_rand(0, 2)]];
+                }
                 if ($ref === 'github.com' || mt_rand(1, 100) <= 12) {
                     $t = $t->addSeconds(mt_rand(3, 30));
                     $row[] = ['visit_id' => $vid, 'name' => 'Outbound Link: Click', 'pathname' => $path, 'at' => $t, 'props' => ['url' => ['https://github.com/example/repo', 'https://example.org/docs'][mt_rand(0, 1)]]];
@@ -103,7 +115,8 @@ class DemoData extends Command
                     'pageviews' => $views, 'events' => $nEvents, 'is_bounce' => $nEvents <= 1, 'duration' => max(0, $t->getTimestamp() - $start->getTimestamp()),
                 ];
                 foreach ($row as $e) {
-                    $events[] = ['site_id' => $site->id, 'visit_id' => $vid, 'visitor_id' => $visitor, 'name' => $e['name'], 'pathname' => $e['pathname'], 'hostname' => $site->domain, 'created_at' => $e['at']->utc()->format('Y-m-d H:i:s'), '_props' => $e['props']];
+                    $events[] = ['site_id' => $site->id, 'visit_id' => $vid, 'visitor_id' => $visitor, 'name' => $e['name'], 'pathname' => $e['pathname'], 'hostname' => $site->domain, 'created_at' => $e['at']->utc()->format('Y-m-d H:i:s'),
+                        'revenue' => $e['revenue'] ?? null, 'currency' => isset($e['revenue']) ? 'USD' : null, 'revenue_reporting' => $e['revenue'] ?? null, '_props' => $e['props']];
                 }
                 $n++;
             }

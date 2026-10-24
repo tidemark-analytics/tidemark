@@ -2,6 +2,7 @@
 
 use App\Console\Commands\CheckUpdates;
 use App\Console\Commands\PruneEvents;
+use App\Console\Commands\RefreshExchangeRates;
 use Illuminate\Support\Facades\Schedule;
 
 // Shared hosting needs one cron entry:  * * * * * php /path/to/artisan schedule:run
@@ -11,3 +12,4 @@ Schedule::command(PruneEvents::class)->dailyAt('03:15')->when(fn () => config('t
 Schedule::command('cache:prune-stale-tags')->hourly()->when(fn () => config('cache.default') === 'redis');
 // Looks for a new release once a day, at a minute derived from the install's key so installs don't all call GitHub together.
 Schedule::command(CheckUpdates::class)->dailyAt('04:'.str_pad((string) (crc32((string) config('app.key')) % 60), 2, '0', STR_PAD_LEFT))->when(fn () => config('tidemark.update_check'));
+Schedule::command(RefreshExchangeRates::class)->dailyAt('16:30');

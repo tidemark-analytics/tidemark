@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Contracts\AllowsBranding;
+use App\Contracts\AllowsConversionReports;
 use App\Contracts\Entitlements;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
@@ -32,6 +33,11 @@ class Site extends Model
         return $this->hasMany(Goal::class);
     }
 
+    public function funnels(): HasMany
+    {
+        return $this->hasMany(Funnel::class);
+    }
+
     public function sharedLinks(): HasMany
     {
         return $this->hasMany(SharedLink::class);
@@ -56,6 +62,22 @@ class Site extends Model
         $role = $this->members()->where('users.id', $user->id)->first()?->pivot->role;
 
         return $role ?? ($user->is_admin ? 'owner' : null);
+    }
+
+    /** Whether this site may use funnels (always true unless an extension limits it). */
+    public function funnelsAllowed(): bool
+    {
+        $entitlements = app(Entitlements::class);
+
+        return ! ($entitlements instanceof AllowsConversionReports) || $entitlements->allowsFunnels($this);
+    }
+
+    /** Whether this site may report revenue on its goals (always true unless an extension limits it). */
+    public function revenueAllowed(): bool
+    {
+        $entitlements = app(Entitlements::class);
+
+        return ! ($entitlements instanceof AllowsConversionReports) || $entitlements->allowsRevenue($this);
     }
 
     /** Whether this site may show its own branding on public pages (always true unless an extension limits it). */

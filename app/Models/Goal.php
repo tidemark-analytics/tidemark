@@ -9,7 +9,7 @@ class Goal extends Model
 {
     use HasUuids;
 
-    protected $fillable = ['site_id', 'type', 'value'];
+    protected $fillable = ['site_id', 'type', 'value', 'currency'];
 
     /** Name shown in the dashboard. */
     public function getNameAttribute(): string

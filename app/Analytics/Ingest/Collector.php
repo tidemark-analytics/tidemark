@@ -2,11 +2,13 @@
 
 namespace App\Analytics\Ingest;
 
+use App\Analytics\Support\ExchangeRates;
 use App\Analytics\Support\Sources;
 use App\Contracts\Entitlements;
 use App\Models\Site;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Accepts Plausible's event payload — {n: name, u: url, d: domain, r: referrer, w: screen width, p: props, h: hash mode} —
@@ -66,6 +68,7 @@ class Collector
         $referrer = isset($p['r']) && $p['r'] ? (string) $p['r'] : ($referrer && str_contains($referrer, '.') ? $referrer : null);
         $utm = ['source' => $q['utm_source'] ?? null, 'medium' => $q['utm_medium'] ?? null, 'campaign' => $q['utm_campaign'] ?? null, 'content' => $q['utm_content'] ?? null, 'term' => $q['utm_term'] ?? null];
         $src = Sources::classify($referrer, $utm, $site['domain']);
+        $revenue = $name === 'pageview' ? null : $this->revenue($p['revenue'] ?? $p['$'] ?? null, $site['currencies'][$name] ?? null);
 
         $this->sink->record([
             'site_id' => $site['id'],
@@ -79,6 +82,7 @@ class Collector
             'browser' => $agent['browser'], 'os' => $agent['os'],
             'device' => Sources::deviceFromWidth(isset($p['w']) ? (int) $p['w'] : null, $agent['mobile'], $agent['tablet']),
             'props' => $this->props($p['p'] ?? $p['props'] ?? null),
+            'revenue' => $revenue,
         ]);
 
         return ['status' => 202, 'body' => 'ok'];
@@ -90,6 +94,30 @@ class Collector
         $salt = (config('tidemark.salt') ?: config('app.key')).gmdate('Y-m-d');
 
         return substr(hash_hmac('sha256', $siteId.'|'.$ip.'|'.$ua, $salt), 0, 32);
+    }
+
+    /**
+     * The revenue an event carries, `{amount, currency}` as Plausible sends it. When the event's goal reports in a currency, the
+     * amount is also converted into it (null when no rate is known yet).
+     *
+     * @return array{amount:float,currency:string,reporting:?float}|null
+     */
+    private function revenue(mixed $raw, ?string $goalCurrency): ?array
+    {
+        if (is_string($raw)) {
+            $raw = json_decode($raw, true);
+        }
+        if (! is_array($raw) || ! is_numeric($raw['amount'] ?? null)) {
+            return null;
+        }
+        $currency = strtoupper(trim((string) ($raw['currency'] ?? '')));
+        $amount = round((float) $raw['amount'], 4);
+        if (! preg_match('/^[A-Z]{3}$/', $currency) || abs($amount) >= 1.0E+13) {
+            return null;
+        }
+        $reporting = $goalCurrency ? ExchangeRates::convert($amount, $currency, $goalCurrency) : null;
+
+        return ['amount' => $amount, 'currency' => $currency, 'reporting' => $reporting === null ? null : round($reporting, 4)];
     }
 
     /** @return array<string,string> */
@@ -117,7 +145,7 @@ class Collector
             $found = Cache::remember('tdm:site:'.$candidate, 60, function () use ($candidate) {
                 $site = Site::where('domain', $candidate)->first();
 
-                return $site ? ['id' => $site->id, 'domain' => $site->domain, 'owner_id' => $site->members()->wherePivot('role', 'owner')->value('users.id'), 'shields' => $site->shields()->get()->groupBy('type')->map(fn ($g) => $g->pluck('value')->all())->all()] : 0;
+                return $site ? ['id' => $site->id, 'domain' => $site->domain, 'owner_id' => $site->members()->wherePivot('role', 'owner')->value('users.id'), 'shields' => $site->shields()->get()->groupBy('type')->map(fn ($g) => $g->pluck('value')->all())->all(), 'currencies' => Schema::hasColumn('goals', 'currency') ? $site->goals()->where('type', 'event')->whereNotNull('currency')->pluck('currency', 'value')->all() : []] : 0;
             });
             if ($found) {
                 return $found;

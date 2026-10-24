@@ -130,6 +130,10 @@ export function dur(s) {
   if (m < 60) return m + 'm ' + String(s % 60).padStart(2, '0') + 's';
   return Math.floor(m / 60) + 'h ' + String(m % 60).padStart(2, '0') + 'm';
 }
+/** A currency amount, shortened like 12.5K once it gets large. */
+export function moneyShort(v, currency = 'USD') {
+  try { return new Intl.NumberFormat(undefined, { style: 'currency', currency, ...(Math.abs(v || 0) >= 10000 ? { notation: 'compact', maximumFractionDigits: 1 } : {}) }).format(v || 0); } catch (e) { return (v || 0).toFixed(2); }
+}
 export function money(v, currency = 'USD') {
   try { return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(v || 0); } catch (e) { return (v || 0).toFixed(2); }
 }

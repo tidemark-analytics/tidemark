@@ -39,6 +39,8 @@ Route::middleware('api.auth:optional')->group(function () {
         Route::get('/stats/graph', [StatsController::class, 'graph']);
         Route::get('/stats/breakdown/{dim}', [StatsController::class, 'breakdown']);
         Route::get('/stats/goals', [StatsController::class, 'goals']);
+        Route::get('/stats/funnels', [StatsController::class, 'funnels']);
+        Route::get('/stats/funnels/{funnel}', [StatsController::class, 'funnel']);
         Route::get('/stats/props', [StatsController::class, 'props']);
         Route::get('/stats/props/{key}', [StatsController::class, 'propValues'])->where('key', '.+');
         Route::get('/stats/current-visitors', [StatsController::class, 'currentVisitors']);
@@ -76,7 +78,12 @@ Route::middleware('api.auth')->group(function () {
         Route::delete('/import/plausible', [PlausibleImportController::class, 'destroy']);
         Route::get('/goals', [S::class, 'goals']);
         Route::post('/goals', [S::class, 'createGoal']);
+        Route::patch('/goals/{goal}', [S::class, 'updateGoal']);
         Route::delete('/goals/{goal}', [S::class, 'deleteGoal']);
+        Route::get('/funnels', [S::class, 'funnels']);
+        Route::post('/funnels', [S::class, 'createFunnel']);
+        Route::put('/funnels/{funnel}', [S::class, 'updateFunnel']);
+        Route::delete('/funnels/{funnel}', [S::class, 'deleteFunnel']);
         Route::get('/shared-links', [S::class, 'sharedLinks']);
         Route::post('/shared-links', [S::class, 'createSharedLink']);
         Route::patch('/shared-links/{link}', [S::class, 'updateSharedLink']);

@@ -16,7 +16,13 @@ use Illuminate\Http\Request;
  */
 class StatsApiController extends Controller
 {
-    private const METRICS = ['visitors', 'visits', 'pageviews', 'views_per_visit', 'bounce_rate', 'visit_duration'];
+    private const METRICS = ['visitors', 'visits', 'pageviews', 'views_per_visit', 'bounce_rate', 'visit_duration', 'events', 'conversion_rate', 'total_revenue', 'average_revenue'];
+
+    /** With a goal filter the stats are conversions: `visitors` are the unique conversions and `events` the total ones, as in Plausible. */
+    private static function asGoalMetrics(array $stats, Filters $f): array
+    {
+        return $f->goalName() && isset($stats['unique_conversions']) ? $stats + ['visitors' => $stats['unique_conversions'], 'events' => $stats['total_conversions']] : $stats;
+    }
 
     private const PROPS = [
         'event:page' => 'page', 'visit:entry_page' => 'entry_page', 'visit:exit_page' => 'exit_page', 'visit:source' => 'source', 'visit:referrer' => 'referrer',
@@ -88,11 +94,14 @@ class StatsApiController extends Controller
     {
         [, $stats, $p, $f] = $this->ctx($r);
         $metrics = $this->metrics($r);
-        $cur = $stats->topStats($p, $f);
+        $cur = self::asGoalMetrics($stats->topStats($p, $f), $f);
         $out = [];
-        $prev = $r->input('compare') === 'previous_period' ? $stats->topStats($p->comparison('previous_period'), $f) : null;
+        $prev = $r->input('compare') === 'previous_period' ? self::asGoalMetrics($stats->topStats($p->comparison('previous_period'), $f), $f) : null;
         foreach ($metrics as $m) {
-            $out[$m] = ['value' => $cur[$m]] + ($prev ? ['change' => $prev[$m] ? round(($cur[$m] - $prev[$m]) / $prev[$m] * 100) : null] : []);
+            if (! array_key_exists($m, $cur)) {
+                continue;
+            }
+            $out[$m] = ['value' => $cur[$m]] + ($prev ? ['change' => ($prev[$m] ?? 0) ? round(($cur[$m] - $prev[$m]) / $prev[$m] * 100) : null] : []);
         }
 
         return ['results' => $out];
@@ -103,11 +112,14 @@ class StatsApiController extends Controller
         [, $stats, $p, $f] = $this->ctx($r);
         $metrics = $this->metrics($r);
         $s = $stats->timeseries($p, $f);
+        $s['plot'] = self::asGoalMetrics($s['plot'], $f);
         $rows = [];
         foreach ($s['labels'] as $i => $label) {
             $row = ['date' => in_array($p->interval, ['hour', 'minute'], true) ? str_replace(' ', ' ', substr($label, 0, 19)) : substr($label, 0, 10)];
             foreach ($metrics as $m) {
-                $row[$m] = $s['plot'][$m][$i];
+                if (isset($s['plot'][$m])) {
+                    $row[$m] = $s['plot'][$m][$i];
+                }
             }
             $rows[] = $row;
         }

@@ -25,6 +25,7 @@
 
     var payload = { n: name, u: options.u || location.href, d: domain, r: doc.referrer || null, w: window.innerWidth };
     if (options.props) { payload.p = options.props; }
+    if (options.revenue) { payload.$ = options.revenue; }
     if (hashMode && !options.u) { payload.h = 1; }
 
     var req = new XMLHttpRequest();
@@ -126,7 +127,8 @@
             var p = c.match(/^plausible-event-(?!name=)(.+?)=(.+)$/);
             if (p) { props[p[1]] = p[2].replace(/\+/g, ' '); }
           });
-          send(m[1].replace(/\+/g, ' '), { props: props });
+          var amount = cls.match(/(?:^|\s)plausible-revenue-amount=(\S+)/), currency = cls.match(/(?:^|\s)plausible-revenue-currency=(\S+)/);
+          send(m[1].replace(/\+/g, ' '), { props: props, revenue: amount && currency ? { amount: amount[1], currency: currency[1] } : undefined });
           return;
         }
         node = node.parentNode;
