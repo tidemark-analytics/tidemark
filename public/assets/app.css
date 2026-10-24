@@ -848,3 +848,4 @@ button.fact:hover { border-color: var(--accent); background: var(--surface); }
 .side .pop { left: 0; right: 0; width: auto; min-width: 0; }
 .side .pop > div { min-width: 0 !important; }
 .who span { overflow-wrap: anywhere; }
+.card.stack > hr { margin: 0; } /* the stack's own gap already spaces a divider evenly */
