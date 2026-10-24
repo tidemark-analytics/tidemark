@@ -4,6 +4,11 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [0.27.1] - 2026-11-07
+
+### Fixed
+- On phones, the site list opened below the Filter row instead of right under the site button.
+
 ## [0.27.0] - 2026-11-07
 
 ### Changed
