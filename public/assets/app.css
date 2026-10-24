@@ -612,20 +612,22 @@ td > .pill { vertical-align: middle; }
 .auth-body .legal-links { position: absolute; left: 24px; right: 24px; bottom: 24px; }
 .legal-links a { color: var(--ink-3); } .legal-links a:hover { color: var(--ink); text-decoration: underline; }
 
-/* ---- phone toolbar: site + live count on the first row, Filter / date / more share the second ---------------- */
+/* ---- phone toolbar (the title before the switcher is not a div, so first-of-type still finds the switcher): site + live count on the first row, Filter / date / more share the second ---------------- */
 @media (max-width: 720px) {
   .toolbar.sticky { position: relative; top: auto; gap: 8px; padding: 6px 0 0; margin: 0; }
   .toolbar .pop-wrap { position: static; }
-  .toolbar > .siteswitch, .toolbar > .pop-wrap:first-child { flex: 1 1 0; min-width: 0; }
-  .toolbar > .pop-wrap:first-child > .siteswitch { width: 100%; justify-content: flex-start; }
-  .toolbar > .pop-wrap:first-child > .siteswitch .ico:last-child { margin-left: auto; }
+  .toolbar > .siteswitch, .toolbar > .pop-wrap:first-of-type { flex: 1 1 0; min-width: 0; }
+  .toolbar > .pop-wrap:first-of-type { position: relative; } /* the site list opens right under its button; Filter and the date menu span the toolbar */
+  .toolbar > .pop-wrap:first-of-type .pop { min-width: 240px; max-width: calc(100vw - 32px); }
+  .toolbar > .pop-wrap:first-of-type > .siteswitch { width: 100%; justify-content: flex-start; }
+  .toolbar > .pop-wrap:first-of-type > .siteswitch .ico:last-child { margin-left: auto; }
   .toolbar > .siteswitch b, .toolbar > .pop-wrap > .siteswitch b { max-width: none; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
   .toolbar > .live { flex: none; }
   .toolbar > .grow { flex: 0 0 100%; height: 0; margin: -8px 0 0; }
-  .toolbar > .pop-wrap:not(:first-child) { flex: 1 1 0; min-width: 0; }
-  .toolbar > .pop-wrap:not(:first-child):last-child { flex: none; }
-  .toolbar > .pop-wrap:not(:first-child) > .btn:not(.icon) { width: 100%; }
-  .toolbar > .pop-wrap:not(:first-child) .pop, .toolbar .filter-pop { left: 0; right: 0; width: auto; min-width: 0; max-width: none; }
+  .toolbar > .pop-wrap:not(:first-of-type) { flex: 1 1 0; min-width: 0; }
+  .toolbar > .pop-wrap:not(:first-of-type):last-child { flex: none; }
+  .toolbar > .pop-wrap:not(:first-of-type) > .btn:not(.icon) { width: 100%; }
+  .toolbar > .pop-wrap:not(:first-of-type) .pop, .toolbar .filter-pop { left: 0; right: 0; width: auto; min-width: 0; max-width: none; }
 }
 
 /* ---- narrow screens: stacked onboarding card, snippet boxes that keep the copy button on its own line --------- */
