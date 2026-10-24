@@ -5,7 +5,7 @@ import { Snippet } from './dashboard.js';
 
 function SiteCard({ s }) {
   const up = s.change > 0, down = s.change < 0;
-  return html`<${Link} to=${'/' + s.domain} class="card site" aria-label=${s.domain}>
+  return html`<${Link} to=${'/' + s.domain} class=${'card site' + (s.visitors === 0 ? ' quiet' : '')} aria-label=${s.domain}>
     <div class="name"><${Icon} name=${s.rollup ? 'layers' : 'globe'} size=${16} class="muted" /><span class="t">${s.domain}</span>${s.rollup && html`<span class="pill brand" title="Adds up several of your sites">Rollup · ${s.members} ${s.members === 1 ? 'site' : 'sites'}</span>`}${s.public && html`<span class="pill">Public</span>`}</div>
     <div class="nums"><div><b>${fmtShort(s.visitors)}</b><span>Visitors, last 24 hours</span></div>
       <div><b class=${up ? 'up' : down ? 'down' : ''}>${s.change === 0 ? '–' : html`${up ? '+' : ''}${s.change}%`}</b><span>vs previous</span></div></div>
@@ -25,7 +25,7 @@ export function SitesPage() {
   const total = res.data ? res.data.data.length : 0;
   const { user } = useContext(UserCtx) || {};
   const realSites = res.data ? res.data.data.filter((s) => !s.rollup && s.role).length : 0;
-  return html`<main class="main"><header class="page-head"><div class="grow"><h1>Your sites</h1></div>
+  return html`<main class="main"><header class="page-head"><div class="grow"><h1>Your sites</h1>${res.data && total > 0 && html`<div class="sub"><b>${fmtShort(res.data.data.filter((s) => !s.rollup).reduce((n, s) => n + s.visitors, 0))}</b> visitors across ${res.data.data.filter((s) => !s.rollup).length} ${res.data.data.filter((s) => !s.rollup).length === 1 ? 'site' : 'sites'} in the last 24 hours</div>`}</div>
     <div class="row wrap">${total > 3 && html`<div class="searchbox"><${Icon} name="search" size=${14} /><input placeholder="Search sites" aria-label="Search sites" value=${q} onInput=${(e) => setQ(e.target.value)} /></div>`}
       ${total > 1 && html`<select aria-label="Sort" value=${sort} onChange=${(e) => setSort(e.target.value)} style="width:auto"><option value="visitors">Most visitors</option><option value="name">Name</option></select>`}
       ${realSites >= 2 && html`<${Link} to="/sites/rollup" class="btn" title="Add up several of your sites in one dashboard"><${Icon} name="layers" size=${14} /> Create a rollup<//>`}

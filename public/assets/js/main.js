@@ -1,11 +1,11 @@
 import { html, render, useState, useEffect, useBrand, api, navigate, useLocation, matchRoute, Link, Icon, toggleTheme, useToasts, UserCtx } from './lib.js';
-import { Pop } from './ui.js';
 import { Login, Register, ForgotPassword, ResetPassword } from './pages/auth.js';
 import { Dashboard } from './dashboard.js';
 import { SitesPage, NewSite, NewRollup, Installation } from './sites.js';
 import { SiteSettings, AccountSettings } from './settings.js';
 import { Logo, Lockup } from './logo.js';
 import { registry, loadExtensions } from './extensions.js';
+import { Sidebar, CommandPalette, AccountMenu } from './shell.js';
 
 const head = [
   ['/login', Login],
@@ -40,15 +40,7 @@ function TopBar({ user, shared }) {
     ${shared && html`<span class="pill">Shared view</span>`}
     <span class="grow"></span>
     <button class="btn ghost icon" onClick=${toggleTheme} aria-label="Toggle light and dark theme" title="Toggle theme"><${Icon} name="sun" size=${16} class="theme-sun" /><${Icon} name="moon" size=${16} class="theme-moon" /></button>
-    ${user ? html`<${Pop} align="right" ariaLabel="Account menu" btnClass="btn ghost avatar-btn" label=${html`<span class="avatar" aria-hidden="true">${(user.name || '?').slice(0, 1).toUpperCase()}</span>${user.update && html`<span class="notif on-avatar" aria-hidden="true"></span><span class="sr-only">Update available</span>`}`}>
-        ${(close) => html`<div style="min-width:220px"><div class="who"><b>${user.name}</b><span class="muted">${user.email}</span></div><hr />
-          <${Link} to="/sites" class="item" onClick=${close}><span>Your sites</span><${Icon} name="globe" size=${14} /><//>
-          <${Link} to="/settings" class="item" onClick=${close}><span>Account settings${user.update && html`<span class="notif inline" aria-hidden="true"></span><span class="sr-only"> (update available)</span>`}</span><${Icon} name="settings" size=${14} /><//>
-          <a class="item" href="https://discord.gg/sCkHD3PPZh" target="_blank" rel="noopener" onClick=${close}><span>Community (Discord)</span><${Icon} name="users" size=${14} /></a>
-          ${registry.menuItems.filter((m) => !m.visible || m.visible(user)).map((m) => (m.onClick
-            ? html`<button class="item" onClick=${() => { close(); m.onClick(); }}><span>${m.label}</span><${Icon} name=${m.icon || 'external-link'} size=${14} /></button>`
-            : html`<a class="item" href=${m.href} target=${m.external ? '_blank' : null} rel=${m.external ? 'noopener' : null} onClick=${close}><span>${m.label}</span><${Icon} name=${m.icon || 'external-link'} size=${14} /></a>`))}
-          <button class="item" onClick=${async () => { close(); await api('/auth/logout', { method: 'POST' }); window.location.assign(window.SD.base + '/login'); }}><span>Sign out</span><${Icon} name="log-out" size=${14} /></button></div>`}<//>`
+    ${user ? html`<${AccountMenu} user=${user} />`
       : !shared && html`<${Link} to="/login" class="btn sm">Sign in<//>`}
   </div></header>`;
 }
@@ -85,12 +77,19 @@ function App() {
   if (isAuth) return html`<${UserCtx.Provider} value=${{ user, setUser }}>${Page ? html`<${Page} setUser=${setUser} />` : null}${toastEls}<//>`;
   if (user === undefined) return html`<div style="display:grid;place-items:center;height:100vh"><${Logo} size=${40} /></div>`;
   if (user === null && !publicRoute) return null;
+  const side = !!user && !isShare;
   return html`<${UserCtx.Provider} value=${{ user, setUser }}>
-    <${TopBar} user=${user} shared=${isShare} />
-    ${user && html`<${VerifyBanner} user=${user} />`}
-    ${user && registry.banners.map((B) => html`<${B} user=${user} />`)}
-    ${Page ? html`<${Page} ...${m.params} />` : html`<main class="main"><div class="empty" style="padding-top:80px"><div class="ico"><${Icon} name="search" size=${20} /></div><b>Page not found</b><p>The page you're looking for doesn't exist.</p><${Link} to="/sites" class="btn">Your sites<//></div></main>`}
-    ${publicRoute && !user && html`<${PublicFooter} />`}
+    <div class=${'app' + (side ? ' has-side' : '')}>
+      ${side && html`<${Sidebar} user=${user} path=${path} />`}
+      <div class="app-main">
+        <${TopBar} user=${user} shared=${isShare} />
+        ${user && html`<${VerifyBanner} user=${user} />`}
+        ${user && registry.banners.map((B) => html`<${B} user=${user} />`)}
+        ${Page ? html`<${Page} ...${m.params} />` : html`<main class="main"><div class="empty" style="padding-top:80px"><div class="ico"><${Icon} name="search" size=${20} /></div><b>Page not found</b><p>The page you're looking for doesn't exist.</p><${Link} to="/sites" class="btn">Your sites<//></div></main>`}
+        ${publicRoute && !user && html`<${PublicFooter} />`}
+      </div>
+    </div>
+    ${side && html`<${CommandPalette} path=${path} />`}
     ${toastEls}<//>`;
 }
 

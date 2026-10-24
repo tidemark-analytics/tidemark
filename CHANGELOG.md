@@ -2,6 +2,13 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+- A new look and layout. A harbor sidebar lists your sites and the sections of the open dashboard, with a ⌘K command palette to jump between sites, change the date range, compare or filter.
+- The dashboard opens with a plain-language summary and the top channel, page and country, then KPI tiles with a sparkline each, then Traffic, Audience and Conversions sections.
+- Settings sections are a tab bar under the title; the sites list shows the combined visitor count.
+
 ## [0.24.0] - 2026-11-04
 
 ### Changed

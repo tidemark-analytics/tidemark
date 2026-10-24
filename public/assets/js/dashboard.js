@@ -1,6 +1,7 @@
 // The site dashboard: toolbar (site, filters, date), top stats + graph, then the report panels.
-import { setBrand, html, useState, useEffect, useMemo, useRef, useApi, api, useLocation, setQuery, setFilters, parseFilters, navigate, Link, Icon, toast, PERIODS, FILTER_OPS, FILTER_DIMS, dimLabel, todayStr, shiftDate, rememberPeriod, fmt, fmtShort, moneyShort, dur, countryName, shareAuth, share, useDocTitle, useScope, BASE, UserCtx, useContext } from './lib.js';
-import { Pop, Modal, Loading, Empty, Field, CodeBlock, useDebounced } from './ui.js';
+import { setBrand, html, useState, useEffect, useMemo, useRef, useApi, api, useLocation, setQuery, setFilters, parseFilters, navigate, Link, Icon, toast, PERIODS, FILTER_OPS, FILTER_DIMS, dimLabel, todayStr, shiftDate, rememberPeriod, fmt, fmtShort, moneyShort, dur, countryName, flag, addFilter, shareAuth, share, useDocTitle, useScope, BASE, UserCtx, useContext } from './lib.js';
+import { Pop, Modal, Loading, Empty, Field, CodeBlock, useDebounced, Sparkline } from './ui.js';
+import { announceSections } from './shell.js';
 import { LineChart, ChartTable, bucketText } from './chart.js';
 import { Sources, Pages, Locations, Devices, Behaviors } from './reports.js';
 
@@ -54,24 +55,61 @@ function TopGraph({ site, scope, live, onIntervals }) {
   const stats = top.data && top.data.stats;
   const comparing = top.data && top.data.comparing;
   const busy = top.loading || graph.loading;
-  return html`<section class="card graph-card" aria-label="Top stats and graph">
-    <div class="metric-tabs" role="tablist">${Object.entries(defs).map(([k, [label, fmtv]]) => {
-      const s = stats && stats[k];
-      return html`<button role="tab" aria-selected=${k === current} title=${HELP[k]} class=${'metric ' + (k === current ? 'on' : '')} onClick=${() => setMetric(k)}>
-        <span class="k">${label}</span>
-        <span class="vd"><span class="v">${s ? fmtv(s.value) : html`<span class="skeleton" style="display:inline-block;width:64px;height:26px"></span>`}</span>
+  const kpi = (k, [label, fmtv]) => {
+    const s = stats && stats[k];
+    const series = g && g.plot[k];
+    return html`<button role="tab" aria-selected=${k === current} title=${HELP[k]} class=${'kpi ' + (k === current ? 'on' : '')} onClick=${() => setMetric(k)}>
+      <span class="k">${label}</span>
+      <span class="vd"><span class="v">${s ? fmtv(s.value) : html`<span class="skeleton" style="display:inline-block;width:64px;height:28px"></span>`}</span>
         ${s && comparing && !(s.value === 0 && !s.previous) ? html`<span class="d" title=${s.previous !== null && s.previous !== undefined ? 'Previous: ' + fmtv(s.previous) : ''}><${Delta} metric=${k} change=${s.change} /></span>` : ''}</span>
-        ${s && comparing && scope.params.comparison && top.data.comparison_period ? html`<span class="cmp"><span class="range">${rangeLabel(top.data.period)}</span><span class="pv">${s.previous === null || s.previous === undefined ? '–' : fmtv(s.previous)}</span><span class="range">${rangeLabel(top.data.comparison_period)}</span></span>` : ''}</button>`;
-    })}</div>
-    <div class=${'graph-b ' + (busy && g ? 'stale' : '')}>
-      ${graph.error && !g ? html`<div class="panel-empty" style="min-height:300px"><b>Couldn't load the graph</b><p class="muted">${graph.error.message}</p><button class="btn sm" onClick=${() => { graph.reload(); top.reload(); }}>Try again</button></div>` : !g ? html`<div class="skeleton" style="height:300px"></div>` : asTable
-        ? html`<${ChartTable} labels=${g.labels} values=${g.plot[current]} prev=${(g.comparison && g.comparison.plot[current]) || null} format=${format} name=${name} interval=${g.interval} />`
-        : html`<${LineChart} labels=${g.labels} values=${g.plot[current]} prev=${g.comparison && g.comparison.plot[current] ? g.comparison.plot[current] : null} prevLabels=${g.comparison && g.comparison.labels} format=${format} name=${name} interval=${g.interval} live=${live} />`}
-      <div class="graph-foot">
-        <span class="legend"><span><i style="background:var(--series-1)"></i>${name}</span>${g && g.comparison && html`<span><i style="background:var(--series-2)"></i>Comparison</span>`}</span>
-        <button class="more" onClick=${() => setAsTable(!asTable)}>${asTable ? 'View as chart' : 'View as table'}</button>
+      ${s && comparing && scope.params.comparison && top.data.comparison_period ? html`<span class="cmp"><span class="range">${rangeLabel(top.data.period)}</span><span class="pv">${s.previous === null || s.previous === undefined ? '–' : fmtv(s.previous)}</span><span class="range">${rangeLabel(top.data.comparison_period)}</span></span>` : ''}
+      ${series && series.length > 1 ? html`<span class="kpi-spark"><${Sparkline} data=${series} height=${30} /></span>` : ''}</button>`;
+  };
+  return html`<${Pulse} site=${site} scope=${scope} stats=${stats} comparing=${comparing} top=${top.data} graph=${g} />
+    <div class="kpis" role="tablist" aria-label="Top stats">${Object.entries(defs).map(([k, d]) => kpi(k, d))}</div>
+    <section class="card graph-card" aria-label="Graph">
+      <div class="card-h"><h3>${name} over time</h3><div class="row"><span class="legend"><span><i style="background:var(--series-1)"></i>${name}</span>${g && g.comparison && html`<span><i style="background:var(--series-2)"></i>Comparison</span>`}</span>
+        <button class="more" onClick=${() => setAsTable(!asTable)}>${asTable ? 'View as chart' : 'View as table'}</button></div></div>
+      <div class=${'graph-b ' + (busy && g ? 'stale' : '')}>
+        ${graph.error && !g ? html`<div class="panel-empty" style="min-height:300px"><b>Couldn't load the graph</b><p class="muted">${graph.error.message}</p><button class="btn sm" onClick=${() => { graph.reload(); top.reload(); }}>Try again</button></div>` : !g ? html`<div class="skeleton" style="height:300px"></div>` : asTable
+          ? html`<${ChartTable} labels=${g.labels} values=${g.plot[current]} prev=${(g.comparison && g.comparison.plot[current]) || null} format=${format} name=${name} interval=${g.interval} />`
+          : html`<${LineChart} labels=${g.labels} values=${g.plot[current]} prev=${g.comparison && g.comparison.plot[current] ? g.comparison.plot[current] : null} prevLabels=${g.comparison && g.comparison.labels} format=${format} name=${name} interval=${g.interval} live=${live} />`}
       </div>
-    </div>
+    </section>`;
+}
+
+const WHEN = { Today: 'today', Yesterday: 'yesterday', 'Month to date': 'this month', 'Year to date': 'this year', 'Last month': 'last month', 'All time': 'across all time', Realtime: 'in the last 30 minutes' };
+const whenPhrase = (scope, site) => { const l = periodLabel(scope, site); return WHEN[l] || (/^Last /.test(l) ? 'in the ' + l.toLowerCase() : 'in ' + l); };
+
+/** The answer first: one plain sentence about the period, plus the few facts people look for next (click one to filter by it). */
+function Pulse({ site, scope, stats, comparing, top, graph }) {
+  const goal = !!scope.goal;
+  const base = `/sites/${site.domain}/stats/breakdown`;
+  const p = { ...scope.params, limit: 1 };
+  const ch = useApi(goal ? null : `${base}/channel`, p, [], { enabled: !goal });
+  const pg = useApi(goal ? null : `${base}/page`, p, [], { enabled: !goal });
+  const co = useApi(goal ? null : `${base}/country`, p, [], { enabled: !goal });
+  if (goal || !stats) return null;
+  const total = stats.visitors.value;
+  const first = (r) => (r.data && r.data.results && r.data.results[0]) || null;
+  const share = (row) => (row && total ? Math.min(100, Math.round((row.visitors / total) * 100)) + '%' : '');
+  const chips = [];
+  const c1 = first(ch), c2 = first(pg), c3 = first(co);
+  if (c1) chips.push(['Top channel', c1.name, share(c1), () => addFilter('channel', c1.name)]);
+  if (c2) chips.push(['Top page', c2.name, share(c2), () => addFilter('page', c2.name)]);
+  if (c3) chips.push(['Top country', flag(c3.name) + ' ' + countryName(c3.name), share(c3), () => addFilter('country', c3.name)]);
+  const v = graph && graph.plot.visitors;
+  if (v && v.length > 2) {
+    const i = v.indexOf(Math.max(...v));
+    if (v[i] > 0) chips.push(['Busiest ' + graph.interval, bucketText(graph.labels[i], graph.interval), fmtShort(v[i]), null]);
+  }
+  const change = comparing ? stats.visitors.change : null;
+  const when = whenPhrase(scope, site);
+  return html`<section class="card pulse" aria-label="Summary">
+    <div class="pulse-t"><${Icon} name="sparkles" size=${15} /> <span>At a glance</span></div>
+    <p class="pulse-s"><b>${fmt(total)}</b> ${total === 1 ? 'visitor' : 'visitors'} made <b>${fmt(stats.pageviews.value)}</b> ${stats.pageviews.value === 1 ? 'pageview' : 'pageviews'} ${when}${stats.visit_duration && stats.visit_duration.value ? html`, staying <b>${dur(stats.visit_duration.value)}</b> on average` : ''}.
+      ${change !== null && change !== undefined && Math.abs(change) >= 0.5 && html` That's <b class=${change > 0 ? 'up' : 'down'}>${Math.abs(change) >= 1000 ? '999%+' : Math.abs(change).toFixed(change % 1 === 0 ? 0 : 1) + '%'} ${change > 0 ? 'more' : 'fewer'}</b> visitors than the comparison period.`}</p>
+    ${chips.length > 0 && html`<div class="facts">${chips.map(([k, val, sh, fn]) => html`<${fn ? 'button' : 'div'} class=${'fact' + (fn ? ' click' : '')} onClick=${fn} title=${fn ? 'Filter by ' + val : ''}><span class="fk">${k}</span><span class="fv">${val}</span>${sh && html`<span class="fs">${sh}</span>`}<//>`)}</div>`}
   </section>`;
 }
 
@@ -247,6 +285,15 @@ function DatePicker({ site, scope }) {
     document.addEventListener('keydown', k);
     return () => document.removeEventListener('keydown', k);
   });
+  useEffect(() => {
+    const h = (e) => {
+      const c = e.detail || {};
+      if (c.type === 'period') { if (c.key === 'custom') { setOpen(true); setCustom(true); } else choose(c.key); }
+      else if (c.type === 'compare' && canCompare) setQuery({ comparison: comparison ? null : 'previous_period' });
+    };
+    window.addEventListener('tdm:cmd', h);
+    return () => window.removeEventListener('tdm:cmd', h);
+  });
   return html`<div class="row" style="gap:4px">
     ${navigable && html`<button class="btn icon" aria-label="Previous" onClick=${() => shift(-1)}><${Icon} name="chevron-left" size=${15} /></button>`}
     <${Pop} open=${open} setOpen=${setOpen} align="right" ariaLabel="Date range" btnClass="btn" label=${html`<${Icon} name="calendar" size=${14} /><span>${periodLabel(scope, site)}</span><${Icon} name="chevron-down" size=${13} class="muted" />`}>
@@ -322,6 +369,8 @@ function SharePassword({ domain, onDone }) {
     ${err && html`<div class="alert">That password isn't right.</div>`}<${Field} label="Password"><input type="password" autofocus required value=${pw} onInput=${(e) => setPw(e.target.value)} /><//><button class="btn primary" style="height:38px">View dashboard</button></form></div>`;
 }
 
+const SecHead = ({ title, sub }) => html`<header class="sec-head"><h2>${title}</h2><span class="muted">${sub}</span></header>`;
+
 export function Dashboard({ domain, shared }) {
   const { user } = useContext(UserCtx) || {};
   const site = useApi(`/sites/${domain}`, null, [domain]);
@@ -339,6 +388,20 @@ export function Dashboard({ domain, shared }) {
   const brand = !user && s ? s.brand : null;
   useEffect(() => { setBrand(brand); return () => setBrand(null); }, [brand && brand.color, brand && brand.name, brand && brand.has_logo, brand && brand.logo && brand.logo.length]);
   useEffect(() => {
+    if (!s) return;
+    announceSections([{ id: 'overview', label: 'Overview', icon: 'chart-column' }, { id: 'traffic', label: 'Traffic', icon: 'compass' }, { id: 'audience', label: 'Audience', icon: 'users' }, { id: 'conversions', label: 'Conversions', icon: 'target' }]);
+    return () => announceSections([]);
+  }, [s && s.domain]);
+  useEffect(() => {
+    const h = (e) => {
+      const c = e.detail || {};
+      if (c.type === 'filter') setFilter({});
+      else if (c.type === 'export' && s) { const q = new URLSearchParams(scope.params); const a = shareAuth(); if (a) q.set('auth', a); window.location.assign(`${BASE}/api/sites/${s.domain}/stats/export?${q}`); }
+    };
+    window.addEventListener('tdm:cmd', h);
+    return () => window.removeEventListener('tdm:cmd', h);
+  });
+  useEffect(() => {
     const onScroll = () => { const t = document.querySelector('.toolbar.sticky'); if (t) t.classList.toggle('raised', window.scrollY > 8); };
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
@@ -350,6 +413,7 @@ export function Dashboard({ domain, shared }) {
   const poll = live ? 10000 : 0;
   return html`<main class="main dash" id="main" key=${rev}>
     <div class="toolbar sticky">
+      <h1 class="dash-title"><${Icon} name=${s.rollup ? 'layers' : 'globe'} size=${18} />${s.domain}</h1>
       <${SiteSwitcher} site=${s} linkable=${!shared && !!user} />
       <${CurrentVisitors} site=${s} scope=${scope} />
       <span class="grow"></span>
@@ -362,11 +426,12 @@ export function Dashboard({ domain, shared }) {
     ${segmentDialog === 'manage' && html`<${ManageSegments} site=${s} scope=${scope} segs=${segs} onClose=${() => setSegmentDialog(null)} />`}
     ${s.imported && scope.filters.length > 0 && html`<p class="muted small imported-note">Data imported from Plausible (${s.imported.start} to ${s.imported.end}) is left out while a filter is applied.</p>`}
     ${!s.has_data && !live && html`<${Waiting} site=${s} onData=${() => { site.reload(); setRev((r) => r + 1); }} />`}
-    <${TopGraph} site=${s} scope=${scope} live=${live} onIntervals=${setIntervals} />
-    <div class="grid2 panels">
-      <${Sources} site=${s} scope=${scope} poll=${poll} /><${Pages} site=${s} scope=${scope} poll=${poll} />
-      <${Locations} site=${s} scope=${scope} poll=${poll} /><${Devices} site=${s} scope=${scope} poll=${poll} />
-    </div>
-    <${Behaviors} site=${s} scope=${scope} poll=${poll} />
+    <div id="sec-overview" class="dsec first"><${TopGraph} site=${s} scope=${scope} live=${live} onIntervals=${setIntervals} /></div>
+    <section id="sec-traffic" class="dsec"><${SecHead} title="Traffic" sub="Where visitors come from and what they read" />
+      <div class="grid2 panels"><${Sources} site=${s} scope=${scope} poll=${poll} /><${Pages} site=${s} scope=${scope} poll=${poll} /></div></section>
+    <section id="sec-audience" class="dsec"><${SecHead} title="Audience" sub="Who they are, where they are and what they use" />
+      <div class="grid2 panels"><${Locations} site=${s} scope=${scope} poll=${poll} /><${Devices} site=${s} scope=${scope} poll=${poll} /></div></section>
+    <section id="sec-conversions" class="dsec"><${SecHead} title="Conversions" sub="Goals, funnels, properties and journeys" />
+      <${Behaviors} site=${s} scope=${scope} poll=${poll} /></section>
   </main>`;
 }

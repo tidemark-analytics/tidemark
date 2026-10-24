@@ -43,3 +43,10 @@ layers
 tag
 circle-check
 life-buoy
+layout-dashboard
+compass
+book-open
+command
+sparkles
+trending-up
+house
