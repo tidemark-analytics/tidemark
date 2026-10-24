@@ -129,6 +129,9 @@ function countryCode(text) {
   return countryIdx.get(t.toLowerCase()) || t;
 }
 
+const DIM_ICON = { page: 'file-text', entry_page: 'log-in', exit_page: 'log-out', hostname: 'server', channel: 'compass', source: 'external-link', referrer: 'link', country: 'globe', region: 'map-pin', city: 'map-pin', browser: 'monitor', os: 'laptop', device: 'smartphone', goal: 'target' };
+const dimIcon = (d) => DIM_ICON[d] || 'tag';
+
 function FilterMenu({ site, scope, initial, onClose, segs, onSave, onManage }) {
   const editing = initial && initial.index !== undefined;
   const [dim, setDim] = useState(initial ? initial.rule[1] : null);
@@ -136,11 +139,13 @@ function FilterMenu({ site, scope, initial, onClose, segs, onSave, onManage }) {
   const [values, setValues] = useState(initial ? initial.rule[2] : []);
   const [text, setText] = useState('');
   const [find, setFind] = useState('');
+  const [hi, setHi] = useState(-1);
   const search = useDebounced(text, 200);
   const props = useApi(`/sites/${site.domain}/stats/props`, { period: 'all' }, []);
   const sugg = useApi(dim ? (dim === 'goal' ? `/sites/${site.domain}/stats/goals` : dim.startsWith('prop:') ? `/sites/${site.domain}/stats/props/${encodeURIComponent(dim.slice(5))}` : `/sites/${site.domain}/stats/breakdown/${dim}`) : null,
     { period: 'all', limit: dim === 'country' ? 250 : 8, search: dim === 'country' ? undefined : search || undefined }, [dim, search], { enabled: !!dim });
-  const options = ((sugg.data && (sugg.data.results || [])) || []).filter((r) => !search || String(r.name).toLowerCase().includes(search.toLowerCase()) || (dim === 'country' && countryName(r.name).toLowerCase().includes(search.toLowerCase()))).map((r) => r.name).filter((n) => !values.includes(n)).slice(0, 8);
+  const options = ((sugg.data && (sugg.data.results || [])) || []).filter((r) => !search || String(r.name).toLowerCase().includes(search.toLowerCase()) || (dim === 'country' && countryName(r.name).toLowerCase().includes(search.toLowerCase()))).filter((r) => !values.includes(r.name)).slice(0, 8);
+  useEffect(() => setHi(-1), [search, dim]);
   const groups = [...FILTER_DIMS, ['Properties', ((props.data && props.data.results) || []).map((p) => ['prop:' + p.name, p.name])]].filter(([, l]) => l.length);
   const norm = (v) => (dim === 'country' ? countryCode(v) : String(v).trim());
   const add = (v) => { v = norm(v); if (v && !values.includes(v)) setValues([...values, v]); setText(''); };
@@ -154,24 +159,57 @@ function FilterMenu({ site, scope, initial, onClose, segs, onSave, onManage }) {
     onClose();
   };
   const multi = dim !== 'goal';
+  const OPS = FILTER_OPS.filter(([o]) => multi || o === 'is' || o === 'is_not');
+  const results = (sugg.data && sugg.data.results) || [];
+  const countOf = (n) => { const r = results.find((x) => x.name === n); return r ? r.visitors : undefined; };
+  const typed = text.trim();
+  const exact = typed && (values.includes(norm(typed)) || results.some((r) => String(r.name).toLowerCase() === typed.toLowerCase()));
+  // selected values first (checked), then what the search suggests, then "add what I typed"
+  const rows = [...values.map((v) => ({ name: v, on: true, visitors: countOf(v) })), ...options.map((r) => ({ name: r.name, on: false, visitors: r.visitors })), ...(typed && !exact && (dim !== 'country' || /^[a-z]{2}$/i.test(typed)) ? [{ name: norm(typed), on: false, custom: true }] : [])];
+  const firstOff = rows.findIndex((r) => !r.on);
+  const active = hi >= 0 ? hi : typed && firstOff >= 0 ? firstOff : -1;
+  const applyWith = (vals) => {
+    if (!vals.length) return;
+    const list = parseFilters(scope.query);
+    const rule = [op, dim, vals];
+    if (editing) list[initial.index] = rule; else list.push(rule);
+    setFilters(list.filter((r, i, a) => a.findIndex((x) => x[1] === r[1] && x[0] === r[0] && JSON.stringify(x[2]) === JSON.stringify(r[2])) === i));
+    onClose();
+  };
+  const toggle = (row) => {
+    if (!multi) return applyWith([row.name]);
+    setValues(row.on ? values.filter((v) => v !== row.name) : [...values, row.name]);
+    setText('');
+  };
+  const onKey = (e) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); setHi(Math.min(rows.length - 1, active + 1)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setHi(Math.max(0, active - 1)); }
+    else if (e.key === 'Enter') { e.preventDefault(); if (active >= 0 && rows[active]) toggle(rows[active]); else apply(); }
+    else if (e.key === 'Backspace' && !text && values.length && multi) setValues(values.slice(0, -1));
+  };
+  const segmentItems = segs && segs.allowed ? segs.list.filter((x) => x.name.toLowerCase().includes(find.toLowerCase())) : [];
   return html`<div class="pop filter-pop left" role="dialog" aria-label="Filter">
-    <div class="fp-head">${dim && !editing ? html`<button class="btn ghost icon sm" aria-label="Back" onClick=${() => { setDim(null); setValues([]); setText(''); }}><${Icon} name="chevron-left" size=${15} /></button>` : null}<b>${dim ? (editing ? 'Edit filter' : dimLabel(dim)) : 'Filter by'}</b></div>
+    <div class="fp-head">${dim && !editing ? html`<button class="btn ghost icon sm" aria-label="Back" onClick=${() => { setDim(null); setValues([]); setText(''); }}><${Icon} name="chevron-left" size=${15} /></button>` : null}${dim && html`<${Icon} name=${dimIcon(dim)} size=${15} class="fp-ico" />`}<b>${dim ? (editing ? 'Edit filter: ' + dimLabel(dim) : dimLabel(dim)) : 'Filter by'}</b></div>
     ${!dim ? html`<div class="searchbox"><${Icon} name="search" size=${14} /><input placeholder="Search filters" aria-label="Search filters" value=${find} onInput=${(e) => setFind(e.target.value)} autofocus /></div>
-      <div class="filter-groups">${segs && segs.allowed && html`<div><div class="grp">Segments</div>
-        ${segs.list.filter((x) => x.name.toLowerCase().includes(find.toLowerCase())).map((x) => html`<button class="item" onClick=${() => { setFilters([...parseFilters(scope.query).filter((r) => r[1] !== 'segment'), ['is', 'segment', [x.id]]]); onClose(); }}><span>${x.name}</span>${x.type === 'site' && html`<span class="muted">Shared</span>`}</button>`)}
-        ${scope.filters.some((r) => r[1] !== 'segment') && site.role && html`<button class="item" onClick=${() => { onClose(); onSave(); }}><span>Save current filters as segment…</span></button>`}
-        ${site.role && html`<button class="item" onClick=${() => { onClose(); onManage(); }}><span>Manage segments…</span></button>`}</div>`}
+      <div class="filter-groups">${segs && segs.allowed && segmentItems.length > 0 && html`<div><div class="grp">Segments</div>
+        ${segmentItems.map((x) => html`<button class="item" onClick=${() => { setFilters([...parseFilters(scope.query).filter((r) => r[1] !== 'segment'), ['is', 'segment', [x.id]]]); onClose(); }}><span class="item-l"><${Icon} name="bookmark" size=${14} />${x.name}</span>${x.type === 'site' && html`<span class="muted">Shared</span>`}</button>`)}</div>`}
       ${groups.map(([g, list]) => {
         const shown = list.filter(([, l]) => l.toLowerCase().includes(find.toLowerCase()));
-        return shown.length ? html`<div><div class="grp">${g}</div>${shown.map(([k, l]) => html`<button class="item" onClick=${() => { setDim(k); setOp(k === 'goal' ? 'is' : 'is'); }}>${l}</button>`)}</div>` : null;
-      })}</div>`
-      : html`<div class="form">
-        <select aria-label="Operator" value=${op} onChange=${(e) => setOp(e.target.value)}>${FILTER_OPS.filter(([o]) => multi || o === 'is' || o === 'is_not').map(([o, l]) => html`<option value=${o} selected=${op === o}>${l}</option>`)}</select>
-        <div class="chips">${values.map((v) => html`<span class="chip"><b><${FilterValueLabel} dim=${dim} v=${v} /></b><button aria-label=${'Remove ' + v} onClick=${() => setValues(values.filter((x) => x !== v))}><${Icon} name="x" size=${12} /></button></span>`)}</div>
-        <${Field} label="Value" help=${op.startsWith('contains') || dim === 'page' ? 'Use * as a wildcard, e.g. /blog/*' : ''}><input value=${text} autofocus onInput=${(e) => setText(e.target.value)} onKeyDown=${(e) => { if (e.key === 'Enter') { e.preventDefault(); if (text.trim()) { multi ? add(text) : setValues([norm(text)]); } else apply(); } }} placeholder=${'Type or pick a ' + dimLabel(dim).toLowerCase()} /><//>
-        ${options.length > 0 && html`<div class="sugg">${options.map((n) => html`<button onClick=${() => (multi ? add(n) : setValues([n]))}><span><${FilterValueLabel} dim=${dim} v=${n} /></span></button>`)}</div>`}
+        return shown.length ? html`<div><div class="grp">${g}</div>${shown.map(([k, l]) => html`<button class="item" onClick=${() => { setDim(k); setOp('is'); }}><span class="item-l"><${Icon} name=${dimIcon(k)} size=${14} />${l}</span></button>`)}</div>` : null;
+      })}</div>
+      ${segs && segs.allowed && site.role && html`<div class="fp-links">
+        ${scope.filters.some((r) => r[1] !== 'segment') && html`<button class="item" onClick=${() => { onClose(); onSave(); }}><span class="item-l"><${Icon} name="plus" size=${14} />Save current filters as segment</span></button>`}
+        <button class="item" onClick=${() => { onClose(); onManage(); }}><span class="item-l"><${Icon} name="settings" size=${14} />Manage segments</span></button></div>`}`
+      : html`<div class="fp-form">
+        <div class="fb-input"><select class="op-select" aria-label="Operator" value=${op} onChange=${(e) => setOp(e.target.value)}>${OPS.map(([o, l]) => html`<option value=${o} selected=${op === o}>${({ contains_not: 'excludes' })[o] || l}</option>`)}</select>
+          <input value=${text} autofocus onInput=${(e) => setText(e.target.value)} onKeyDown=${onKey} placeholder=${'Search ' + dimLabel(dim).toLowerCase() + '…'} aria-label="Value" /></div>
+        ${op.startsWith('contains') || dim === 'page' ? html`<span class="help fb-help">Use * as a wildcard, like /blog/*</span>` : null}
+        <div class="fb-list" role="listbox" aria-label="Values" aria-multiselectable=${multi}>${rows.length === 0 && html`<div class="fb-empty">${sugg.loading ? 'Loading…' : 'Nothing to suggest yet. Type a value and press Enter.'}</div>`}
+          ${rows.map((r, n) => html`<button role="option" aria-selected=${r.on} class=${'fb-row' + (n === active ? ' hot' : '') + (r.on ? ' sel' : '')} onMouseMove=${() => setHi(n)} onClick=${() => toggle(r)}>
+            ${multi && html`<span class="fb-box" aria-hidden="true">${r.on && html`<${Icon} name="check" size=${12} />`}</span>`}
+            <span class="trunc">${r.custom ? html`Add “${r.name}”` : html`<${FilterValueLabel} dim=${dim} v=${r.name} />`}</span>${r.visitors !== undefined && html`<em>${fmtShort(r.visitors)}</em>`}</button>`)}</div>
       </div>`}
-    ${dim && html`<div class="fp-foot"><button class="btn primary" onClick=${apply} disabled=${!values.length && !text.trim()}>Apply filter</button></div>`}
+    ${dim && multi && html`<div class="fp-foot"><span class="muted small">${values.length ? values.length + ' selected' : 'Pick one or more'}</span><button class="btn primary sm" onClick=${apply} disabled=${!values.length && !typed}>Apply filter</button></div>`}
   </div>`;
 }
 
@@ -186,7 +224,7 @@ function FilterButton({ site, scope, filter, setFilter, segs, onSave, onManage }
     return () => { document.removeEventListener('mousedown', out); document.removeEventListener('keydown', esc); };
   }, [!!filter]);
   return html`<div class="pop-wrap" ref=${ref}>
-    <button class="btn" aria-haspopup="dialog" aria-expanded=${!!filter} onClick=${() => setFilter(filter ? null : {})}><${Icon} name="funnel" size=${14} /> Filter</button>
+    <button class="btn" aria-haspopup="dialog" aria-expanded=${!!filter} onClick=${() => setFilter(filter ? null : {})}><${Icon} name="funnel" size=${14} /> Filter${scope.filters.length > 0 && html`<span class="count-badge" aria-label=${scope.filters.length + ' active'}>${scope.filters.length}</span>`}</button>
     ${filter && html`<${FilterMenu} key=${filter.index ?? 'new'} site=${site} scope=${scope} initial=${filter.rule ? filter : null} onClose=${() => setFilter(null)} segs=${segs} onSave=${onSave} onManage=${onManage} />`}
   </div>`;
 }
@@ -196,7 +234,7 @@ function FilterChips({ scope, edit, segs, onSave, site }) {
   if (!list.length) return null;
   const valueLabel = (dim, v) => (dim === 'country' ? countryName(v) : dim === 'segment' ? ((segs && segs.list.find((x) => x.id === v)) || { name: 'Unknown segment' }).name : v);
   return html`<div class="chips filter-chips" aria-label="Active filters">${list.map(([op, dim, vals], i) => html`<span class="chip">
-    <button class="chip-edit" onClick=${() => dim !== 'segment' && edit({ index: i, rule: [op, dim, vals] })} title=${dim === 'segment' ? 'Segment' : 'Edit filter'}><span>${dimLabel(dim)}</span><em>${opLabel(op)}</em><b>${vals.map((v) => valueLabel(dim, v)).join(' or ')}</b></button>
+    <button class="chip-edit" onClick=${() => dim !== 'segment' && edit({ index: i, rule: [op, dim, vals] })} title=${dim === 'segment' ? 'Segment' : 'Edit filter'}><${Icon} name=${dim === 'segment' ? 'bookmark' : dimIcon(dim)} size=${13} class="chip-ico" /><span>${dimLabel(dim)}</span><em>${opLabel(op)}</em><b>${vals.map((v) => valueLabel(dim, v)).join(' or ')}</b></button>
     <button aria-label=${'Remove filter ' + dimLabel(dim)} onClick=${() => setFilters(list.filter((_, j) => j !== i))}><${Icon} name="x" size=${12} /></button></span>`)}
     ${list.length > 1 && html`<button class="more" onClick=${() => setFilters([])}>Clear all</button>`}
     ${segs && segs.allowed && site.role && list.some((r) => r[1] !== 'segment') && html`<button class="more" onClick=${onSave}>Save as segment</button>`}</div>`;
@@ -217,9 +255,12 @@ function SaveSegment({ site, scope, segs, onClose }) {
   };
   return html`<${Modal} title="Save as segment" onClose=${onClose} footer=${html`<button class="btn" onClick=${onClose}>Cancel</button><button class="btn primary" disabled=${!name.trim() || busy} onClick=${save}>Save segment</button>`}>
     <div class="form">${err && html`<div class="alert">${err}</div>`}
+      <div class="seg-sum"><span class="lbl">Filters saved</span>
+        <div class="chips">${parseFilters(scope.query).filter((r) => r[1] !== 'segment').map(([op, dim, vals]) => html`<span class="chip static"><${Icon} name=${dimIcon(dim)} size=${13} class="chip-ico" /><span>${dimLabel(dim)}</span><em>${opLabel(op)}</em><b>${vals.map((v) => (dim === 'country' ? countryName(v) : v)).join(' or ')}</b></span>`)}</div></div>
       <${Field} label="Name"><input autofocus maxlength="100" value=${name} onInput=${(e) => setName(e.target.value)} placeholder="Visitors from Germany" /><//>
-      <${Field} label="Who can use it"><select value=${type} onChange=${(e) => setType(e.target.value)}><option value="personal">Only me</option>${site.can_manage && html`<option value="site">Everyone who can see this site</option>`}</select><//>
-      <p class="muted small">It saves ${scope.filters.filter((r) => r[1] !== 'segment').length} filter${scope.filters.filter((r) => r[1] !== 'segment').length === 1 ? '' : 's'}. Pick it from the Filter menu any time.</p></div><//>`;
+      <div class="bf-field"><span class="lbl">Who can use it</span>
+        <div class="seg" role="radiogroup" aria-label="Who can use it">${[['personal', 'Only me', 'user'], ...(site.can_manage ? [['site', 'Everyone who can see this site', 'users']] : [])].map(([k, l, i]) => html`<button type="button" role="radio" aria-checked=${type === k} class=${type === k ? 'on' : ''} onClick=${() => setType(k)}><${Icon} name=${i} size=${14} />${l}</button>`)}</div></div>
+      <p class="muted small">Pick it from the Filter menu any time.</p></div><//>`;
 }
 
 function ManageSegments({ site, scope, segs, onClose }) {
@@ -231,10 +272,11 @@ function ManageSegments({ site, scope, segs, onClose }) {
   return html`<${Modal} title="Segments" onClose=${onClose} wide footer=${html`<button class="btn" onClick=${onClose}>Done</button>`}>
     ${err && html`<div class="alert">${err}</div>`}
     ${!segs.list.length && html`<p class="muted">No segments yet. Add some filters, then choose Save as segment.</p>`}
-    ${segs.list.length > 0 && html`<div class="tscroll"><table class="t"><thead><tr><th>Name</th><th>Shared</th><th></th></tr></thead><tbody>${segs.list.map((x) => html`<tr><td>
-        <input aria-label=${'Name of ' + x.name} value=${names[x.id] ?? x.name} disabled=${!can(x)} maxlength="100" onInput=${(e) => setNames({ ...names, [x.id]: e.target.value })} onBlur=${() => names[x.id] && names[x.id] !== x.name && run(() => api(`/sites/${site.domain}/segments/${x.id}`, { method: 'PATCH', body: { name: names[x.id] } }))} /></td>
-      <td class="muted">${x.type === 'site' ? 'Everyone' : 'Only you'}</td>
-      <td class="right">${can(x) && html`<button class="btn sm ghost" disabled=${!current.length} title=${current.length ? 'Replace the saved filters with the ones on screen' : 'Apply some filters first'} onClick=${() => run(() => api(`/sites/${site.domain}/segments/${x.id}`, { method: 'PATCH', body: { filters: current } }).then(() => toast('Segment updated')))}>Use current filters</button><button class="btn sm ghost danger" onClick=${() => run(() => api(`/sites/${site.domain}/segments/${x.id}`, { method: 'DELETE' }))}>Delete</button>`}</td></tr>`)}</tbody></table></div>`}<//>`;
+    ${segs.list.length > 0 && html`<ul class="rows" aria-label="Segments">${segs.list.map((x) => html`<li class="rowitem">
+      <span class="ri-ico" aria-hidden="true"><${Icon} name="bookmark" size=${16} /></span>
+      <div class="grow ri-main"><input class="seg-name" aria-label=${'Name of ' + x.name} value=${names[x.id] ?? x.name} disabled=${!can(x)} maxlength="100" onInput=${(e) => setNames({ ...names, [x.id]: e.target.value })} onBlur=${() => names[x.id] && names[x.id] !== x.name && run(() => api(`/sites/${site.domain}/segments/${x.id}`, { method: 'PATCH', body: { name: names[x.id] } }))} /><span class="muted small">${x.type === 'site' ? 'Shared with everyone who can see this site' : 'Only you'}</span></div>
+      ${can(x) && html`<button class="btn sm ghost" disabled=${!current.length} title=${current.length ? 'Replace the saved filters with the ones on screen' : 'Apply some filters first'} onClick=${() => run(() => api(`/sites/${site.domain}/segments/${x.id}`, { method: 'PATCH', body: { filters: current } }).then(() => toast('Segment updated')))}>Use current filters</button>
+        <button class="btn ghost icon sm danger" aria-label=${'Delete ' + x.name} title="Delete segment" onClick=${() => run(() => api(`/sites/${site.domain}/segments/${x.id}`, { method: 'DELETE' }))}><${Icon} name="trash-2" size=${15} /></button>`}</li>`)}</ul>`}<//>`;
 }
 
 // ------------------------------------------------------------------------------------------- date picker

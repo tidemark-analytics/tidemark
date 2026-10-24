@@ -4,6 +4,19 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Changed
+- The sidebar keeps the same Workspace links on every page (Sites, Account, and Users and Updates for administrators) with Community and support under Help. On the sites list it also shows your busiest sites for a quick jump, and the account menu at the bottom is down to signing out. The site switcher now appears only while you are inside a site, and switching keeps you on the same settings page.
+
+### Changed
+- The light and dark toggle is gone from the sidebar, the top bar and the command palette for signed-in users. Choose Light, Dark or System under Account settings → Profile. Public and shared dashboards keep a toggle for visitors.
+
+### Changed
+- A calmer filter menu. After choosing what to filter by, one search box with the operator beside it lists the values with their visitor counts. Tick several, or type to narrow the list and press Enter, then apply. Filters have icons, the Filter button shows how many are active, and Save as segment and Manage segments have a cleaner layout.
+
+### Changed
+- Site settings are grouped into four tabs: Tracking (snippet, extras and shields), Conversions (goals and funnels), Sharing and access (people, public dashboard, shared links and branding) and Data (reporting timezone, export and import, and the danger zone). Rollups have Sites, Conversions, Sharing and Data. Older links to the previous tabs still work.
+- Account settings are four tabs: Profile (with a Light, Dark or System theme choice), Security (password, two-factor and API keys), Users and Updates. Goals, funnels, shared links, people, branding, shields, API keys and users use the same inline forms and lists instead of pop-ups and tables.
+
 ### Fixed
 - A long email address no longer gets cut off in the account menu in the sidebar; it wraps onto a second line.
 
