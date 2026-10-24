@@ -4,6 +4,9 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Fixed
+- A long email address no longer gets cut off in the account menu in the sidebar; it wraps onto a second line.
+
 ## [0.26.0] - 2026-11-06
 
 ### Changed
