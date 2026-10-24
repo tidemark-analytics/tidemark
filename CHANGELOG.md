@@ -2,6 +2,8 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
 ## [0.25.0] - 2026-11-05
 
 ### Changed
