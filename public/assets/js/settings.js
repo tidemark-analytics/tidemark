@@ -153,6 +153,7 @@ function Visibility({ site, reload }) {
     ${del && html`<${Confirm} title="Delete shared link?" message=${`Anyone using "${del.name}" will lose access immediately.`} onClose=${() => setDel(null)} onConfirm=${async () => { await api(`/sites/${site.domain}/shared-links/${del.id}`, { method: 'DELETE' }); links.reload(); }} />`}`;
 }
 
+const BRAND_PRESETS = ['#0e7c86', '#2563eb', '#7c3aed', '#db2777', '#dc2626', '#ea580c', '#16a34a', '#0f172a'];
 function Branding({ site, reload }) {
   const b = site.branding || { allowed: true, name: '', color: null, has_logo: false };
   const [name, setName] = useState(b.name || '');
@@ -171,24 +172,42 @@ function Branding({ site, reload }) {
     body.append('logo', f);
     run(() => api(`/sites/${site.domain}/branding/logo`, { method: 'POST', body }), 'Logo updated');
   };
+  const dark = document.documentElement.dataset.theme === 'dark' || (!document.documentElement.dataset.theme && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  const accent = valid && color ? ((dark ? shown.dark : shown.light) || color) : '#0e7c86';
+  const logo = site.brand && site.brand.logo;
+  const off = !b.allowed;
   return html`<${Section} title="Branding" help="Show your own logo, name and color to people who open the public dashboard or a shared link. A small “Analytics by Tidemark” link always stays in the footer.">
-      ${!b.allowed && html`<div class="notice"><${Icon} name="info" size=${16} /><div>Custom branding is included with Pro. <${Link} to="/settings">Open your account settings<//> to upgrade.</div></div>`}
-      <div class="form">
-        <${Field} label="Display name" help="Shown in the header next to (or instead of) the logo. Leave empty to keep the Tidemark logo."><input value=${name} maxlength="60" disabled=${!b.allowed} onInput=${(e) => setName(e.target.value)} placeholder=${site.domain} /><//>
-        <${Field} label="Brand color" help="Used for buttons, links and the chart."><div class="row">
-          <input type="color" value=${valid && color ? color : '#0e7c86'} disabled=${!b.allowed} onInput=${(e) => setColor(e.target.value)} style="width:48px;padding:2px;height:36px" aria-label="Pick a color" />
-          <input value=${color} disabled=${!b.allowed} onInput=${(e) => setColor(e.target.value.trim())} placeholder="#0e7c86" style="max-width:140px" class="mono" aria-label="Color hex code" />
-          ${color && html`<button class="btn sm ghost" disabled=${!b.allowed} onClick=${() => setColor('')}>Reset</button>`}</div>
-          ${!valid && html`<span class="help" style="color:var(--bad)">Use six hex digits, like #0e7c86.</span>`}
-          ${valid && color && shown.changed && html`<span class="help">So text stays readable (WCAG AA contrast), visitors see this as <b class="mono">${shown.light}</b> on light pages and <b class="mono">${shown.dark}</b> on dark ones, the closest shades that pass.</span>`}<//>
-        <div><button class="btn primary" disabled=${!b.allowed || busy || !changed || !valid} onClick=${save}>Save</button></div>
-      </div><//>
-    <${Section} title="Logo" help="PNG, JPEG, WebP or SVG, up to 100 KB. A wide logo about 28 pixels tall works best.">
-      ${site.brand && site.brand.logo && html`<div class="logo-preview"><img src=${site.brand.logo} alt="Current logo" /></div>`}
-      <div class="row">
-        <label class=${'btn' + (!b.allowed || busy ? ' disabled' : '')}>${b.has_logo ? 'Replace logo' : 'Upload logo'}<input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" hidden disabled=${!b.allowed || busy} onChange=${upload} /></label>
-        ${b.has_logo && html`<button class="btn danger" disabled=${!b.allowed || busy} onClick=${() => run(() => api(`/sites/${site.domain}/branding/logo`, { method: 'DELETE' }), 'Logo removed')}>Remove</button>`}</div>
-      ${!site.public && html`<p class="muted small">Branding shows on the public dashboard and shared links. This site's dashboard is private, so only shared links use it. <${Link} to=${`/${site.domain}/settings/visibility`}>Visibility settings<//></p>`}<//>`;
+      ${off && html`<div class="notice"><${Icon} name="info" size=${16} /><div>Custom branding is included with Pro. <${Link} to="/settings">Open your account settings<//> to upgrade.</div></div>`}
+      <div class="brand-grid">
+        <div class="brand-form">
+          <div class="bf-field"><span class="lbl">Logo</span>
+            <div class="logo-row">
+              <span class="logo-tile">${logo ? html`<img src=${logo} alt="Current logo" />` : html`<${Icon} name="globe" size=${20} />`}</span>
+              <div class="stack sm"><div class="row wrap">
+                <label class=${'btn sm' + (off || busy ? ' disabled' : '')}>${b.has_logo ? 'Replace logo' : 'Upload logo'}<input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" hidden disabled=${off || busy} onChange=${upload} /></label>
+                ${b.has_logo && html`<button class="btn sm ghost danger" disabled=${off || busy} onClick=${() => run(() => api(`/sites/${site.domain}/branding/logo`, { method: 'DELETE' }), 'Logo removed')}>Remove</button>`}</div>
+                <span class="help">PNG, JPEG, WebP or SVG, up to 100 KB. A wide logo about 28 pixels tall works best.</span></div></div></div>
+          <${Field} label="Display name" help="Shown in the header next to (or instead of) the logo. Leave empty to keep the Tidemark logo."><input value=${name} maxlength="60" disabled=${off} onInput=${(e) => setName(e.target.value)} placeholder=${site.domain} /><//>
+          <div class="bf-field"><span class="lbl">Brand color</span>
+            <div class="swatches" role="group" aria-label="Preset colors">${BRAND_PRESETS.map((c) => html`<button type="button" class=${'swatch' + (color.toLowerCase() === c ? ' on' : '')} style=${`--sw:${c}`} disabled=${off} aria-label=${'Use ' + c} title=${c} onClick=${() => setColor(c)}></button>`)}</div>
+            <div class="row">
+              <input type="color" value=${valid && color ? color : '#0e7c86'} disabled=${off} onInput=${(e) => setColor(e.target.value)} class="color-pick" aria-label="Pick a color" />
+              <input value=${color} disabled=${off} onInput=${(e) => setColor(e.target.value.trim())} placeholder="#0e7c86" style="max-width:140px" class="mono" aria-label="Color hex code" />
+              ${color && html`<button class="btn sm ghost" disabled=${off} onClick=${() => setColor('')}>Reset</button>`}</div>
+            <span class="help">Used for buttons, links and the chart.</span>
+            ${!valid && html`<span class="help" style="color:var(--bad)">Use six hex digits, like #0e7c86.</span>`}
+            ${valid && color && shown.changed && html`<span class="help">So text stays readable (WCAG AA contrast), visitors see this as <b class="mono">${shown.light}</b> on light pages and <b class="mono">${shown.dark}</b> on dark ones, the closest shades that pass.</span>`}</div>
+          <div class="row"><button class="btn primary" disabled=${off || busy || !changed || !valid} onClick=${save}>Save changes</button>${changed && html`<span class="muted small">Unsaved changes</span>`}</div>
+        </div>
+        <div class="brand-side"><span class="lbl">Preview</span>
+          <div class="bp" style=${`--bc:${accent}`} aria-hidden="true">
+            <div class="bp-head">${logo ? html`<img src=${logo} alt="" />` : ''}<b>${name.trim() || (logo ? '' : site.domain)}</b><span class="bp-btn">Sign in</span></div>
+            <div class="bp-body"><div class="bp-k"><em>Unique visitors</em><b>3,254</b></div>
+              <svg viewBox="0 0 200 56" preserveAspectRatio="none"><path d="M0 44 L20 38 L40 40 L60 26 L80 30 L100 18 L120 24 L140 12 L160 20 L180 8 L200 14 L200 56 L0 56Z" class="a"/><path d="M0 44 L20 38 L40 40 L60 26 L80 30 L100 18 L120 24 L140 12 L160 20 L180 8 L200 14" class="l"/></svg></div>
+            <div class="bp-foot">Analytics by Tidemark</div></div>
+          ${!site.public && html`<p class="muted small">Branding shows on the public dashboard and shared links. This site's dashboard is private, so only shared links use it. <${Link} to=${`/${site.domain}/settings/access`}>Sharing settings<//></p>`}</div>
+      </div>
+    <//>`;
 }
 
 function NewLink({ site, onClose, onDone }) {
