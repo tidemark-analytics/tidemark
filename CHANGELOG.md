@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.19.0] - 2026-10-24
+
+### Added
+- The account menu links to the Tidemark community on Discord.
+
 ## [0.18.0] - 2026-10-23
 
 ### Added
