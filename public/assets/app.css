@@ -950,3 +950,19 @@ button.fact:hover { border-color: var(--accent); background: var(--surface); }
 
 /* the sidebar already leads back to your sites and the dashboard; keep the link only where there is no sidebar */
 @media (min-width: 1024px) { .has-side .page-head .crumb-back { display: none; } }
+
+/* rollup site picker */
+.opt-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 640px) { .opt-cards { grid-template-columns: minmax(0, 1fr); } }
+.opt-card { display: flex; align-items: center; gap: 12px; padding: 12px 14px; text-align: left; background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--radius-sm); cursor: pointer; color: inherit; }
+.opt-card:hover { border-color: var(--ink-3); }
+.opt-card.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; background: linear-gradient(180deg, var(--accent-soft), var(--surface)); }
+.oc-t { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; line-height: 1.35; }
+.oc-t b { font-weight: 600; font-size: 14px; } .oc-t .muted { font-size: 12.5px; }
+.oc-dot { flex: none; width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--line-2); }
+.opt-card.on .oc-dot { border-color: var(--accent); background: radial-gradient(circle, var(--accent) 45%, transparent 50%); }
+.rowitem .tick { color: var(--accent-ink); flex: none; }
+.rowitem.pick { padding: 0; }
+.rowitem.pick label { display: flex; flex-direction: row; align-items: center; gap: 12px; padding: 10px 12px; min-height: 56px; cursor: pointer; margin: 0; }
+.rowitem.pick input { flex: none; width: 16px; height: 16px; margin: 0; }
+.rowitem.pick b { font-weight: 600; font-size: 14px; }

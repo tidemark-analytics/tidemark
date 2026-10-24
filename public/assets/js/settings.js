@@ -321,13 +321,21 @@ function RollupSites({ site, reload }) {
   const list = (cands.data && cands.data.data) || [];
   const dirty = all !== site.rollup.all || (!all && JSON.stringify([...chosen].sort()) !== JSON.stringify(site.rollup.sites.map((s) => s.domain).sort()));
   const save = async () => { setErr(null); try { await api(`/sites/${site.domain}/rollup`, { method: 'PUT', body: { all, sites: all ? undefined : chosen } }); reload(); toast('Saved'); } catch (x) { setErr(firstError(x)); } };
-  return html`<${Section} title="Sites in this rollup" help="Changing the list changes the whole history: a site you take out disappears from this dashboard's past as well as its future, and the other way round. Your sites themselves are never changed.">
+  const members = site.rollup.sites.map((x) => x.domain);
+  const count = all ? list.length || site.rollup.count : chosen.length;
+  const toggle = (d, on) => setChosen(on ? [...chosen, d] : chosen.filter((x) => x !== d));
+  const OPTIONS = [[true, 'All the sites I own', 'layers', 'Includes the sites you add later.'], [false, 'Only the sites I choose', 'funnel', 'Pick exactly which sites to add up.']];
+  return html`<${Section} title="Sites in this rollup" help="A rollup adds up the visits of several of your sites on one dashboard. Your sites themselves are never changed.">
     ${err && html`<div class="alert">${err}</div>`}
-    <div class="stack sm"><label class="row"><input type="radio" name="scope" checked=${all} onChange=${() => setAll(true)} /> <span><b>All the sites I own</b>, including ones I add later</span></label>
-      <label class="row"><input type="radio" name="scope" checked=${!all} onChange=${() => setAll(false)} /> <span>Only the sites I choose</span></label></div>
-    ${!all && html`<div class="stack sm" role="group" aria-label="Sites in this rollup">${list.map((s) => html`<label class="row"><input type="checkbox" checked=${chosen.includes(s.domain)} onChange=${(e) => setChosen(e.target.checked ? [...chosen, s.domain] : chosen.filter((d) => d !== s.domain))} /> <span>${s.domain}</span></label>`)}</div>`}
-    ${all && html`<p class="muted small">Right now that is ${site.rollup.count} ${site.rollup.count === 1 ? 'site' : 'sites'}.</p>`}
-    <div><button class="btn primary" disabled=${!dirty || (!all && !chosen.length)} onClick=${save}>Save</button></div><//>`;
+    <div class="opt-cards" role="radiogroup" aria-label="Which sites">${OPTIONS.map(([v, t, i, d]) => html`<button type="button" role="radio" aria-checked=${all === v} class=${'opt-card' + (all === v ? ' on' : '')} onClick=${() => { setAll(v); if (!v && !chosen.length) setChosen(list.map((x) => x.domain)); }}>
+      <span class="ri-ico" aria-hidden="true"><${Icon} name=${i} size=${16} /></span><span class="oc-t"><b>${t}</b><span class="muted">${d}</span></span><span class="oc-dot" aria-hidden="true"></span></button>`)}</div>
+    ${all ? html`<ul class="rows" aria-label="Sites in this rollup">${(list.length ? list.map((x) => x.domain) : members).map((d) => html`<li class="rowitem"><span class="ri-ico" aria-hidden="true"><${Icon} name="globe" size=${16} /></span><div class="grow ri-main"><b class="trunc">${d}</b></div><${Icon} name="check" size=${15} class="tick" /></li>`)}</ul>`
+      : html`<div class="row spread wrap"><span class="muted small">${chosen.length} of ${list.length} selected</span><div class="row"><button type="button" class="btn sm ghost" onClick=${() => setChosen(list.map((x) => x.domain))}>Select all</button><button type="button" class="btn sm ghost" disabled=${!chosen.length} onClick=${() => setChosen([])}>Clear</button></div></div>
+      <ul class="rows" role="group" aria-label="Sites in this rollup">${list.map((x) => html`<li class="rowitem pick"><label class="grow"><input type="checkbox" checked=${chosen.includes(x.domain)} onChange=${(e) => toggle(x.domain, e.target.checked)} /><span class="ri-ico" aria-hidden="true"><${Icon} name="globe" size=${16} /></span><b class="trunc">${x.domain}</b></label></li>`)}</ul>
+      ${!list.length && cands.data && html`<div class="empty-inline"><${Icon} name="globe" size=${18} /><div><b>No sites to choose from</b><span>Add a site first, then come back to include it here.</span></div></div>`}`}
+    ${dirty && html`<div class="notice"><${Icon} name="info" size=${16} /><div>Changing the list changes the whole history: a site you take out disappears from this dashboard's past as well as its future, and the other way round.</div></div>`}
+    <div class="row"><button class="btn primary" disabled=${!dirty || (!all && !chosen.length)} onClick=${save}>Save changes</button>${dirty && html`<span class="muted small">${count} ${count === 1 ? 'site' : 'sites'} after saving</span>`}</div>
+  <//>`;
 }
 
 function People({ site }) {
