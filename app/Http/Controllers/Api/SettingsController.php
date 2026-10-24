@@ -67,9 +67,6 @@ class SettingsController extends Controller
         if ($type !== 'event') {
             throw ValidationException::withMessages(['currency' => 'Only custom events can report revenue.']);
         }
-        if ($site->isRollup()) {
-            throw ValidationException::withMessages(['currency' => 'Revenue goals are not supported in rollups, because the sites may use different currencies.']);
-        }
         if (! $site->revenueAllowed()) {
             throw ValidationException::withMessages(['currency' => 'Revenue reporting is not available on this plan.']);
         }

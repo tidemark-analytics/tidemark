@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.24.0] - 2026-11-04
+
+### Changed
+- A rollup's goals can now report revenue. A rollup adds up only the amounts its sites sent in the goal's own currency, because the sites' goals may report in different ones.
+
 ## [0.23.0] - 2026-11-03
 
 ### Added

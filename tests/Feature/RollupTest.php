@@ -121,7 +121,6 @@ class RollupTest extends TestCase
         $this->postJson('/api/rollups', ['name' => 'network', 'all' => true])->assertCreated();
         $page = $this->postJson('/api/sites/network/goals', ['type' => 'page', 'value' => '/pricing'])->assertCreated()->json('data.id');
         $signup = $this->postJson('/api/sites/network/goals', ['type' => 'event', 'value' => 'Signup'])->assertCreated()->json('data.id');
-        $this->postJson('/api/sites/network/goals', ['type' => 'event', 'value' => 'Purchase', 'currency' => 'USD'])->assertUnprocessable();
 
         $goals = $this->getJson('/api/sites/network/stats/goals?period=day')->assertOk()->json('results');
         $this->assertSame(['Visit /pricing' => 3, 'Signup' => 2], array_column($goals, 'visitors', 'name'));
@@ -133,6 +132,21 @@ class RollupTest extends TestCase
 
         $segment = $this->postJson('/api/sites/network/segments', ['name' => 'Germany', 'type' => 'site', 'filters' => [['is', 'country', ['DE']]]])->assertCreated()->json('data.id');
         $this->assertSame(3, $this->visitors('network', ['filters' => json_encode([['is', 'segment', [$segment]]])]));
+    }
+
+    public function test_a_rollup_goal_can_report_revenue_in_one_currency(): void
+    {
+        $a = $this->site('a.example.com');
+        $b = $this->site('b.example.com');
+        foreach ([[$a, '1', 20, 'USD'], [$a, '2', 5, 'EUR'], [$b, '3', 30, 'USD']] as [$site, $visitor, $amount, $currency]) {
+            $this->visit($site, $visitor, [['pageview', '/'], ['Purchase', '/buy']]);
+            DB::table('events')->where('site_id', $site->id)->where('visitor_id', str_pad($visitor, 32, '0'))->where('name', 'Purchase')->update(['revenue' => $amount, 'currency' => $currency]);
+        }
+        $this->postJson('/api/rollups', ['name' => 'network', 'all' => true])->assertCreated();
+        $this->postJson('/api/sites/network/goals', ['type' => 'event', 'value' => 'Purchase', 'currency' => 'USD'])->assertCreated()->assertJsonPath('data.currency', 'USD');
+
+        $top = $this->getJson('/api/sites/network/stats/top?'.http_build_query(['period' => 'day', 'filters' => json_encode([['is', 'goal', ['Purchase']]])]))->assertOk();
+        $top->assertJsonPath('stats.unique_conversions.value', 3)->assertJsonPath('stats.total_revenue.value', 50)->assertJsonPath('currency', 'USD');
     }
 
     public function test_events_are_never_collected_for_a_rollup_and_its_data_cannot_be_changed(): void

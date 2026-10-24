@@ -137,9 +137,6 @@ class Site extends Model
     /** Whether this site may report revenue on its goals (always true unless an extension limits it). */
     public function revenueAllowed(): bool
     {
-        if ($this->isRollup()) {
-            return false; // the member sites may report in different currencies
-        }
         $entitlements = app(Entitlements::class);
 
         return ! ($entitlements instanceof AllowsConversionReports) || $entitlements->allowsRevenue($this);

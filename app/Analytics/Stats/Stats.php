@@ -81,17 +81,19 @@ class Stats
     }
 
     /** Revenue of an event in the goal's currency: converted when it was recorded, or as sent when it already is in that currency. */
-    private static function revenueExpr(string $currency): string
+    private function revenueExpr(string $currency): string
     {
         $currency = preg_replace('/[^A-Z]/', '', $currency);
+        $sameCurrency = "CASE WHEN e.currency = '{$currency}' THEN e.revenue END";
 
-        return "COALESCE(e.revenue_reporting, CASE WHEN e.currency = '{$currency}' THEN e.revenue END)";
+        // a rollup adds up sites whose goals may report in other currencies, so it counts only amounts sent in its own goal's currency
+        return $this->site->isRollup() ? $sameCurrency : "COALESCE(e.revenue_reporting, {$sameCurrency})";
     }
 
     /** SUM and AVG over the revenue column, for a query over `events as e`. */
-    private static function revenueAgg(string $currency): string
+    private function revenueAgg(string $currency): string
     {
-        $x = self::revenueExpr($currency);
+        $x = $this->revenueExpr($currency);
 
         return "COALESCE(SUM({$x}), 0) as revenue, COUNT({$x}) as revenue_events";
     }
@@ -144,7 +146,7 @@ class Stats
     private function goalTopStats(Period $p, Filters $f): array
     {
         $currency = $this->goalCurrency($f);
-        $row = $this->eventsQ($p, $f)->selectRaw('COUNT(DISTINCT e.visitor_id) as uniq, COUNT(*) as total'.($currency ? ', '.self::revenueAgg($currency) : ''))->first();
+        $row = $this->eventsQ($p, $f)->selectRaw('COUNT(DISTINCT e.visitor_id) as uniq, COUNT(*) as total'.($currency ? ', '.$this->revenueAgg($currency) : ''))->first();
         $visitors = (int) $this->visitsQ($p, $f->without('goal'))->selectRaw('COUNT(DISTINCT v.visitor_id) as n')->value('n');
         $out = ['unique_conversions' => (int) $row->uniq, 'total_conversions' => (int) $row->total];
         if ($currency) {
@@ -232,7 +234,7 @@ class Stats
         $currency = $this->goalCurrency($f);
         $be = $this->bucket('e.created_at', $p);
         $conv = [];
-        foreach ($this->eventsQ($p, $f)->selectRaw("{$be} as t, COUNT(DISTINCT e.visitor_id) as uniq, COUNT(*) as total".($currency ? ', '.self::revenueAgg($currency) : ''))->groupBy('t')->get() as $r) {
+        foreach ($this->eventsQ($p, $f)->selectRaw("{$be} as t, COUNT(DISTINCT e.visitor_id) as uniq, COUNT(*) as total".($currency ? ', '.$this->revenueAgg($currency) : ''))->groupBy('t')->get() as $r) {
             $conv[$r->t] = $r;
         }
         $bv = $this->bucket('v.started_at', $p);
@@ -431,7 +433,7 @@ class Stats
     {
         $col = $this->col($dim);
         $currency = $this->goalCurrency($f);
-        $q = $this->eventsQ($p, $f)->selectRaw("{$col} as name, COUNT(DISTINCT e.visitor_id) as uniq, COUNT(*) as total".($currency ? ', '.self::revenueAgg($currency) : ''))->groupBy($col)->orderByDesc('uniq')->orderBy('name')->limit($limit)->offset($offset);
+        $q = $this->eventsQ($p, $f)->selectRaw("{$col} as name, COUNT(DISTINCT e.visitor_id) as uniq, COUNT(*) as total".($currency ? ', '.$this->revenueAgg($currency) : ''))->groupBy($col)->orderByDesc('uniq')->orderBy('name')->limit($limit)->offset($offset);
         if ($dim !== 'source') {
             $q->whereNotNull($col);
         }
@@ -491,7 +493,7 @@ class Stats
         foreach ($this->site->goals()->orderBy('created_at')->get() as $goal) {
             $g = new Filters([...$base->rules, ['is', 'goal', [$goal->name]]], $this->site);
             $currency = $this->currencyOf($goal);
-            $r = $this->eventsQ($p, $g)->selectRaw('COUNT(DISTINCT e.visitor_id) as uniq, COUNT(*) as total'.($currency ? ', '.self::revenueAgg($currency) : ''))->first();
+            $r = $this->eventsQ($p, $g)->selectRaw('COUNT(DISTINCT e.visitor_id) as uniq, COUNT(*) as total'.($currency ? ', '.$this->revenueAgg($currency) : ''))->first();
             $uniq = (int) $r->uniq;
             $total = (int) $r->total;
             if ($range) {

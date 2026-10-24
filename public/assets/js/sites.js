@@ -105,7 +105,7 @@ export function NewRollup() {
         <div class="stack sm"><label class="row"><input type="radio" name="scope" checked=${all} onChange=${() => setAll(true)} /> <span><b>All the sites I own</b>, including ones I add later</span></label>
           <label class="row"><input type="radio" name="scope" checked=${!all} onChange=${() => setAll(false)} /> <span>Only the sites I choose</span></label></div><//>
       ${!all && html`<div class="stack sm" role="group" aria-label="Sites in this rollup">${list.map((s) => html`<label class="row"><input type="checkbox" checked=${chosen.includes(s.domain)} onChange=${(e) => setChosen(e.target.checked ? [...chosen, s.domain] : chosen.filter((d) => d !== s.domain))} /> <span>${s.domain}</span></label>`)}</div>`}
-      <p class="muted small">Imported data is left out, and revenue goals aren't available because your sites may use different currencies. The rollup's timezone starts as the one most of your sites use.</p>
+      <p class="muted small">Imported data is left out, and a revenue goal adds up only amounts sent in its own currency. The rollup's timezone starts as the one most of your sites use.</p>
       <div class="row"><button class="btn primary" disabled=${busy || !name || !allowed || (!all && !chosen.length)}>${busy ? 'Creating…' : 'Create rollup'}</button><${Link} to="/sites" class="btn ghost">Cancel<//></div>
     </form></main>`;
 }
