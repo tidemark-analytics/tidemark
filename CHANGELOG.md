@@ -4,8 +4,15 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-11-06
+
 ### Changed
-- The sidebar's list of sites is now a searchable dropdown at the top, so it stays tidy with many sites. Open it, type to filter, and press Enter to jump to a site.
+- The sidebar's list of sites is now a searchable dropdown at the top, so it stays tidy with many sites. Open it, type to filter, and press Enter to jump to a site. The dashboard sections stay in the sidebar on a site's settings pages, and choosing one from there opens the dashboard at that section.
+- Updated Laravel and the build tooling to their latest releases.
+
+### Fixed
+- "Save as segment" and "Clear all" now line up with the filter chips, and the chips in the Edit filter menu have proper padding.
+- The sidebar could highlight Conversions after returning to the dashboard from settings.
 
 ## [0.25.0] - 2026-11-05
 
