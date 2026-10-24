@@ -7,8 +7,11 @@ import { registry } from './extensions.js';
 const NOT_A_SITE = new Set(['', 'sites', 'settings', 'login', 'register', 'forgot-password', 'reset-password', 'share']);
 export const siteFromPath = (path) => { const seg = path.split('/')[1] || ''; return NOT_A_SITE.has(seg) ? null : decodeURIComponent(seg); };
 
-/** The dashboard announces its sections here so the sidebar can list them. */
-export const announceSections = (list) => window.dispatchEvent(new CustomEvent('tdm:sections', { detail: list }));
+/** The sections of a site's dashboard. They stay in the sidebar on every page of the site, so the menu doesn't change under you. */
+const SECTIONS = [{ id: 'overview', label: 'Overview', icon: 'chart-column' }, { id: 'traffic', label: 'Traffic', icon: 'compass' }, { id: 'audience', label: 'Audience', icon: 'users' }, { id: 'conversions', label: 'Conversions', icon: 'target' }];
+const smooth = () => (window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth');
+/** Scroll the dashboard to a section; from another page of the site, open the dashboard and let it do the scrolling. */
+export const scrollToSection = (id) => { const el = document.getElementById('sec-' + id); if (el) el.scrollIntoView({ behavior: smooth(), block: 'start' }); };
 /** Tell the open dashboard to do something (change the period, toggle the comparison). */
 export const command = (detail) => window.dispatchEvent(new CustomEvent('tdm:cmd', { detail }));
 
@@ -83,19 +86,12 @@ function SiteSwitcher({ list, current, onPick }) {
 
 export function Sidebar({ user, path }) {
   const sites = useApi('/sites', null, [path.startsWith('/sites') ? path : '']);
-  const [sections, setSections] = useState([]);
   const domain = siteFromPath(path);
-  useEffect(() => {
-    const h = (e) => setSections(e.detail || []);
-    window.addEventListener('tdm:sections', h);
-    return () => window.removeEventListener('tdm:sections', h);
-  }, []);
-  useEffect(() => { if (!domain) setSections([]); }, [domain]);
   const list = ((sites.data && sites.data.data) || []).slice().sort((a, b) => (a.rollup !== b.rollup ? (a.rollup ? -1 : 1) : a.domain.localeCompare(b.domain)));
   const current = domain && list.find((s) => s.domain === domain);
-  const ids = domain ? sections.map((s) => s.id) : [];
-  const active = useScrollSpy(ids);
-  const jump = (id) => { const el = document.getElementById('sec-' + id); if (el) el.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }); };
+  const onDash = !!domain && path === '/' + domain;
+  const active = useScrollSpy(onDash ? SECTIONS.map((x) => x.id) : []);
+  const jump = (id) => { if (onDash) scrollToSection(id); else { window.__tdmJump = id; navigate('/' + domain); } };
   const canManage = current && (current.role === 'owner' || current.role === 'admin');
   const onSite = (p) => path === p || path.startsWith(p + '/');
   return html`<aside class="side" aria-label="Main">
@@ -103,8 +99,8 @@ export function Sidebar({ user, path }) {
     <button class="side-search" onClick=${() => window.dispatchEvent(new CustomEvent('tdm:palette'))}><${Icon} name="search" size=${14} /><span>Search or jump to…</span><kbd>⌘K</kbd></button>
     <${SiteSwitcher} list=${list} current=${current} onPick=${(s) => navigate('/' + s.domain)} />
     <nav class="side-nav">
-      ${current && sections.length > 0 && html`<div class="side-grp">On this site</div>
-        ${sections.map((s) => html`<button class=${'side-link ' + (active === s.id && !onSite('/' + domain + '/settings') ? 'on' : '')} onClick=${() => jump(s.id)}><${Icon} name=${s.icon} size=${16} /><span>${s.label}</span></button>`)}`}
+      ${current && html`<div class="side-grp">On this site</div>
+        ${SECTIONS.map((s) => html`<button class=${'side-link ' + (onDash && active === s.id ? 'on' : '')} onClick=${() => jump(s.id)}><${Icon} name=${s.icon} size=${16} /><span>${s.label}</span></button>`)}`}
       ${current && html`${canManage && html`<${Link} to=${'/' + domain + '/settings'} class=${'side-link ' + (onSite('/' + domain + '/settings') ? 'on' : '')}><${Icon} name="settings" size=${16} /><span>Site settings</span><//>`}`}
     </nav>
     <div class="side-foot">
