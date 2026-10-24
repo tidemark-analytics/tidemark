@@ -2,6 +2,11 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.19.1] - 2026-10-24
+
+### Fixed
+- The PNG app icons (home-screen and web app icons) were cropped off-centre or blank; they are re-rendered from the logo.
+
 ## [0.19.0] - 2026-10-24
 
 ### Added
