@@ -2,7 +2,7 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/), and versions follow [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.25.0] - 2026-11-05
 
 ### Changed
 - A new look and layout. A harbor sidebar lists your sites and the sections of the open dashboard, with a ⌘K command palette to jump between sites, change the date range, compare or filter.
