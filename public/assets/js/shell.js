@@ -100,10 +100,9 @@ export function Sidebar({ user, path }) {
   const onSite = (p) => path === p || path.startsWith(p + '/');
   return html`<aside class="side" aria-label="Main">
     <${Link} to="/sites" class="side-brand" aria-label="Tidemark home"><${Lockup} size=${22} /><//>
-    <${SiteSwitcher} list=${list} current=${current} onPick=${(s) => navigate('/' + s.domain)} />
     <button class="side-search" onClick=${() => window.dispatchEvent(new CustomEvent('tdm:palette'))}><${Icon} name="search" size=${14} /><span>Search or jump to…</span><kbd>⌘K</kbd></button>
+    <${SiteSwitcher} list=${list} current=${current} onPick=${(s) => navigate('/' + s.domain)} />
     <nav class="side-nav">
-      <${Link} to="/sites" class=${'side-link ' + (path === '/sites' ? 'on' : '')}><${Icon} name="layout-dashboard" size=${16} /><span>All sites</span><//>
       ${current && sections.length > 0 && html`<div class="side-grp">On this site</div>
         ${sections.map((s) => html`<button class=${'side-link ' + (active === s.id && !onSite('/' + domain + '/settings') ? 'on' : '')} onClick=${() => jump(s.id)}><${Icon} name=${s.icon} size=${16} /><span>${s.label}</span></button>`)}`}
       ${current && html`${canManage && html`<${Link} to=${'/' + domain + '/settings'} class=${'side-link ' + (onSite('/' + domain + '/settings') ? 'on' : '')}><${Icon} name="settings" size=${16} /><span>Site settings</span><//>`}`}
