@@ -2,6 +2,8 @@
 
 Thanks for helping! Tidemark aims to stay small: one clear dashboard, easy installs on shared hosting, and no personal data collected. Changes that fit that spirit are very welcome.
 
+Want to talk something through first? Join the [Tidemark Discord](https://discord.gg/sCkHD3PPZh) and use #contributing.
+
 ## Getting started
 
 ```bash

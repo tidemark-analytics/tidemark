@@ -1,6 +1,6 @@
 # Tidemark
 
-[![CI](https://github.com/tidemark-analytics/tidemark/actions/workflows/ci.yml/badge.svg)](https://github.com/tidemark-analytics/tidemark/actions/workflows/ci.yml) [![Latest release](https://img.shields.io/github/v/release/tidemark-analytics/tidemark)](https://github.com/tidemark-analytics/tidemark/releases/latest) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![CI](https://github.com/tidemark-analytics/tidemark/actions/workflows/ci.yml/badge.svg)](https://github.com/tidemark-analytics/tidemark/actions/workflows/ci.yml) [![Latest release](https://img.shields.io/github/v/release/tidemark-analytics/tidemark)](https://github.com/tidemark-analytics/tidemark/releases/latest) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![Discord](https://img.shields.io/badge/chat-Discord-5865F2?logo=discord&logoColor=white)](https://discord.gg/sCkHD3PPZh)
 
 Simple, privacy-first web analytics that runs on **ordinary PHP shared hosting**. One light dashboard in the spirit of
 [Plausible](https://plausible.io), built with Laravel — upload a zip, open `/install`, done. No Node, no Docker, no SSH required.
@@ -169,6 +169,10 @@ Icons are [Lucide](https://lucide.dev) (ISC license), served from one self-hoste
 
 MIT
 
+
+## Community
+
+Questions, ideas and show-and-tell: join the [Tidemark Discord](https://discord.gg/sCkHD3PPZh). Bugs belong in [GitHub issues](https://github.com/tidemark-analytics/tidemark/issues).
 
 ## Contributing
 
