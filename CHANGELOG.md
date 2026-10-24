@@ -4,6 +4,8 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-11-07
+
 ### Added
 - Extensions can provide a separate administration interface (`registerAdminUi`). Administrators get an Admin link in the sidebar, and Users and Updates move out of Account settings into that interface. Without an extension nothing changes.
 
