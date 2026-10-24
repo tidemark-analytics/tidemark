@@ -160,12 +160,32 @@ function FilterMenu({ site, scope, initial, onClose, segs, onSave, onManage }) {
   };
   const multi = dim !== 'goal';
   const OPS = FILTER_OPS.filter(([o]) => multi || o === 'is' || o === 'is_not');
-  const SHORT = { is: 'is', is_not: 'is not', contains: 'contains', contains_not: 'excludes' };
-  const pick = (n) => (multi ? add(n) : setValues([n]));
+  const results = (sugg.data && sugg.data.results) || [];
+  const countOf = (n) => { const r = results.find((x) => x.name === n); return r ? r.visitors : undefined; };
+  const typed = text.trim();
+  const exact = typed && (values.includes(norm(typed)) || results.some((r) => String(r.name).toLowerCase() === typed.toLowerCase()));
+  // selected values first (checked), then what the search suggests, then "add what I typed"
+  const rows = [...values.map((v) => ({ name: v, on: true, visitors: countOf(v) })), ...options.map((r) => ({ name: r.name, on: false, visitors: r.visitors })), ...(typed && !exact && (dim !== 'country' || /^[a-z]{2}$/i.test(typed)) ? [{ name: norm(typed), on: false, custom: true }] : [])];
+  const firstOff = rows.findIndex((r) => !r.on);
+  const active = hi >= 0 ? hi : typed && firstOff >= 0 ? firstOff : -1;
+  const applyWith = (vals) => {
+    if (!vals.length) return;
+    const list = parseFilters(scope.query);
+    const rule = [op, dim, vals];
+    if (editing) list[initial.index] = rule; else list.push(rule);
+    setFilters(list.filter((r, i, a) => a.findIndex((x) => x[1] === r[1] && x[0] === r[0] && JSON.stringify(x[2]) === JSON.stringify(r[2])) === i));
+    onClose();
+  };
+  const toggle = (row) => {
+    if (!multi) return applyWith([row.name]);
+    setValues(row.on ? values.filter((v) => v !== row.name) : [...values, row.name]);
+    setText('');
+  };
   const onKey = (e) => {
-    if (e.key === 'ArrowDown') { e.preventDefault(); setHi((i) => Math.min(options.length - 1, i + 1)); }
-    else if (e.key === 'ArrowUp') { e.preventDefault(); setHi((i) => Math.max(-1, i - 1)); }
-    else if (e.key === 'Enter') { e.preventDefault(); if (hi >= 0 && options[hi]) pick(options[hi].name); else if (text.trim()) pick(text); else apply(); }
+    if (e.key === 'ArrowDown') { e.preventDefault(); setHi(Math.min(rows.length - 1, active + 1)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setHi(Math.max(0, active - 1)); }
+    else if (e.key === 'Enter') { e.preventDefault(); if (active >= 0 && rows[active]) toggle(rows[active]); else apply(); }
+    else if (e.key === 'Backspace' && !text && values.length && multi) setValues(values.slice(0, -1));
   };
   const segmentItems = segs && segs.allowed ? segs.list.filter((x) => x.name.toLowerCase().includes(find.toLowerCase())) : [];
   return html`<div class="pop filter-pop left" role="dialog" aria-label="Filter">
@@ -180,14 +200,16 @@ function FilterMenu({ site, scope, initial, onClose, segs, onSave, onManage }) {
       ${segs && segs.allowed && site.role && html`<div class="fp-links">
         ${scope.filters.some((r) => r[1] !== 'segment') && html`<button class="item" onClick=${() => { onClose(); onSave(); }}><span class="item-l"><${Icon} name="plus" size=${14} />Save current filters as segment</span></button>`}
         <button class="item" onClick=${() => { onClose(); onManage(); }}><span class="item-l"><${Icon} name="settings" size=${14} />Manage segments</span></button></div>`}`
-      : html`<div class="form fp-form">
-        <div class="seg" role="radiogroup" aria-label="Operator">${OPS.map(([o]) => html`<button type="button" role="radio" aria-checked=${op === o} class=${op === o ? 'on' : ''} onClick=${() => setOp(o)}>${SHORT[o] || o}</button>`)}</div>
-        ${values.length > 0 && html`<div class="chips">${values.map((v) => html`<span class="chip"><b><${FilterValueLabel} dim=${dim} v=${v} /></b><button aria-label=${'Remove ' + v} onClick=${() => setValues(values.filter((x) => x !== v))}><${Icon} name="x" size=${12} /></button></span>`)}</div>`}
-        <div class="searchbox"><${Icon} name="search" size=${14} /><input value=${text} autofocus onInput=${(e) => setText(e.target.value)} onKeyDown=${onKey} placeholder=${'Type or pick a ' + dimLabel(dim).toLowerCase()} aria-label="Value" /></div>
-        ${op.startsWith('contains') || dim === 'page' ? html`<span class="help">Use * as a wildcard, e.g. /blog/*</span>` : null}
-        ${options.length > 0 && html`${dim !== 'country' && !search && html`<span class="help sugg-cap">Most common values, by visitors over all time</span>`}<div class="sugg" role="listbox" aria-label="Suggestions">${options.map((r, n) => html`<button role="option" aria-selected=${n === hi} class=${n === hi ? 'on' : ''} onMouseMove=${() => setHi(n)} onClick=${() => pick(r.name)}><span class="trunc"><${FilterValueLabel} dim=${dim} v=${r.name} /></span>${r.visitors !== undefined && html`<em>${fmtShort(r.visitors)}</em>`}</button>`)}</div>`}
+      : html`<div class="fp-form">
+        <div class="fb-input"><select class="op-select" aria-label="Operator" value=${op} onChange=${(e) => setOp(e.target.value)}>${OPS.map(([o, l]) => html`<option value=${o} selected=${op === o}>${({ contains_not: 'excludes' })[o] || l}</option>`)}</select>
+          <input value=${text} autofocus onInput=${(e) => setText(e.target.value)} onKeyDown=${onKey} placeholder=${'Search ' + dimLabel(dim).toLowerCase() + '…'} aria-label="Value" /></div>
+        ${op.startsWith('contains') || dim === 'page' ? html`<span class="help fb-help">Use * as a wildcard, like /blog/*</span>` : null}
+        <div class="fb-list" role="listbox" aria-label="Values" aria-multiselectable=${multi}>${rows.length === 0 && html`<div class="fb-empty">${sugg.loading ? 'Loading…' : 'Nothing to suggest yet. Type a value and press Enter.'}</div>`}
+          ${rows.map((r, n) => html`<button role="option" aria-selected=${r.on} class=${'fb-row' + (n === active ? ' hot' : '') + (r.on ? ' sel' : '')} onMouseMove=${() => setHi(n)} onClick=${() => toggle(r)}>
+            ${multi && html`<span class="fb-box" aria-hidden="true">${r.on && html`<${Icon} name="check" size=${12} />`}</span>`}
+            <span class="trunc">${r.custom ? html`Add “${r.name}”` : html`<${FilterValueLabel} dim=${dim} v=${r.name} />`}</span>${r.visitors !== undefined && html`<em>${fmtShort(r.visitors)}</em>`}</button>`)}</div>
       </div>`}
-    ${dim && html`<div class="fp-foot"><button class="btn" onClick=${onClose}>Cancel</button><button class="btn primary" onClick=${apply} disabled=${!values.length && !text.trim()}>Apply filter</button></div>`}
+    ${dim && multi && html`<div class="fp-foot"><span class="muted small">${values.length ? values.length + ' selected' : 'Pick one or more'}</span><button class="btn primary sm" onClick=${apply} disabled=${!values.length && !typed}>Apply filter</button></div>`}
   </div>`;
 }
 

@@ -992,3 +992,21 @@ button.fact:hover { border-color: var(--accent); background: var(--surface); }
 .seg-name { height: 30px; font-weight: 600; font-size: 14px; padding: 0 8px; margin-left: -8px; border-color: transparent; background: transparent; width: 100%; }
 .seg-name:hover:not(:disabled), .seg-name:focus { border-color: var(--line-2); background: var(--surface); }
 .seg-name:disabled { opacity: 1; cursor: default; }
+
+/* filter builder: one combobox, operator inline, checkable rows */
+.fp-form { display: flex; flex-direction: column; gap: 8px; padding: 6px 8px 8px; max-width: none; }
+.fb-input { display: flex; align-items: center; height: 38px; border: 1px solid var(--line-2); border-radius: 9px; background: var(--surface); overflow: hidden; }
+.fb-input:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+.fb-input .op-select { width: auto; flex: none; height: 100%; border: 0; border-right: 1px solid var(--line); border-radius: 0; background-color: var(--surface-2); padding: 0 26px 0 11px; font-size: 12.5px; font-weight: 560; color: var(--accent-ink); box-shadow: none; }
+.fb-input input { flex: 1; min-width: 0; height: 100%; border: 0; border-radius: 0; background: none; box-shadow: none; padding: 0 11px; font-size: 13.5px; }
+.fb-input input:focus, .fb-input .op-select:focus { outline: none; box-shadow: none; }
+.fb-help { margin: -2px 2px 0; }
+.fb-list { display: flex; flex-direction: column; max-height: 300px; overflow-y: auto; }
+.fb-row { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 34px; padding: 0 8px; border: 0; border-radius: 7px; background: none; cursor: pointer; text-align: left; font-size: 13.5px; color: var(--ink); }
+.fb-row.hot { background: var(--surface-2); }
+.fb-row.sel { font-weight: 600; }
+.fb-row em { margin-left: auto; font-style: normal; font-size: 12px; color: var(--ink-3); font-variant-numeric: tabular-nums; font-weight: 450; }
+.fb-box { flex: none; width: 16px; height: 16px; border-radius: 5px; border: 1.5px solid var(--line-2); display: grid; place-items: center; color: var(--on-accent); }
+.fb-row.sel .fb-box { background: var(--accent); border-color: var(--accent); }
+.fb-empty { padding: 14px 8px; font-size: 13px; color: var(--ink-3); }
+.fp-foot { justify-content: space-between; align-items: center; }
