@@ -171,8 +171,6 @@ Per-customer installs look attractive for privacy, but at analytics price points
 
 **Tidemark** — a tidemark is the line a tide leaves behind on a shore or harbor wall: a record of how high the water reached, kept without keeping the water. That is the product's privacy model in one image: it keeps the aggregate line and never the footprints of individual visitors.
 
-Conflict check (when the name was chosen): no web analytics product or GitHub/Packagist project uses it. The only well-known "Tidemark" was an enterprise financial-planning software company, since acquired, and the GitHub repos with the name are unrelated hobby tools. The bare `tidemark.com`, `.io`, `.app` and the `use`/`try`/`get` variants are taken, so the practical domains are `tidemarkanalytics.com`, `tidemarkstats.com` or `withtidemark.com`, which were unregistered at the time of writing. Availability changes daily, so re-check before registering.
-
 ## Icons
 
 Icons are [Lucide](https://lucide.dev) (ISC license), served from one self-hosted sprite at `public/assets/icons.svg` (only the icons in `scripts/icons.txt`). To add one: add its Lucide name to `scripts/icons.txt`, then `npm i --no-save lucide-static && node scripts/build-icons.mjs`. Use it with `<${Icon} name="chart-column" />`.
