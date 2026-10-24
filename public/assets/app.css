@@ -432,8 +432,9 @@ label.btn.disabled { opacity: .5; pointer-events: none; }
 .live:hover { background: var(--surface-2); }
 .live .dot { flex: none; }
 .dot.off { background: var(--ink-3); animation: none; opacity: 0.5; }
-.filter-chips { padding-top: 2px; }
-.chip { padding: 0 4px 0 0; }
+.filter-chips { padding-top: 2px; align-items: center; }
+.filter-chips .chip { padding: 0 4px 0 0; }
+.filter-chips .more { margin: 0; padding: 0 8px; height: 28px; display: inline-flex; align-items: center; }
 .chip-edit { display: inline-flex; align-items: center; gap: 6px; padding: 0 4px 0 12px; width: auto !important; height: 26px !important; border-radius: 999px !important; font-size: 12.5px; color: var(--ink-2) !important; }
 .chip-edit em { font-style: normal; color: var(--ink-3); }
 .chip-edit:hover { background: var(--surface-2) !important; }
