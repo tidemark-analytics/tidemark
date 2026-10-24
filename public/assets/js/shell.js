@@ -105,7 +105,7 @@ export function Sidebar({ user, path }) {
   return html`<aside class="side" aria-label="Main">
     <${Link} to="/sites" class="side-brand" aria-label="Tidemark home"><${Lockup} size=${22} /><//>
     <button class="side-search" onClick=${() => window.dispatchEvent(new CustomEvent('tdm:palette'))}><${Icon} name="search" size=${14} /><span>Search or jump to…</span><kbd>⌘K</kbd></button>
-    <${SiteSwitcher} list=${list} current=${current} onPick=${(s) => navigate('/' + s.domain)} />
+    ${domain && html`<${SiteSwitcher} list=${list} current=${current} onPick=${(s) => navigate('/' + s.domain + (path.startsWith('/' + domain + '/settings') ? path.slice(domain.length + 1) : ''))} />`}
     <nav class="side-nav">
       ${current && html`<div class="side-grp">On this site</div>
         ${SECTIONS.map((s) => html`<button class=${'side-link ' + (onDash && active === s.id ? 'on' : '')} onClick=${() => jump(s.id)}><${Icon} name=${s.icon} size=${16} /><span>${s.label}</span></button>`)}
