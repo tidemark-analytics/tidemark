@@ -101,7 +101,7 @@ export function brandTheme(hex, isDark) {
   // the hover shade keeps the same button text readable
   const hover = hslToHex(h, sat, nearestLightness(h, sat, hexToHsl(accent)[2] + toward * 0.07, (c) => contrast(c, onAccent) >= 4.5, toward));
 
-  const soft = isDark ? '#1a1a1a' : '#f0f0f0';
+  const soft = isDark ? '#18181b' : '#f4f4f5';
   const ink = hslToHex(h, sat, nearestLightness(h, sat, hexToHsl(accent)[2], (c) => [n.bg, n.surface, n.s2, soft].every((bg) => contrast(c, bg) >= 4.5), toward));
   const [r, g, b] = hexToRgb(accent);
 
