@@ -22,7 +22,7 @@ class ExtensionPointsTest extends TestCase
 
     private function hit(string $domain = 'example.com')
     {
-        return $this->call('POST', '/api/event', [], [], [], $this->transformHeadersToServerVars(['User-Agent' => self::CHROME, 'Content-Type' => 'text/plain']),
+        return $this->call('POST', '/api/event', [], [], [], $this->transformHeadersToServerVars(['Accept-Language' => 'en-US,en;q=0.9', 'User-Agent' => self::CHROME, 'Content-Type' => 'text/plain']),
             json_encode(['n' => 'pageview', 'u' => "https://{$domain}/", 'd' => $domain, 'w' => 1200]));
     }
 

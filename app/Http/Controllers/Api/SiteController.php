@@ -89,7 +89,7 @@ class SiteController extends Controller
             'timezone' => ['sometimes', 'string', fn ($a, $v, $fail) => in_array($v, \DateTimeZone::listIdentifiers(), true) || $fail('Unknown timezone')],
             'public' => 'sometimes|boolean',
             'track_outbound' => 'sometimes|boolean', 'track_downloads' => 'sometimes|boolean', 'track_forms' => 'sometimes|boolean',
-            'honor_gpc' => 'sometimes|boolean', 'honor_dnt' => 'sometimes|boolean', 'referrer_domain_only' => 'sometimes|boolean', 'pii_scrub' => 'sometimes|boolean',
+            'honor_gpc' => 'sometimes|boolean', 'honor_dnt' => 'sometimes|boolean', 'referrer_domain_only' => 'sometimes|boolean', 'pii_scrub' => 'sometimes|boolean', 'bot_filter' => 'sometimes|boolean',
             'location_precision' => 'sometimes|in:city,region,country',
             'min_group_size' => ['sometimes', 'integer', 'between:0,1000', fn ($a, $v, $fail) => (int) $v === 1 ? $fail('Use 0 to turn this off, or at least 2.') : null],
             'url_params' => ['sometimes', 'nullable', 'string', 'max:2000', fn ($a, $v, $fail) => ($problem = UrlParams::problem($v)) ? $fail($problem) : null],
@@ -118,6 +118,7 @@ class SiteController extends Controller
         DB::table('annotations')->where('site_id', $site->id)->delete();
         DB::table('report_subscriptions')->where('site_id', $site->id)->delete();
         DB::table('alert_rules')->where('site_id', $site->id)->delete();
+        DB::table('filtered_hits')->where('site_id', $site->id)->delete();
         DB::table('alert_webhooks')->where('site_id', $site->id)->delete();
         foreach (['funnels', 'segments', 'goals', 'sharedLinks', 'shields'] as $rel) {
             $site->{$rel}()->delete();
@@ -143,6 +144,7 @@ class SiteController extends Controller
     private function wipe(string $id): void
     {
         DB::table('pii_masks')->where('site_id', $id)->delete();
+        DB::table('filtered_hits')->where('site_id', $id)->delete();
         $db = Sql::connection();
         foreach (['event_props', 'events', 'visits'] as $t) {
             $db->table($t)->where('site_id', $id)->delete();
@@ -154,7 +156,7 @@ class SiteController extends Controller
         $role ??= $site->roleOf($user);
         $first = (new Stats($site))->firstVisitAt();
 
-        return $site->only(['id', 'domain', 'timezone', 'public', 'track_outbound', 'track_downloads', 'track_forms', 'honor_gpc', 'honor_dnt', 'location_precision', 'url_params', 'referrer_domain_only', 'min_group_size', 'pii_scrub']) + ['rollup' => $site->isRollup() ? ['all' => $site->rollup_all, 'sites' => $site->rollupMembers()->orderBy('domain')->get(['sites.id', 'sites.domain'])->map->only(['id', 'domain'])->all(), 'count' => count($site->memberSiteIds())] : null] + [
+        return $site->only(['id', 'domain', 'timezone', 'public', 'track_outbound', 'track_downloads', 'track_forms', 'honor_gpc', 'honor_dnt', 'location_precision', 'url_params', 'referrer_domain_only', 'min_group_size', 'pii_scrub', 'bot_filter']) + ['rollup' => $site->isRollup() ? ['all' => $site->rollup_all, 'sites' => $site->rollupMembers()->orderBy('domain')->get(['sites.id', 'sites.domain'])->map->only(['id', 'domain'])->all(), 'count' => count($site->memberSiteIds())] : null] + [
             'role' => $role,
             'can_manage' => in_array($role, ['owner', 'admin'], true),
             'is_owner' => $role === 'owner',

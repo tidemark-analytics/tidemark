@@ -36,7 +36,7 @@ class FunnelsAndRevenueTest extends TestCase
 
     private function hit(string $visitor, array $payload = [])
     {
-        return $this->call('POST', '/api/event', [], [], [], $this->transformHeadersToServerVars(['User-Agent' => self::CHROME, 'Content-Type' => 'text/plain', 'X-Forwarded-For' => $visitor]),
+        return $this->call('POST', '/api/event', [], [], [], $this->transformHeadersToServerVars(['Accept-Language' => 'en-US,en;q=0.9', 'User-Agent' => self::CHROME, 'Content-Type' => 'text/plain', 'X-Forwarded-For' => $visitor]),
             json_encode($payload + ['n' => 'pageview', 'u' => 'https://example.com/', 'd' => 'example.com', 'w' => 1920]));
     }
 

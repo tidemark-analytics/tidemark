@@ -120,6 +120,7 @@ Route::middleware('api.auth')->group(function () {
         Route::delete('/alert-webhooks/{webhook}', [AlertController::class, 'destroyWebhook']);
         Route::post('/alert-webhooks/{webhook}/test', [AlertController::class, 'testWebhook'])->middleware('throttle:10,1');
         Route::get('/pii-masks', [S::class, 'piiMasks']);
+        Route::get('/filtered', [S::class, 'filtered']);
         Route::get('/shields', [S::class, 'shields']);
         Route::post('/shields', [S::class, 'createShield']);
         Route::delete('/shields/{rule}', [S::class, 'deleteShield']);

@@ -21,7 +21,7 @@ class PiiScrubberTest extends TestCase
 
     private function hit(array $payload = [], array $headers = [])
     {
-        return $this->call('POST', '/api/event', [], [], [], $this->transformHeadersToServerVars($headers + ['User-Agent' => self::CHROME, 'Content-Type' => 'text/plain']),
+        return $this->call('POST', '/api/event', [], [], [], $this->transformHeadersToServerVars($headers + ['Accept-Language' => 'en-US,en;q=0.9', 'User-Agent' => self::CHROME, 'Content-Type' => 'text/plain']),
             json_encode($payload + ['n' => 'pageview', 'u' => 'https://example.com/', 'd' => 'example.com', 'w' => 1920]));
     }
 

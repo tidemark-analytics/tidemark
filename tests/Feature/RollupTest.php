@@ -163,7 +163,7 @@ class RollupTest extends TestCase
         $a = $this->site('a.example.com');
         $this->postJson('/api/rollups', ['name' => 'network', 'all' => true])->assertCreated();
 
-        $this->call('POST', '/api/event', [], [], [], ['HTTP_USER_AGENT' => 'Mozilla/5.0 (Macintosh) Chrome/124.0 Safari/537.36', 'CONTENT_TYPE' => 'text/plain'], json_encode(['n' => 'pageview', 'u' => 'https://network/', 'd' => 'network']))->assertNotFound();
+        $this->call('POST', '/api/event', [], [], [], ['HTTP_ACCEPT_LANGUAGE' => 'en-US', 'HTTP_USER_AGENT' => 'Mozilla/5.0 (Macintosh) Chrome/124.0 Safari/537.36', 'CONTENT_TYPE' => 'text/plain'], json_encode(['n' => 'pageview', 'u' => 'https://network/', 'd' => 'network']))->assertNotFound();
         $this->assertSame(0, DB::table('events')->count());
 
         $this->postJson('/api/sites/network/reset')->assertUnprocessable();

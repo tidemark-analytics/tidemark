@@ -24,7 +24,7 @@ class CollectTest extends TestCase
 
     private function hit(array $payload = [], array $headers = [], string $ua = self::CHROME)
     {
-        return $this->call('POST', '/api/event', [], [], [], $this->transformHeadersToServerVars($headers + ['User-Agent' => $ua, 'Content-Type' => 'text/plain']),
+        return $this->call('POST', '/api/event', [], [], [], $this->transformHeadersToServerVars($headers + ['Accept-Language' => 'en-US,en;q=0.9', 'User-Agent' => $ua, 'Content-Type' => 'text/plain']),
             json_encode($payload + ['n' => 'pageview', 'u' => 'https://example.com/', 'd' => 'example.com', 'w' => 1920]));
     }
 
@@ -87,7 +87,7 @@ class CollectTest extends TestCase
     {
         $this->site();
         $this->hit(['d' => 'nope.org'])->assertStatus(404);
-        $this->call('POST', '/api/event', [], [], [], $this->transformHeadersToServerVars(['User-Agent' => self::CHROME]), '{"n":"pageview"}')->assertStatus(400);
+        $this->call('POST', '/api/event', [], [], [], $this->transformHeadersToServerVars(['Accept-Language' => 'en-US,en;q=0.9', 'User-Agent' => self::CHROME]), '{"n":"pageview"}')->assertStatus(400);
         $this->hit(['u' => 'javascript:alert(1)'])->assertStatus(400);
         $this->assertSame(0, DB::table('events')->count());
     }

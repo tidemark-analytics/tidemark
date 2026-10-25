@@ -3,6 +3,7 @@
 namespace App\Analytics\Ingest;
 
 use App\Analytics\Support\ExchangeRates;
+use App\Analytics\Support\FilteredHits;
 use App\Analytics\Support\PiiMasks;
 use App\Analytics\Support\PiiScrubber;
 use App\Analytics\Support\Sources;
@@ -51,10 +52,18 @@ class Collector
 
         $ua = (string) $request->userAgent();
         $agent = UserAgent::parse($ua);
-        if ($agent['bot'] && ! config('tidemark.disable_bot_filter')) {
+        $ip = Geo::clientIp($request);
+        parse_str($parts['query'] ?? '', $q);
+        $q = array_map(fn ($v) => is_string($v) ? mb_substr($v, 0, 255) : null, $q);
+        $referrer = $q['ref'] ?? $q['source'] ?? $q['utm_source'] ?? null;
+        $referrer = isset($p['r']) && $p['r'] ? (string) $p['r'] : ($referrer && str_contains($referrer, '.') ? $referrer : null);
+        $visitorId = $this->visitorId($site['id'], $ip, $ua);
+        // crawlers, scripts, data center traffic, referrer spam and floods are left out and only counted, unless the owner turned the filter off
+        if (($site['bot_filter'] ?? true) && ! config('tidemark.disable_bot_filter') && ($why = BotFilter::verdict($request, $ua, $agent, $ip, $referrer, $visitorId))) {
+            FilteredHits::record($site['id'], $why);
+
             return ['status' => 202, 'body' => 'ok'];
         }
-        $ip = Geo::clientIp($request);
         $hostname = strtolower($parts['host'] ?? '');
         $pathname = ($parts['path'] ?? '') === '' ? '/' : $parts['path'];
         if (! empty($p['h']) && ! empty($parts['fragment'])) {
@@ -77,8 +86,6 @@ class Collector
             return ['status' => 202, 'body' => 'ok'];
         }
 
-        parse_str($parts['query'] ?? '', $q);
-        $q = array_map(fn ($v) => is_string($v) ? mb_substr($v, 0, 255) : null, $q);
         $pathname = UrlParams::apply($pathname, $q, $site['url_params'] ?? []); // only what the owner allow-listed; none by default
         // personal data sites send by accident (an email in a URL, a token in a path) is masked before it is stored; only counts are kept
         $masked = [];
@@ -86,8 +93,6 @@ class Collector
             return ($site['pii_scrub'] ?? true) && $v ? PiiScrubber::scrub($v, $masked) : $v;
         };
         $pathname = (string) $clean($pathname);
-        $referrer = $q['ref'] ?? $q['source'] ?? $q['utm_source'] ?? null;
-        $referrer = isset($p['r']) && $p['r'] ? (string) $p['r'] : ($referrer && str_contains($referrer, '.') ? $referrer : null);
         $utm = ['source' => $q['utm_source'] ?? null, 'medium' => $q['utm_medium'] ?? null, 'campaign' => $q['utm_campaign'] ?? null, 'content' => $q['utm_content'] ?? null, 'term' => $q['utm_term'] ?? null];
         $utm = array_map($clean, $utm);
         $src = Sources::classify($referrer, $utm, $site['domain']);
@@ -96,7 +101,7 @@ class Collector
 
         $this->sink->record([
             'site_id' => $site['id'],
-            'visitor_id' => $this->visitorId($site['id'], $ip, $ua),
+            'visitor_id' => $visitorId,
             'at' => now()->format('Y-m-d H:i:s'),
             'name' => mb_substr((string) $clean($name), 0, 120),
             'pathname' => $pathname,
@@ -186,7 +191,7 @@ class Collector
             $found = Cache::remember('tdm:site:'.$candidate, 60, function () use ($candidate) {
                 $site = Site::real()->where('domain', $candidate)->first();
 
-                return $site ? ['id' => $site->id, 'domain' => $site->domain, 'owner_id' => $site->members()->wherePivot('role', 'owner')->value('users.id'), 'honor_gpc' => (bool) $site->honor_gpc, 'honor_dnt' => (bool) $site->honor_dnt, 'location_precision' => $site->location_precision ?: 'city', 'url_params' => UrlParams::parse($site->url_params), 'referrer_domain_only' => (bool) $site->referrer_domain_only, 'pii_scrub' => (bool) ($site->pii_scrub ?? true), 'shields' => $site->shields()->get()->groupBy('type')->map(fn ($g) => $g->pluck('value')->all())->all(), 'currencies' => Schema::hasColumn('goals', 'currency') ? $site->goals()->where('type', 'event')->whereNotNull('currency')->pluck('currency', 'value')->all() : []] : 0;
+                return $site ? ['id' => $site->id, 'domain' => $site->domain, 'owner_id' => $site->members()->wherePivot('role', 'owner')->value('users.id'), 'honor_gpc' => (bool) $site->honor_gpc, 'honor_dnt' => (bool) $site->honor_dnt, 'location_precision' => $site->location_precision ?: 'city', 'url_params' => UrlParams::parse($site->url_params), 'referrer_domain_only' => (bool) $site->referrer_domain_only, 'pii_scrub' => (bool) ($site->pii_scrub ?? true), 'bot_filter' => (bool) ($site->bot_filter ?? true), 'shields' => $site->shields()->get()->groupBy('type')->map(fn ($g) => $g->pluck('value')->all())->all(), 'currencies' => Schema::hasColumn('goals', 'currency') ? $site->goals()->where('type', 'event')->whereNotNull('currency')->pluck('currency', 'value')->all() : []] : 0;
             });
             if ($found) {
                 return $found;
