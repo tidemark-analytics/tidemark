@@ -4,6 +4,8 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [0.31.0] - 2026-10-25
+
 ### Added
 - **MCP server and OpenAPI description.** AI assistants such as Claude can now read a site's stats through a read-only [MCP](https://modelcontextprotocol.io) endpoint at `/api/mcp` (Streamable HTTP, API key as Bearer token, 120 requests a minute). Tools: `list_sites`, `get_stats`, `get_timeseries`, `get_breakdown`, `get_goals`, `list_funnels`, `get_funnel`, `get_current_visitors` and `get_annotations`; every one is read-only and returns aggregates only. Account settings → Security shows the configuration to paste into the assistant. The Stats API and Events API are described in an OpenAPI 3.1 document at `/api/v1/openapi.json`, checked against the real routes by the tests and linted in CI.
 - **Read-only API keys.** New keys can be read-only (the default in Account settings): they can read statistics through the Stats API and MCP and nothing else, unlike full-access keys, which still have the same access as their owner. Existing keys stay full-access (`scope` when creating one through the API).
@@ -20,6 +22,7 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
   - Keep only the referrer's domain, without the path of the page that linked to you.
   - Query parameters to keep: page addresses are still stored without their query string, but an owner can allow-list parameters (such as `page` or `lang`) to see them in the Pages report. They are stored sorted by name so one page is one row, and names that look like they carry a secret or personal data (such as `email` or `token`) are refused.
   - New site settings fields `honor_gpc`, `honor_dnt`, `location_precision`, `url_params` and `referrer_domain_only` in the sites API. Nothing changes for existing sites until a switch is turned on.
+- **Extension points** for hosts that limit features by plan: `App\Contracts\AllowsAlerts` (alert rules and webhooks) and `App\Contracts\EnforcesPiiScrubbing` (masking of personal data always on, with the setting hidden). Without them every site has both, as before. Sections a plan doesn't include (alerts, webhooks, funnels, branding) now show blurred under a lock with an upgrade link, instead of a notice.
 
 ## [0.30.2] - 2026-10-25
 

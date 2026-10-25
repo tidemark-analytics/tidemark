@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Alerts\RuleEvaluator;
 use App\Alerts\WebhookUrl;
+use App\Contracts\AllowsAlerts;
+use App\Contracts\Entitlements;
 use App\Jobs\DeliverWebhook;
 use App\Mail\AlertMail;
 use App\Models\AlertRule;
@@ -11,6 +13,7 @@ use App\Models\AlertWebhook;
 use App\Models\Goal;
 use App\Models\Site;
 use App\Models\User;
+use App\Support\DefaultEntitlements;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Factory;
@@ -348,5 +351,51 @@ class AlertsTest extends TestCase
         Http::fake();
         $this->as($this->owner)->postJson("/api/sites/example.com/alert-webhooks/$hook/test")->assertOk()->assertJson(['ok' => false, 'status' => 0]);
         Http::assertNothingSent();
+    }
+
+    // ------------------------------------------------------------------------------------------------ plans
+    private function withoutAlerts(): void
+    {
+        $this->app->instance(Entitlements::class, new class extends DefaultEntitlements implements AllowsAlerts
+        {
+            public function allowsAlerts(Site $site): bool
+            {
+                return false;
+            }
+        });
+    }
+
+    public function test_a_plan_without_alerts_cannot_create_them_but_can_clean_up(): void
+    {
+        $hook = AlertWebhook::create(['site_id' => $this->site->id, 'name' => 'H', 'kind' => 'generic', 'url' => self::HOOK, 'secret' => 's']);
+        $rule = $this->rule('traffic_spike', ['percent' => 100, 'min_visitors' => 50], ['webhook_ids' => [$hook->id]]);
+        $this->withoutAlerts();
+        $base = '/api/sites/example.com';
+
+        $this->as($this->owner)->getJson("$base/alerts")->assertOk()->assertJsonPath('allowed', false)->assertJsonCount(1, 'rules');
+        $this->as($this->owner)->getJson($base)->assertJsonPath('data.features.alerts', false);
+        $this->as($this->owner)->postJson("$base/alert-rules", ['type' => 'traffic_spike', 'email' => true])->assertForbidden();
+        $this->as($this->owner)->postJson("$base/alert-webhooks", ['name' => 'N', 'kind' => 'slack', 'url' => self::HOOK])->assertForbidden();
+        $this->as($this->owner)->patchJson("$base/alert-rules/{$rule->id}", ['enabled' => true])->assertForbidden();
+        $this->as($this->owner)->postJson("$base/alert-webhooks/{$hook->id}/test")->assertForbidden();
+
+        $this->as($this->owner)->patchJson("$base/alert-rules/{$rule->id}", ['enabled' => false])->assertOk();
+        $this->as($this->owner)->deleteJson("$base/alert-rules/{$rule->id}")->assertOk();
+        $this->as($this->owner)->deleteJson("$base/alert-webhooks/{$hook->id}")->assertOk();
+    }
+
+    public function test_rules_of_a_plan_without_alerts_are_paused_not_deleted(): void
+    {
+        $this->usual(10);
+        $this->visits('2026-11-11', 100);
+        $rule = $this->rule('traffic_spike', ['percent' => 100, 'min_visitors' => 50]);
+        $this->withoutAlerts();
+        $this->artisan('alerts:run')->assertSuccessful();
+        Mail::assertNothingSent();
+        $this->assertTrue($rule->refresh()->enabled);
+
+        $this->app->instance(Entitlements::class, new DefaultEntitlements);
+        $this->artisan('alerts:run');
+        Mail::assertSent(AlertMail::class, 1);
     }
 }
