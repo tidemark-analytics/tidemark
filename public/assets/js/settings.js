@@ -160,10 +160,11 @@ function Branding({ site, reload }) {
   const [color, setColor] = useState(b.color || '');
   const [busy, setBusy] = useState(false);
   const valid = color === '' || /^#[0-9a-fA-F]{6}$/.test(color);
-  const changed = name !== (b.name || '') || color !== (b.color || '');
+  const [hideName, setHideName] = useState(!!b.hide_name);
+  const changed = name !== (b.name || '') || color !== (b.color || '') || hideName !== !!b.hide_name;
   const shown = (() => { if (!valid || !color) return { changed: false }; const l = brandTheme(color, false); const d = brandTheme(color, true); return { changed: l.changed || d.changed, light: l.accent, dark: d.accent }; })();
   const run = async (fn, ok) => { setBusy(true); try { await fn(); reload(); toast(ok); } catch (x) { toast(firstError(x), 'err'); } setBusy(false); };
-  const save = () => run(() => api(`/sites/${site.domain}/branding`, { method: 'PATCH', body: { brand_name: name.trim(), brand_color: color } }), 'Saved');
+  const save = () => run(() => api(`/sites/${site.domain}/branding`, { method: 'PATCH', body: { brand_name: name.trim(), brand_color: color, brand_hide_name: hideName } }), 'Saved');
   const upload = (e) => {
     const f = e.target.files && e.target.files[0];
     e.target.value = '';
@@ -187,7 +188,9 @@ function Branding({ site, reload }) {
                 <label class=${'btn sm' + (off || busy ? ' disabled' : '')}>${b.has_logo ? 'Replace logo' : 'Upload logo'}<input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" hidden disabled=${off || busy} onChange=${upload} /></label>
                 ${b.has_logo && html`<button class="btn sm ghost danger" disabled=${off || busy} onClick=${() => run(() => api(`/sites/${site.domain}/branding/logo`, { method: 'DELETE' }), 'Logo removed')}>Remove</button>`}</div>
                 <span class="help">PNG, JPEG, WebP or SVG, up to 100 KB. A wide logo about 28 pixels tall works best.</span></div></div></div>
-          <${Field} label="Display name" help="Shown in the header next to (or instead of) the logo. Leave empty to keep the Tidemark logo."><input value=${name} maxlength="60" disabled=${off} onInput=${(e) => setName(e.target.value)} placeholder=${site.domain} /><//>
+          <${Field} label="Display name" help=${hideName && b.has_logo ? 'Not shown in the header. Visitors who use a screen reader or have images turned off get it as the logo’s description.' : 'Shown in the header next to (or instead of) the logo. Leave empty to keep the Tidemark logo.'}><input value=${name} maxlength="60" disabled=${off} onInput=${(e) => setName(e.target.value)} placeholder=${site.domain} /><//>
+          <div class="bf-field"><label class="check"><input type="checkbox" checked=${hideName && !!b.has_logo} disabled=${off || !b.has_logo} onChange=${(e) => setHideName(e.target.checked)} />Show only the logo, not the name</label>
+            <span class="help">${b.has_logo ? 'For a wordmark that already includes your name. The name above becomes the logo’s alt text.' : 'Upload a logo first. Without one, the name is what visitors see.'}</span></div>
           <div class="bf-field"><span class="lbl">Brand color</span>
             <div class="swatches" role="group" aria-label="Preset colors">${BRAND_PRESETS.map((c) => html`<button type="button" class=${'swatch' + (color.toLowerCase() === c ? ' on' : '')} style=${`--sw:${c}`} disabled=${off} aria-label=${'Use ' + c} title=${c} onClick=${() => setColor(c)}></button>`)}</div>
             <div class="row">
@@ -201,7 +204,7 @@ function Branding({ site, reload }) {
         </div>
         <div class="brand-side"><span class="lbl">Preview</span>
           <div class="bp" style=${`--bc:${accent}`} aria-hidden="true">
-            <div class="bp-head">${logo ? html`<img src=${logo} alt="" />` : ''}<b>${name.trim() || (logo ? '' : site.domain)}</b><span class="bp-btn">Sign in</span></div>
+            <div class="bp-head">${logo ? html`<img src=${logo} alt="" />` : ''}<b>${hideName && logo ? '' : (name.trim() || (logo ? '' : site.domain))}</b><span class="bp-btn">Sign in</span></div>
             <div class="bp-body"><div class="bp-k"><em>Unique visitors</em><b>3,254</b></div>
               <svg viewBox="0 0 200 56" preserveAspectRatio="none"><path d="M0 44 L20 38 L40 40 L60 26 L80 30 L100 18 L120 24 L140 12 L160 20 L180 8 L200 14 L200 56 L0 56Z" class="a"/><path d="M0 44 L20 38 L40 40 L60 26 L80 30 L100 18 L120 24 L140 12 L160 20 L180 8 L200 14" class="l"/></svg></div>
             <div class="bp-foot">Analytics by Tidemark</div></div>

@@ -16,13 +16,13 @@ class Site extends Model
 {
     use HasUuids;
 
-    protected $fillable = ['kind', 'rollup_all', 'domain', 'timezone', 'public', 'track_outbound', 'track_downloads', 'track_forms', 'brand_name', 'brand_color', 'brand_logo', 'brand_logo_mime'];
+    protected $fillable = ['kind', 'rollup_all', 'domain', 'timezone', 'public', 'track_outbound', 'track_downloads', 'track_forms', 'brand_name', 'brand_hide_name', 'brand_color', 'brand_logo', 'brand_logo_mime'];
 
     protected $hidden = ['brand_logo'];
 
     protected function casts(): array
     {
-        return ['rollup_all' => 'boolean', 'public' => 'boolean', 'track_outbound' => 'boolean', 'track_downloads' => 'boolean', 'track_forms' => 'boolean', 'imported_start' => 'date', 'imported_end' => 'date'];
+        return ['rollup_all' => 'boolean', 'public' => 'boolean', 'track_outbound' => 'boolean', 'track_downloads' => 'boolean', 'track_forms' => 'boolean', 'brand_hide_name' => 'boolean', 'imported_start' => 'date', 'imported_end' => 'date'];
     }
 
     public function members(): BelongsToMany
@@ -170,7 +170,9 @@ class Site extends Model
      * The branding public pages should show, or null for the default Tidemark look. The logo is a data URI so it travels with
      * the site's own (already access-checked) response.
      *
-     * @return array{name:?string,color:?string,logo:?string}|null
+     * `hide_name` only applies when there is a logo: the name then becomes the logo's alt text instead of visible text.
+     *
+     * @return array{name:?string,color:?string,logo:?string,has_logo:bool,hide_name:bool}|null
      */
     public function brand(bool $withLogo = true): ?array
     {
@@ -183,6 +185,7 @@ class Site extends Model
             'color' => $this->brand_color,
             'logo' => $withLogo && $this->brand_logo ? 'data:'.$this->brand_logo_mime.';base64,'.$this->brand_logo : null,
             'has_logo' => (bool) $this->brand_logo,
+            'hide_name' => (bool) $this->brand_hide_name && (bool) $this->brand_logo,
         ];
     }
 

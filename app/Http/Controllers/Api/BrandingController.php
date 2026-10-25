@@ -21,6 +21,7 @@ class BrandingController extends Controller
         }
         $data = $request->validate([
             'brand_name' => 'sometimes|nullable|string|max:60',
+            'brand_hide_name' => 'sometimes|boolean',
             'brand_color' => ['sometimes', 'nullable', 'regex:/^#[0-9a-fA-F]{6}$/'],
         ], ['brand_color.regex' => 'Use a color like #0e7c86.']);
         $site->update(array_map(fn ($v) => $v === '' ? null : $v, $data));

@@ -35,7 +35,7 @@ function TopBar({ user, shared }) {
   const brand = useBrand();
   const custom = !user && brand && (brand.logo || brand.name);
   return html`<a class="skip" href="#main" onClick=${(e) => { e.preventDefault(); const t = document.getElementById('main'); t && (t.setAttribute('tabindex', '-1'), t.focus()); }}>Skip to content</a><header class="topbar"><div class="topbar-in">
-    ${custom ? html`<span class="brand custom">${brand.logo && html`<img class="brand-logo" src=${brand.logo} alt=${brand.name || ''} />`}${brand.name && html`<span class="brand-name">${brand.name}</span>`}</span>`
+    ${custom ? html`<span class="brand custom">${brand.logo && html`<img class="brand-logo" src=${brand.logo} alt=${brand.name || ''} />`}${brand.name && !(brand.hide_name && brand.logo) && html`<span class="brand-name">${brand.name}</span>`}</span>`
       : html`<${Link} to=${user ? '/sites' : '/login'} class="brand" aria-label="Tidemark home"><${Lockup} size=${24} /><//>`}
     ${shared && html`<span class="pill">Shared view</span>`}
     <span class="grow"></span>
