@@ -31,7 +31,7 @@ class SmallGroupsTest extends TestCase
         $n = 0;
         foreach ([['DE', 'Berlin', 12], ['FR', 'Paris', 6], ['IS', 'Reykjavik', 2], ['FJ', 'Suva', 1]] as [$country, $city, $count]) {
             for ($i = 0; $i < $count; $i++) {
-                $this->call('POST', '/api/event', [], [], [], $this->transformHeadersToServerVars(['User-Agent' => self::CHROME, 'Content-Type' => 'text/plain', 'CF-Connecting-IP' => '203.0.113.'.(++$n), 'CF-IPCountry' => $country, 'CF-IPCity' => $city]),
+                $this->call('POST', '/api/event', [], [], [], $this->transformHeadersToServerVars(['Accept-Language' => 'en-US,en;q=0.9', 'User-Agent' => self::CHROME, 'Content-Type' => 'text/plain', 'CF-Connecting-IP' => '203.0.113.'.(++$n), 'CF-IPCountry' => $country, 'CF-IPCity' => $city]),
                     json_encode(['n' => 'pageview', 'u' => 'https://example.com/'.strtolower($city), 'd' => 'example.com', 'w' => 1920]))->assertStatus(202);
             }
         }

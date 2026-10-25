@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Analytics\Support\FilteredHits;
 use App\Analytics\Support\PiiMasks;
 use App\Analytics\Support\Sql;
 use App\Http\Controllers\Controller;
@@ -191,6 +192,12 @@ class SettingsController extends Controller
     public function piiMasks(Request $request)
     {
         return ['days' => 30, 'results' => PiiMasks::recent($request->attributes->get('site')->id)];
+    }
+
+    /** How many hits bot filtering left out in the last 30 days, by reason (never anything about who sent them). */
+    public function filtered(Request $request)
+    {
+        return ['days' => 30, 'results' => FilteredHits::recent($request->attributes->get('site')->id)];
     }
 
     public function shields(Request $r)

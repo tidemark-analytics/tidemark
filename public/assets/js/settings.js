@@ -120,6 +120,21 @@ function PrivacyControls({ site, reload }) {
     ${err && html`<div class="alert">${err}</div>`}<//>`;
 }
 
+/** Crawlers, scripts, data center traffic, referrer spam and floods: left out of the numbers and counted here. */
+function BotFiltering({ site, reload }) {
+  const filtered = useApi(`/sites/${site.domain}/filtered`, null, []);
+  const [err, setErr] = useState(null);
+  const patch = async (body) => { setErr(null); try { await api(`/sites/${site.domain}`, { method: 'PATCH', body }); reload(); toast('Saved'); } catch (x) { setErr(firstError(x)); } };
+  const names = { crawler: 'crawlers and known bots', headless: 'headless browsers and scripts', referrer_spam: 'referrer spam', datacenter: 'data center traffic', flood: 'floods from one visitor' };
+  const rows = (filtered.data && filtered.data.results) || [];
+  const total = rows.reduce((n, r) => n + r.count, 0);
+  return html`<${Section} title="Bot and spam filtering" help="Hits that don't come from a person's browser are left out of your numbers, using only what the request already carries (never stored): known crawlers, headless browsers, addresses of cloud and hosting providers, referrer spam and sudden floods from a single visitor. Lists of providers and spam domains are updated with each release.">
+    <${Toggle} label="Filter bots and spam" help="Turn it off to count everything, for example while testing from a script or a server." checked=${site.bot_filter !== false} onChange=${(v) => patch({ bot_filter: v })} />
+    ${err && html`<div class="alert">${err}</div>`}
+    ${filtered.data && html`<p class="muted small" style="margin:-4px 0 4px 46px">${total === 0 ? 'Nothing was filtered in the last 30 days.' : `Filtered in the last 30 days: ${total.toLocaleString()} (${rows.map((r) => `${r.count.toLocaleString()} ${names[r.reason] || r.reason}`).join(', ')}). Only these counts are kept.`}</p>`}
+  <//>`;
+}
+
 /** How visits get in: the snippet, its extensions and the rules that drop traffic you don't want counted. */
 function Tracking({ site, reload }) {
   const patch = async (body) => { try { await api(`/sites/${site.domain}`, { method: 'PATCH', body }); reload(); toast('Saved'); } catch (x) { toast(firstError(x), 'err'); } };
@@ -129,6 +144,7 @@ function Tracking({ site, reload }) {
       <${Toggle} label="File downloads" checked=${site.track_downloads} onChange=${(v) => patch({ track_downloads: v })} />
       <${Toggle} label="Form submissions" checked=${site.track_forms} onChange=${(v) => patch({ track_forms: v })} /><//>
     ${!site.rollup && site.can_manage && html`<${PrivacyControls} site=${site} reload=${reload} />`}
+    ${!site.rollup && site.can_manage && html`<${BotFiltering} site=${site} reload=${reload} />`}
     <${Shields} site=${site} />`;
 }
 
