@@ -151,7 +151,7 @@ class SiteController extends Controller
             'features' => ['funnels' => $site->funnelsAllowed(), 'revenue' => $site->revenueAllowed(), 'segments' => $site->segmentsAllowed(), 'journeys' => $site->journeysAllowed()],
             'imported' => $site->imported_from ? ['from' => $site->imported_from, 'start' => $site->imported_start?->toDateString(), 'end' => $site->imported_end?->toDateString()] : null,
         ] + (in_array($role, ['owner', 'admin'], true) ? ['branding' => [
-            'allowed' => $site->brandingAllowed(), 'name' => $site->brand_name, 'color' => $site->brand_color, 'has_logo' => (bool) $site->brand_logo,
+            'allowed' => $site->brandingAllowed(), 'name' => $site->brand_name, 'color' => $site->brand_color, 'has_logo' => (bool) $site->brand_logo, 'hide_name' => (bool) $site->brand_hide_name,
         ]] : []);
     }
 }

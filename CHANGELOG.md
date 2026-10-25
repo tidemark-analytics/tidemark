@@ -4,6 +4,11 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [0.29.0] - 2026-11-07
+
+### Added
+- Branding has a “Show only the logo, not the name” option for a wordmark that already includes the name. The name is then used as the logo’s alt text instead of showing beside it.
+
 ## [0.28.3] - 2026-11-07
 
 ### Changed

@@ -428,7 +428,7 @@ export function Dashboard({ domain, shared }) {
   useDocTitle(domain);
   // visitors to a public or shared dashboard see the site's own branding; signed-in members keep the normal look
   const brand = !user && s ? s.brand : null;
-  useEffect(() => { setBrand(brand); return () => setBrand(null); }, [brand && brand.color, brand && brand.name, brand && brand.has_logo, brand && brand.logo && brand.logo.length]);
+  useEffect(() => { setBrand(brand); return () => setBrand(null); }, [brand && brand.color, brand && brand.name, brand && brand.has_logo, brand && brand.hide_name, brand && brand.logo && brand.logo.length]);
   useEffect(() => {
     // arriving from another page of the site via a sidebar section link
     if (!s || !window.__tdmJump) return;
