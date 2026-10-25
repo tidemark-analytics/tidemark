@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Analytics\Support\PiiMasks;
 use App\Analytics\Support\Sql;
 use App\Http\Controllers\Controller;
 use App\Models\Funnel;
@@ -186,6 +187,12 @@ class SettingsController extends Controller
     }
 
     // ---- shields (block lists) ---------------------------------------------------------------------------
+    /** How many values were masked in the last 30 days, by kind (never the values). */
+    public function piiMasks(Request $request)
+    {
+        return ['days' => 30, 'results' => PiiMasks::recent($request->attributes->get('site')->id)];
+    }
+
     public function shields(Request $r)
     {
         return ['data' => $r->attributes->get('site')->shields()->orderBy('created_at')->get()];
