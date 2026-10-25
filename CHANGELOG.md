@@ -4,6 +4,11 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [0.28.3] - 2026-11-07
+
+### Changed
+- The sign-in pages use a wave pattern that spans the full width of any screen, in place of the contour lines with depth numbers, which stopped short of the edges on large, high-resolution displays.
+
 ## [0.28.2] - 2026-11-07
 
 ### Fixed
