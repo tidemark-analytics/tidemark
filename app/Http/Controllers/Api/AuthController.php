@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password as PasswordBroker;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 
@@ -219,8 +220,8 @@ class AuthController extends Controller
 
     public function createKey(Request $request)
     {
-        $data = $request->validate(['name' => 'required|string|max:100']);
-        [$key, $plain] = ApiKey::issue($request->user(), $data['name']);
+        $data = $request->validate(['name' => 'required|string|max:100', 'scope' => ['sometimes', Rule::in(ApiKey::SCOPES)]]);
+        [$key, $plain] = ApiKey::issue($request->user(), $data['name'], $data['scope'] ?? 'full');
 
         return response()->json(['data' => $key, 'token' => $plain], 201);
     }
