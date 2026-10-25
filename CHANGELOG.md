@@ -4,6 +4,8 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [0.30.1] - 2026-10-25
+
 ### Fixed
 - Typing in a chat widget on a dashboard no longer triggers the dashboard's keyboard shortcuts.
 
