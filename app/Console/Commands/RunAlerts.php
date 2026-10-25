@@ -17,11 +17,15 @@ class RunAlerts extends Command
     public function handle(RuleEvaluator $evaluator, AlertDispatcher $dispatcher): int
     {
         $fired = 0;
+        $allowed = [];
         foreach (AlertRule::with('site')->where('enabled', true)->cursor() as $rule) {
             $site = $rule->site;
             if (! $site) {
                 $rule->delete();
 
+                continue;
+            }
+            if (! ($allowed[$site->id] ??= $site->alertsAllowed())) { // a plan without alerts pauses its rules; they are kept
                 continue;
             }
             $now = CarbonImmutable::now($site->timezone);

@@ -21,6 +21,7 @@ class AlertController extends Controller
         $site = $r->attributes->get('site');
 
         return [
+            'allowed' => $site->alertsAllowed(),
             'mail' => AuthController::mailConfigured(),
             'private_allowed' => (bool) config('tidemark.webhooks.allow_private'),
             'rules' => AlertRule::where('site_id', $site->id)->orderBy('created_at')->get()->map(fn ($x) => self::rule($x))->values(),
@@ -39,8 +40,15 @@ class AlertController extends Controller
     }
 
     // ------------------------------------------------------------------------------------------------ rules
+    /** Alerts come with some plans only; whoever lost access can still switch rules off and delete them. */
+    private function requireAlerts(Request $r): void
+    {
+        abort_unless($r->attributes->get('site')->alertsAllowed(), 403, 'Alerts and webhooks are included with Pro.');
+    }
+
     public function storeRule(Request $r)
     {
+        $this->requireAlerts($r);
         $site = $r->attributes->get('site');
         abort_if(AlertRule::where('site_id', $site->id)->count() >= AlertRule::MAX_PER_SITE, 422, 'A site can have up to '.AlertRule::MAX_PER_SITE.' alert rules.');
         $rule = AlertRule::create($this->ruleData($r, $site, requireType: true) + ['site_id' => $site->id]);
@@ -51,6 +59,9 @@ class AlertController extends Controller
     public function updateRule(Request $r, string $site, string $rule)
     {
         $s = $r->attributes->get('site');
+        if (! $s->alertsAllowed() && $r->input('enabled') !== false) {
+            $this->requireAlerts($r);
+        }
         $model = AlertRule::where('site_id', $s->id)->findOrFail($rule);
         $data = $this->ruleData($r, $s, requireType: false, current: $model);
         // a changed condition starts from a clean slate
@@ -139,6 +150,7 @@ class AlertController extends Controller
     // ------------------------------------------------------------------------------------------------ webhooks
     public function storeWebhook(Request $r)
     {
+        $this->requireAlerts($r);
         $site = $r->attributes->get('site');
         abort_if(AlertWebhook::where('site_id', $site->id)->count() >= AlertWebhook::MAX_PER_SITE, 422, 'A site can have up to '.AlertWebhook::MAX_PER_SITE.' webhooks.');
         $v = $r->validate(['name' => 'required|string|max:80', 'kind' => ['required', Rule::in(AlertWebhook::KINDS)], 'url' => 'required|string|max:1000']);
@@ -152,6 +164,7 @@ class AlertController extends Controller
 
     public function updateWebhook(Request $r, string $site, string $webhook)
     {
+        $this->requireAlerts($r);
         $hook = AlertWebhook::where('site_id', $r->attributes->get('site')->id)->findOrFail($webhook);
         $v = $r->validate(['name' => 'sometimes|string|max:80', 'url' => 'sometimes|string|max:1000']);
         if (isset($v['url'])) {
@@ -179,6 +192,7 @@ class AlertController extends Controller
     /** Sends a sample alert right away and reports what the other end answered. */
     public function testWebhook(Request $r, string $site, string $webhook)
     {
+        $this->requireAlerts($r);
         $s = $r->attributes->get('site');
         $hook = AlertWebhook::where('site_id', $s->id)->findOrFail($webhook);
         $status = DeliverWebhook::deliver($hook, AlertDispatcher::payload($s, ['event' => 'test', 'summary' => 'This is a test alert from Tidemark for '.$s->domain.'.', 'data' => (object) []]));

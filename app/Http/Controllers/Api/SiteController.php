@@ -94,6 +94,9 @@ class SiteController extends Controller
             'min_group_size' => ['sometimes', 'integer', 'between:0,1000', fn ($a, $v, $fail) => (int) $v === 1 ? $fail('Use 0 to turn this off, or at least 2.') : null],
             'url_params' => ['sometimes', 'nullable', 'string', 'max:2000', fn ($a, $v, $fail) => ($problem = UrlParams::problem($v)) ? $fail($problem) : null],
         ]);
+        if (Site::piiScrubEnforced()) { // not the owner's choice here: ignored rather than refused, so clients that send everything keep working
+            unset($data['pii_scrub']);
+        }
         if (array_key_exists('url_params', $data)) {
             $data['url_params'] = UrlParams::normalize($data['url_params']);
         }
@@ -156,7 +159,7 @@ class SiteController extends Controller
         $role ??= $site->roleOf($user);
         $first = (new Stats($site))->firstVisitAt();
 
-        return $site->only(['id', 'domain', 'timezone', 'public', 'track_outbound', 'track_downloads', 'track_forms', 'honor_gpc', 'honor_dnt', 'location_precision', 'url_params', 'referrer_domain_only', 'min_group_size', 'pii_scrub', 'bot_filter']) + ['rollup' => $site->isRollup() ? ['all' => $site->rollup_all, 'sites' => $site->rollupMembers()->orderBy('domain')->get(['sites.id', 'sites.domain'])->map->only(['id', 'domain'])->all(), 'count' => count($site->memberSiteIds())] : null] + [
+        return $site->only(['id', 'domain', 'timezone', 'public', 'track_outbound', 'track_downloads', 'track_forms', 'honor_gpc', 'honor_dnt', 'location_precision', 'url_params', 'referrer_domain_only', 'min_group_size', ...(Site::piiScrubEnforced() ? [] : ['pii_scrub']), 'bot_filter']) + ['rollup' => $site->isRollup() ? ['all' => $site->rollup_all, 'sites' => $site->rollupMembers()->orderBy('domain')->get(['sites.id', 'sites.domain'])->map->only(['id', 'domain'])->all(), 'count' => count($site->memberSiteIds())] : null] + [
             'role' => $role,
             'can_manage' => in_array($role, ['owner', 'admin'], true),
             'is_owner' => $role === 'owner',
@@ -164,7 +167,7 @@ class SiteController extends Controller
             'has_data' => $first !== null,
             'first_visit_at' => $first?->toIso8601String(),
             'brand' => $site->brand(),
-            'features' => ['funnels' => $site->funnelsAllowed(), 'revenue' => $site->revenueAllowed(), 'segments' => $site->segmentsAllowed(), 'journeys' => $site->journeysAllowed()],
+            'features' => ['funnels' => $site->funnelsAllowed(), 'revenue' => $site->revenueAllowed(), 'segments' => $site->segmentsAllowed(), 'journeys' => $site->journeysAllowed(), 'alerts' => $site->alertsAllowed(), 'pii_scrub' => ! Site::piiScrubEnforced()],
             'imported' => $site->imported_from ? ['from' => $site->imported_from, 'start' => $site->imported_start?->toDateString(), 'end' => $site->imported_end?->toDateString()] : null,
         ] + (in_array($role, ['owner', 'admin'], true) ? ['branding' => [
             'allowed' => $site->brandingAllowed(), 'name' => $site->brand_name, 'color' => $site->brand_color, 'has_logo' => (bool) $site->brand_logo, 'hide_name' => (bool) $site->brand_hide_name,

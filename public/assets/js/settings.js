@@ -106,12 +106,13 @@ function PrivacyControls({ site, reload }) {
   const [err, setErr] = useState(null);
   const patch = async (body) => { setErr(null); try { await api(`/sites/${site.domain}`, { method: 'PATCH', body }); reload(); toast('Saved'); } catch (x) { setErr(firstError(x)); } };
   const places = [['city', 'Country, region and city'], ['region', 'Country and region'], ['country', 'Country only']];
-  const masks = useApi(`/sites/${site.domain}/pii-masks`, null, []);
+  const scrubChoice = (site.features || {}).pii_scrub !== false; // a host can require masking and hide the setting
+  const masks = useApi(`/sites/${site.domain}/pii-masks`, null, [], { enabled: scrubChoice });
   const kinds = { email: ['email address', 'email addresses'], uuid: ['UUID', 'UUIDs'], number: ['long number', 'long numbers'], token: ['token', 'tokens'] };
   const masked = ((masks.data && masks.data.results) || []).map((r) => { const k = kinds[r.pattern] || [r.pattern, r.pattern]; return `${r.count.toLocaleString()} ${r.count === 1 ? k[0] : k[1]}`; }).join(', ');
   return html`<${Section} title="Privacy controls" help="Tidemark already sets no cookies, stores no IP addresses and drops query strings. These switches let you collect even less.">
-    <${Toggle} label="Mask personal data sent by accident" help="Email addresses, tokens, UUIDs and long numbers in page addresses, referrers, campaign values, event names and properties are replaced with a placeholder such as [email] before anything is stored. Ordinary page names and short ids are left alone." checked=${site.pii_scrub} onChange=${(v) => patch({ pii_scrub: v })} />
-    ${masked && html`<p class="muted small" style="margin:-4px 0 4px 46px">Masked in the last 30 days: ${masked}. Only these counts are kept, never the values.</p>`}
+    ${scrubChoice && html`<${Toggle} label="Mask personal data sent by accident" help="Email addresses, tokens, UUIDs and long numbers in page addresses, referrers, campaign values, event names and properties are replaced with a placeholder such as [email] before anything is stored. Ordinary page names and short ids are left alone." checked=${site.pii_scrub} onChange=${(v) => patch({ pii_scrub: v })} />`}
+    ${scrubChoice && masked && html`<p class="muted small" style="margin:-4px 0 4px 46px">Masked in the last 30 days: ${masked}. Only these counts are kept, never the values.</p>`}
     <${Toggle} label="Respect Global Privacy Control" help="Visitors whose browser sends the Global Privacy Control signal are not counted." checked=${site.honor_gpc} onChange=${(v) => patch({ honor_gpc: v })} />
     <${Toggle} label="Respect Do Not Track" help="Visitors whose browser sends Do Not Track are not counted." checked=${site.honor_dnt} onChange=${(v) => patch({ honor_dnt: v })} />
     <${Toggle} label="Keep only the referrer's domain" help="Record news.example.org instead of news.example.org/story/42." checked=${site.referrer_domain_only} onChange=${(v) => patch({ referrer_domain_only: v })} />
@@ -532,6 +533,7 @@ function Alerts({ site }) {
   const [err, setErr] = useState(null);
   const [testing, setTesting] = useState(null);
   const d = res.data;
+  const locked = !!d && d.allowed === false;
   const rules = (d && d.rules) || [];
   const hooks = (d && d.webhooks) || [];
   const goals = (goalsRes.data && goalsRes.data.data) || [];
@@ -540,32 +542,33 @@ function Alerts({ site }) {
   const addHook = (e) => { e.preventDefault(); act(async () => { const r = await api(`${base}/alert-webhooks`, { method: 'POST', body: hook }); setHook({ name: '', kind: 'generic', url: '' }); setSecret(r.data.secret ? { name: r.data.name, value: r.data.secret } : null); }, 'Webhook added'); };
   const test = async (h) => { setTesting(h.id); setErr(null); try { const r = await api(`${base}/alert-webhooks/${h.id}/test`, { method: 'POST' }); toast(r.ok ? 'Test alert delivered' : 'Not delivered: ' + (r.error || 'HTTP ' + r.status), r.ok ? undefined : 'err'); res.reload(); } catch (x) { setErr(firstError(x)); } setTesting(null); };
   return html`<${Section} title="Alerts" help="Get told when something is worth a look: a spike or drop in visitors, a goal reaching a number, or a brand new traffic source. Alerts carry totals only, never anything about a visitor. Rules are checked every five minutes.">
-      ${d && !d.mail && html`<div class="notice"><${Icon} name="info" size=${16} /><div>Email isn't set up on this installation, so alerts can only go to webhooks for now.</div></div>`}
+      ${locked && html`<div class="notice"><${Icon} name="info" size=${16} /><div>Alerts and webhooks are included with Pro. <${Link} to="/settings">Open your account settings to upgrade<//>.${rules.length > 0 ? ' Your existing alerts are paused until then.' : ''}</div></div>`}
+      ${d && !d.mail && !locked && html`<div class="notice"><${Icon} name="info" size=${16} /><div>Email isn't set up on this installation, so alerts can only go to webhooks for now.</div></div>`}
       ${err && html`<div class="alert">${err}</div>`}
       ${form ? html`<${RuleForm} site=${site} goals=${goals} hooks=${hooks} mail=${!!(d && d.mail)} rule=${form === 'new' ? null : form} onSaved=${() => { setForm(null); res.reload(); }} onCancel=${() => setForm(null)} />`
-        : html`<div class="section-actions"><button class="btn primary" onClick=${() => setForm('new')}><${Icon} name="plus" size=${14} /> New alert</button></div>`}
-      ${d && rules.length === 0 && !form && html`<div class="empty-inline"><${Icon} name="bell" size=${18} /><div><b>No alerts yet</b><span>Create one to be told when traffic jumps or drops, or when a goal is reached.</span></div></div>`}
+        : html`<div class="section-actions"><button class="btn primary" disabled=${locked} onClick=${() => setForm('new')}><${Icon} name="plus" size=${14} /> New alert</button></div>`}
+      ${d && rules.length === 0 && !form && !locked && html`<div class="empty-inline"><${Icon} name="bell" size=${18} /><div><b>No alerts yet</b><span>Create one to be told when traffic jumps or drops, or when a goal is reached.</span></div></div>`}
       ${rules.length > 0 && html`<ul class="rows" aria-label="Alerts">${rules.map((r) => html`<li class="rowitem" key=${r.id}>
         <span class="ri-ico" aria-hidden="true"><${Icon} name=${ALERT_TYPES[r.type].icon} size=${16} /></span>
         <div class="grow ri-main"><b class="trunc">${ALERT_TYPES[r.type].label}</b><span class="muted">${describeRule(r, goals)} · ${[r.email && 'email', ...r.webhook_ids.map((id) => (hooks.find((h) => h.id === id) || {}).name).filter(Boolean)].filter(Boolean).join(', ') || 'no destination'}${r.quiet_start ? ` · quiet ${r.quiet_start}–${r.quiet_end}` : ''}${r.last_fired_at ? ' · last sent ' + ago(r.last_fired_at) : ''}</span></div>
         <select class="mini-select" style="width:auto" aria-label=${'Turn ' + ALERT_TYPES[r.type].label + ' on or off'} onChange=${(e) => act(() => api(`${base}/alert-rules/${r.id}`, { method: 'PATCH', body: { enabled: e.target.value === 'on' } }))}><option value="on" selected=${r.enabled}>On</option><option value="off" selected=${!r.enabled}>Off</option></select>
-        <button class="btn ghost icon sm" aria-label="Edit alert" title="Edit" onClick=${() => setForm(r)}><${Icon} name="pencil" size=${15} /></button>
+        <button class="btn ghost icon sm" disabled=${locked} aria-label="Edit alert" title="Edit" onClick=${() => setForm(r)}><${Icon} name="pencil" size=${15} /></button>
         <button class="btn ghost icon sm danger" aria-label="Delete alert" title="Delete" onClick=${() => act(() => api(`${base}/alert-rules/${r.id}`, { method: 'DELETE' }))}><${Icon} name="trash-2" size=${15} /></button></li>`)}</ul>`}
     <//>
     <${Section} title="Webhooks" help="Where alerts go besides email. Slack and Discord take their incoming-webhook address. Your own service gets a JSON POST signed with a secret, so you can check it came from Tidemark.${d && d.private_allowed ? '' : ' Addresses must be public https URLs.'}">
-      <form class="goal-add" onSubmit=${addHook}>
+      <form class="goal-add" onSubmit=${addHook}><fieldset disabled=${locked} style="border:0;padding:0;margin:0;display:contents">
         <div class="seg" role="radiogroup" aria-label="Webhook type">${[['generic', 'Signed JSON'], ['slack', 'Slack'], ['discord', 'Discord']].map(([k, l]) => html`<button type="button" role="radio" aria-checked=${hook.kind === k} class=${hook.kind === k ? 'on' : ''} onClick=${() => setHook({ ...hook, kind: k })}>${l}</button>`)}</div>
         <div class="goal-add-row">
           <input required maxlength="80" placeholder="Name, e.g. Team chat" style="width:180px" value=${hook.name} onInput=${(e) => setHook({ ...hook, name: e.target.value })} aria-label="Webhook name" />
           <input class="grow" required type="url" placeholder=${({ generic: 'https://example.com/hooks/tidemark', slack: 'https://hooks.slack.com/services/…', discord: 'https://discord.com/api/webhooks/…' })[hook.kind]} value=${hook.url} onInput=${(e) => setHook({ ...hook, url: e.target.value })} aria-label="Webhook address" />
-          <button class="btn primary">Add webhook</button></div></form>
+          <button class="btn primary">Add webhook</button></div></fieldset></form>
       ${secret && html`<div class="notice"><${Icon} name="info" size=${16} /><div><b>Signing secret for ${secret.name}</b>: copy it now, it is not shown again.<${CodeBlock} text=${secret.value} />
         <p class="muted small">Each request has a <code>Tidemark-Signature: t=timestamp,v1=signature</code> header. The signature is the hex HMAC-SHA256 of <code>timestamp.body</code> with this secret.</p>
         <button class="btn sm" onClick=${() => setSecret(null)}>Done</button></div></div>`}
       ${hooks.length > 0 && html`<ul class="rows" aria-label="Webhooks">${hooks.map((h) => html`<li class="rowitem" key=${h.id}>
         <span class="ri-ico" aria-hidden="true"><${Icon} name="send" size=${16} /></span>
         <div class="grow ri-main"><b class="trunc">${h.name}</b><span class="muted trunc">${({ generic: 'Signed JSON', slack: 'Slack', discord: 'Discord' })[h.kind]} · ${h.url}${h.last_at ? (h.last_error ? ` · last delivery failed (${h.last_error})` : ' · last delivery ok ' + ago(h.last_at)) : ''}</span></div>
-        <button class="btn sm" disabled=${testing === h.id} onClick=${() => test(h)}>Send test</button>
+        <button class="btn sm" disabled=${locked || testing === h.id} onClick=${() => test(h)}>Send test</button>
         <button class="btn ghost icon sm danger" aria-label=${'Delete webhook ' + h.name} title="Delete" onClick=${() => act(() => api(`${base}/alert-webhooks/${h.id}`, { method: 'DELETE' }))}><${Icon} name="trash-2" size=${15} /></button></li>`)}</ul>`}
     <//>`;
 }

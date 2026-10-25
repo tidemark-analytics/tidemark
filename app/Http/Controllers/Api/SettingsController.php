@@ -11,6 +11,7 @@ use App\Models\FunnelStep;
 use App\Models\Goal;
 use App\Models\SharedLink;
 use App\Models\ShieldRule;
+use App\Models\Site;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -191,6 +192,8 @@ class SettingsController extends Controller
     /** How many values were masked in the last 30 days, by kind (never the values). */
     public function piiMasks(Request $request)
     {
+        abort_if(Site::piiScrubEnforced(), 404);
+
         return ['days' => 30, 'results' => PiiMasks::recent($request->attributes->get('site')->id)];
     }
 

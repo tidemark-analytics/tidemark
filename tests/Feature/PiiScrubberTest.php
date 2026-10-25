@@ -4,8 +4,11 @@ namespace Tests\Feature;
 
 use App\Analytics\Support\PiiMasks;
 use App\Analytics\Support\PiiScrubber;
+use App\Contracts\EnforcesPiiScrubbing;
+use App\Contracts\Entitlements;
 use App\Models\Site;
 use App\Models\User;
+use App\Support\DefaultEntitlements;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -161,5 +164,32 @@ class PiiScrubberTest extends TestCase
         $this->postJson('/api/sites/example.com/reset')->assertOk();
 
         $this->assertSame(0, DB::table('pii_masks')->count());
+    }
+
+    public function test_a_host_can_require_masking_and_hide_the_setting(): void
+    {
+        $this->app->instance(Entitlements::class, new class extends DefaultEntitlements implements EnforcesPiiScrubbing
+        {
+            public function enforcesPiiScrubbing(): bool
+            {
+                return true;
+            }
+        });
+        $site = Site::create(['domain' => 'example.com', 'pii_scrub' => false]); // switched off before the host required it
+        $owner = User::create(['name' => 'Owner', 'email' => 'owner@example.com', 'password' => 'password']);
+        $site->members()->attach($owner->id, ['role' => 'owner', 'id' => (string) Str::uuid()]);
+
+        $this->hit(['u' => 'https://example.com/a/x@y.co'])->assertStatus(202);
+        $this->assertSame('/a/[email]', DB::table('events')->value('pathname'), 'masked although the site has it off');
+
+        $this->actingAs($owner)->withHeader('X-Requested-With', 'XMLHttpRequest');
+        $shown = $this->getJson('/api/sites/example.com')->assertOk();
+        $this->assertArrayNotHasKey('pii_scrub', $shown->json('data'));
+        $shown->assertJsonPath('data.features.pii_scrub', false);
+        $this->patchJson('/api/sites/example.com', ['pii_scrub' => false, 'honor_dnt' => true])->assertOk()->assertJsonPath('data.honor_dnt', true);
+        $this->assertFalse((bool) $site->refresh()->pii_scrub, 'the stored choice is left alone, not rewritten');
+        $this->getJson('/api/sites/example.com/pii-masks')->assertNotFound();
+        $this->app->instance(Entitlements::class, new DefaultEntitlements);
+        $this->getJson('/api/sites/example.com')->assertJsonPath('data.features.pii_scrub', true)->assertJsonPath('data.pii_scrub', false);
     }
 }

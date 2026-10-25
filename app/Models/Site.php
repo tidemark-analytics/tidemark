@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use App\Contracts\AllowsAlerts;
 use App\Contracts\AllowsBranding;
 use App\Contracts\AllowsConversionReports;
 use App\Contracts\AllowsExploration;
 use App\Contracts\AllowsRollups;
+use App\Contracts\EnforcesPiiScrubbing;
 use App\Contracts\Entitlements;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
@@ -156,6 +158,22 @@ class Site extends Model
         $entitlements = app(Entitlements::class);
 
         return ! ($entitlements instanceof AllowsExploration) || $entitlements->allowsJourneys($this);
+    }
+
+    /** Whether this site may use alert rules and webhooks (always true unless an extension limits it). */
+    public function alertsAllowed(): bool
+    {
+        $entitlements = app(Entitlements::class);
+
+        return ! ($entitlements instanceof AllowsAlerts) || $entitlements->allowsAlerts($this);
+    }
+
+    /** Whether masking of personal data is always on and not the owner's choice (never, unless an extension requires it). */
+    public static function piiScrubEnforced(): bool
+    {
+        $entitlements = app(Entitlements::class);
+
+        return $entitlements instanceof EnforcesPiiScrubbing && $entitlements->enforcesPiiScrubbing();
     }
 
     /** Whether this site may show its own branding on public pages (always true unless an extension limits it). */
