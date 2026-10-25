@@ -897,6 +897,7 @@ button.fact:hover { border-color: var(--accent); background: var(--surface); }
 .funnel-form { display: flex; flex-direction: column; gap: 14px; padding: 16px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--surface-2) 55%, transparent); }
 .funnel-form > label { max-width: 420px; }
 .alert-nums { display: flex; flex-wrap: wrap; gap: 12px 14px; }
+.alert-quiet { border-top: 1px solid var(--line); padding-top: 16px; }
 .alert-nums > label { width: 210px; max-width: 100%; }
 .steps-edit { display: flex; flex-direction: column; gap: 8px; }
 .steps-edit .lbl { font-size: 13px; font-weight: 560; }

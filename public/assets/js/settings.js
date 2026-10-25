@@ -502,7 +502,7 @@ function RuleForm({ site, goals, hooks, mail, rule, onSaved, onCancel }) {
       <${Toggle} label="Email" help=${mail ? 'The site\'s owners and admins' : 'Email isn\'t set up on this installation yet'} checked=${f.email} disabled=${!mail && !f.email} onChange=${(v) => setF({ ...f, email: v })} />
       ${hooks.map((h) => html`<${Toggle} key=${h.id} label=${h.name} help=${({ generic: 'Signed JSON webhook', slack: 'Slack', discord: 'Discord' })[h.kind]} checked=${f.webhook_ids.includes(h.id)} onChange=${(v) => toggleHook(h.id, v)} />`)}
       ${hooks.length === 0 && html`<span class="muted small">Add a webhook below to send alerts to Slack, Discord or your own service.</span>`}</div>
-    <div class="steps-edit"><${Toggle} label="Quiet hours" help="Nothing is sent in this window, in the site's timezone. Anything still true afterwards is sent then." checked=${f.quiet} onChange=${(v) => setF({ ...f, quiet: v })} />
+    <div class="steps-edit alert-quiet"><span class="lbl">Quiet hours</span><${Toggle} label="Don't send during set hours" help="In the site's timezone. Anything still true afterwards is sent then." checked=${f.quiet} onChange=${(v) => setF({ ...f, quiet: v })} />
       ${f.quiet && html`<div class="alert-nums"><${Field} label="From"><input type="time" required value=${f.quiet_start} onInput=${(e) => setF({ ...f, quiet_start: e.target.value })} /><//><${Field} label="Until"><input type="time" required value=${f.quiet_end} onInput=${(e) => setF({ ...f, quiet_end: e.target.value })} /><//></div>`}</div>
     <div class="row"><button class="btn primary">Save alert</button><button type="button" class="btn" onClick=${onCancel}>Cancel</button></div></form>`;
 }
