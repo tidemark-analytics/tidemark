@@ -13,6 +13,25 @@ export function bucketText(label, interval, long = false) {
   return d.toLocaleDateString(undefined, long ? { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' } : { month: 'short', day: 'numeric' });
 }
 
+/**
+ * Put each note on the bucket that holds its day: the first bucket of that day for hourly charts, otherwise the bucket the day falls in
+ * (a week or a month starts before it). Returns [{ idx, list }] ordered along the axis.
+ */
+export function placeNotes(notes, labels, interval) {
+  const dates = labels.map((l) => l.slice(0, 10));
+  const fine = interval === 'hour' || interval === 'minute';
+  const by = new Map();
+  for (const a of notes || []) {
+    let idx = -1;
+    if (fine) idx = dates.indexOf(a.date);
+    else for (let i = 0; i < dates.length; i++) if (dates[i] <= a.date) idx = i;
+    if (idx < 0) continue;
+    if (!by.has(idx)) by.set(idx, []);
+    by.get(idx).push(a);
+  }
+  return [...by].map(([idx, list]) => ({ idx, list })).sort((a, b) => a.idx - b.idx);
+}
+
 /** Round the axis up to a "nice" step so ticks read 0, 50, 100… not 62.5. Returns [max, step]. */
 function niceScale(v) {
   if (v <= 4) { const m = Math.max(1, Math.ceil(v)); return [m, 1]; }
@@ -38,7 +57,7 @@ export function useWidth() {
  * values/labels: current period. prev/prevLabels: optional comparison series (aligned by index).
  * format(v) renders numbers; interval controls label text.
  */
-export function LineChart({ labels, values, prev, prevLabels, format = fmtShort, name = 'Visitors', interval = 'day', height = 300, live = false }) {
+export function LineChart({ labels, values, prev, prevLabels, format = fmtShort, name = 'Visitors', interval = 'day', height = 300, live = false, annotations = [], onNote }) {
   const [ref, width] = useWidth();
   const [hover, setHover] = useState(null);
   const m = { t: 12, r: 12, b: 28, l: 44 };
@@ -51,6 +70,10 @@ export function LineChart({ labels, values, prev, prevLabels, format = fmtShort,
   const line = (arr) => arr.map((v, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(v).toFixed(1)).join(' ');
   const ticks = Array.from({ length: Math.round(max / step) + 1 }, (_, i) => i * step);
   const every = Math.max(1, Math.ceil(n / Math.max(2, Math.floor(iw / 78))));
+  const notes = useMemo(() => placeNotes(annotations, labels, interval), [annotations, labels, interval]);
+  const hoverNotes = hover === null ? [] : (notes.find((p) => p.idx === hover) || { list: [] }).list;
+  const tipRef = useRef();
+  const [tipH, setTipH] = useState(0); // the tooltip sits above the point, so a tall one (with notes) needs room above it
 
   const move = (e) => {
     const r = e.currentTarget.getBoundingClientRect();
@@ -63,6 +86,7 @@ export function LineChart({ labels, values, prev, prevLabels, format = fmtShort,
     else if (e.key === 'Escape') setHover(null);
   };
   const tipLeft = hover === null ? 0 : Math.min(Math.max(x(hover), 90), W - 90);
+  useEffect(() => { if (tipRef.current) setTipH(tipRef.current.offsetHeight); }, [hover, hoverNotes.length]);
 
   return html`<div class="chart" ref=${ref} style=${`height:${H}px`} tabindex="0" role="img" aria-label=${`${name} over time. Use the arrow keys to read each point.`} onKeyDown=${key} onBlur=${() => setHover(null)}>
     ${width > 0 && html`<svg width=${W} height=${H} onMouseMove=${move} onMouseLeave=${() => setHover(null)} onTouchMove=${move} onTouchEnd=${() => setHover(null)}>
@@ -74,22 +98,28 @@ export function LineChart({ labels, values, prev, prevLabels, format = fmtShort,
       ${n > 1 && html`<path d=${line(values) + ` L${x(n - 1)} ${y(0)} L${x(0)} ${y(0)} Z`} fill="url(#area)" />`}
       <path d=${line(values)} fill="none" stroke="var(--series-1)" stroke-width="2.25" stroke-linejoin="round" stroke-linecap="round" />
       ${n === 1 && html`<circle cx=${x(0)} cy=${y(values[0])} r="4" fill="var(--series-1)" />`}
+      ${notes.map((p) => html`<g class="annot" tabindex="0" role="button" aria-label=${`${p.list.length} ${p.list.length === 1 ? 'note' : 'notes'} on ${bucketText(labels[p.idx], interval, true)}: ${p.list.map((a) => a.note).join('; ')}`}
+        onClick=${(e) => { e.stopPropagation(); onNote && onNote(p); }} onKeyDown=${(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onNote && onNote(p); } }}>
+        <line class="annot-line" x1=${x(p.idx)} x2=${x(p.idx)} y1=${m.t + 6} y2=${y(0)} /><circle class="annot-hit" cx=${x(p.idx)} cy=${m.t + 6} r="11" /><circle class="annot-dot" cx=${x(p.idx)} cy=${m.t + 6} r="5" /></g>`)}
       ${hover !== null && html`<g><line class="cross" x1=${x(hover)} x2=${x(hover)} y1=${m.t} y2=${y(0)} />
         ${prev && prev[hover] !== undefined && html`<circle cx=${x(hover)} cy=${y(prev[hover])} r="4" fill="var(--surface)" stroke="var(--series-2)" stroke-width="2" />`}
         <circle cx=${x(hover)} cy=${y(values[hover])} r="4.5" fill="var(--surface)" stroke="var(--series-1)" stroke-width="2.25" /></g>`}
     </svg>`}
-    ${hover !== null && html`<div class="tooltip" style=${`left:${tipLeft}px;top:${Math.max(0, Math.min(y(values[hover]), y(prev && prev[hover] !== undefined ? prev[hover] : values[hover])) - 12)}px`}>
+    ${hover !== null && html`<div class="tooltip" ref=${tipRef} style=${`left:${tipLeft}px;top:${Math.max(tipH + 4, Math.min(y(values[hover]), y(prev && prev[hover] !== undefined ? prev[hover] : values[hover])) - 12)}px`}>
       <div class="tt-h" style="margin:0 0 3px">${name}</div>
       <div class="tt-r"><i style="background:var(--series-1)"></i><span>${bucketText(labels[hover], interval, true)}</span><b>${format(values[hover])}</b></div>
       ${prev && prev[hover] !== undefined && html`<div class="tt-r"><i style="background:var(--series-2)"></i><span>${prevLabels ? bucketText(prevLabels[hover], interval, true) : 'Previous'}</span><b>${format(prev[hover])}</b></div>`}
+      ${hoverNotes.slice(0, 3).map((a) => html`<div class="tt-n"><${Icon} name=${a.visibility === 'private' ? 'lock' : 'bookmark'} size=${12} /><span>${a.note}</span></div>`)}${hoverNotes.length > 3 && html`<div class="tt-n muted">+${hoverNotes.length - 3} more</div>`}
 </div>`}
   </div>`;
 }
 
 /** Table fallback for the chart, for screen reader and keyboard users. */
-export function ChartTable({ labels, values, prev, format, name, interval }) {
-  return html`<div class="chart-table"><table class="t"><thead><tr><th>Date</th><th class="right">${name}</th>${prev && html`<th class="right">Previous</th>`}</tr></thead>
-    <tbody>${labels.map((l, i) => html`<tr><td>${bucketText(l, interval, true)}</td><td class="right">${format(values[i])}</td>${prev && html`<td class="right">${format(prev[i])}</td>`}</tr>`)}</tbody></table></div>`;
+export function ChartTable({ labels, values, prev, format, name, interval, annotations = [] }) {
+  const notes = placeNotes(annotations, labels, interval);
+  const at = (i) => (notes.find((p) => p.idx === i) || { list: [] }).list.map((a) => a.note).join('; ');
+  return html`<div class="chart-table"><table class="t"><thead><tr><th>Date</th><th class="right">${name}</th>${prev && html`<th class="right">Previous</th>`}${notes.length > 0 && html`<th>Notes</th>`}</tr></thead>
+    <tbody>${labels.map((l, i) => html`<tr><td>${bucketText(l, interval, true)}</td><td class="right">${format(values[i])}</td>${prev && html`<td class="right">${format(prev[i])}</td>`}${notes.length > 0 && html`<td>${at(i)}</td>`}</tr>`)}</tbody></table></div>`;
 }
 
 let worldPromise;

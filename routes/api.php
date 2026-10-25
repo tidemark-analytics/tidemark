@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AdminController;
+use App\Http\Controllers\Api\AnnotationController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BrandingController;
 use App\Http\Controllers\Api\DataController;
@@ -42,6 +43,7 @@ Route::middleware('api.auth:optional')->group(function () {
         Route::get('/stats/breakdown/{dim}', [StatsController::class, 'breakdown']);
         Route::get('/stats/goals', [StatsController::class, 'goals']);
         Route::get('/segments', [SegmentController::class, 'index']);
+        Route::get('/annotations', [AnnotationController::class, 'index']);
         Route::get('/stats/journeys', [StatsController::class, 'journeys']);
         Route::get('/stats/funnels', [StatsController::class, 'funnels']);
         Route::get('/stats/funnels/{funnel}', [StatsController::class, 'funnel']);
@@ -72,6 +74,9 @@ Route::middleware('api.auth')->group(function () {
 
     // Anyone with access to a site (viewers included) may keep personal segments; owners and admins may also share them with everyone.
     Route::middleware('site:view')->prefix('/sites/{site}')->group(function () {
+        Route::post('/annotations', [AnnotationController::class, 'store']);
+        Route::patch('/annotations/{annotation}', [AnnotationController::class, 'update']);
+        Route::delete('/annotations/{annotation}', [AnnotationController::class, 'destroy']);
         Route::post('/segments', [SegmentController::class, 'store']);
         Route::patch('/segments/{segment}', [SegmentController::class, 'update']);
         Route::delete('/segments/{segment}', [SegmentController::class, 'destroy']);
@@ -131,5 +136,6 @@ Route::middleware('api.auth')->group(function () {
         Route::get('/aggregate', [StatsApiController::class, 'aggregate']);
         Route::get('/timeseries', [StatsApiController::class, 'timeseries']);
         Route::get('/breakdown', [StatsApiController::class, 'breakdown']);
+        Route::get('/annotations', [StatsApiController::class, 'annotations']);
     });
 });

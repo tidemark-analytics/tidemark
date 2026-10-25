@@ -7,6 +7,7 @@ use App\Analytics\Support\Filters;
 use App\Analytics\Support\Period;
 use App\Analytics\Support\SmallGroups;
 use App\Http\Controllers\Controller;
+use App\Models\Annotation;
 use App\Models\Funnel;
 use App\Models\Site;
 use Illuminate\Http\Request;
@@ -38,6 +39,18 @@ class StatsController extends Controller
         return $r->attributes->get('role') === null && $min >= 2 ? $min : 0;
     }
 
+    /** The notes on the graph for this window that this viewer may see (none for the realtime view). */
+    private function annotations(Request $r, Site $site, Period $p): array
+    {
+        if ($p->key === 'realtime') {
+            return [];
+        }
+
+        return Annotation::where('site_id', $site->id)->visibleTo($r->user(), $r->attributes->get('role'))
+            ->whereBetween('date', [$p->start->toDateString(), $p->end->toDateString()])->orderBy('date')->orderBy('created_at')->get()
+            ->map(fn ($a) => AnnotationController::present($a, $r->user(), $r->attributes->get('role')))->all();
+    }
+
     private static function change(float|int|null $cur, float|int|null $prev): ?float
     {
         if ($prev === null || $prev == 0) {
@@ -66,7 +79,7 @@ class StatsController extends Controller
 
     public function graph(Request $r)
     {
-        [, $stats, $p, $f] = $this->ctx($r);
+        [$site, $stats, $p, $f] = $this->ctx($r);
         $series = $stats->timeseries($p, $f);
         $comparison = null;
         $mode = (string) $r->input('comparison', '');
@@ -76,7 +89,7 @@ class StatsController extends Controller
             $comparison = $stats->timeseries($cp, $f);
         }
 
-        return $series + ['period' => $p->toArray(), 'interval' => $p->interval, 'intervals' => $p->allowedIntervals(), 'comparison' => $comparison, 'kind' => $f->goalName() ? 'goal' : 'visitors', 'currency' => $stats->goalCurrency($f)];
+        return $series + ['period' => $p->toArray(), 'interval' => $p->interval, 'intervals' => $p->allowedIntervals(), 'comparison' => $comparison, 'kind' => $f->goalName() ? 'goal' : 'visitors', 'currency' => $stats->goalCurrency($f), 'annotations' => $this->annotations($r, $site, $p)];
     }
 
     public function breakdown(Request $r, string $site, string $dim)
@@ -184,6 +197,9 @@ class StatsController extends Controller
             $rows[] = array_merge([substr($l, 0, $p->interval === 'hour' || $p->interval === 'minute' ? 16 : 10)], array_map(fn ($k) => $s['plot'][$k][$i], $keys));
         }
         $files['visitors.csv'] = $csv(array_merge(['date'], $keys), $rows);
+        if ($notes = $this->annotations($r, $site, $p)) {
+            $files['annotations.csv'] = $csv(['date', 'note', 'shared_with'], array_map(fn ($a) => [$a['date'], $a['note'], ['private' => 'only the author', 'team' => 'the site', 'public' => 'public views'][$a['visibility']]], $notes));
+        }
         foreach (['source' => 'sources', 'channel' => 'channels', 'utm_campaign' => 'campaigns', 'page' => 'pages', 'entry_page' => 'entry_pages', 'exit_page' => 'exit_pages',
             'country' => 'countries', 'region' => 'regions', 'city' => 'cities', 'browser' => 'browsers', 'os' => 'operating_systems', 'device' => 'devices'] as $dim => $name) {
             $res = SmallGroups::trim($stats->breakdown($dim, $p, $f, ['limit' => 1000]), $this->minimum($r, $site))['results'];

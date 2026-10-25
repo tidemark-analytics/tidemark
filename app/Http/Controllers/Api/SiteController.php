@@ -115,6 +115,7 @@ class SiteController extends Controller
         $this->wipe($site->id);
         PlausibleImportController::clear($site);
         FunnelStep::whereIn('funnel_id', $site->funnels()->pluck('id'))->delete();
+        DB::table('annotations')->where('site_id', $site->id)->delete();
         foreach (['funnels', 'segments', 'goals', 'sharedLinks', 'shields'] as $rel) {
             $site->{$rel}()->delete();
         }
