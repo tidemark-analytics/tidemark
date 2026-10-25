@@ -4,6 +4,8 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [0.30.2] - 2026-10-25
+
 ### Fixed
 - A page added by an extension (such as `/support`) is no longer mistaken for a site dashboard in the sidebar.
 
