@@ -22,6 +22,7 @@ export function AccountMenu({ user, align = 'right', btnClass = 'btn ghost avata
       ${!compact && html`<div>      <${Link} to="/sites" class="item" onClick=${close}><span>Your sites</span><${Icon} name="globe" size=${14} /><//>
       <${Link} to="/settings" class="item" onClick=${close}><span>Account settings${user.update && html`<span class="notif inline" aria-hidden="true"></span><span class="sr-only"> (update available)</span>`}</span><${Icon} name="settings" size=${14} /><//>
       ${user.is_admin && registry.adminUi && html`<a class="item" href=${BASE + registry.adminUi.href} onClick=${close}><span>${registry.adminUi.label}</span><${Icon} name="shield-check" size=${14} /></a>`}
+      <a class="item" href="https://support.tidemarkanalytics.com/en/docs" target="_blank" rel="noopener" onClick=${close}><span>Documentation</span><${Icon} name="book-open" size=${14} /></a>
       <a class="item" href="https://discord.gg/sCkHD3PPZh" target="_blank" rel="noopener" onClick=${close}><span>Community (Discord)</span><${Icon} name="users" size=${14} /></a>
       ${registry.menuItems.filter((m) => !m.visible || m.visible(user)).map((m) => (m.onClick
         ? html`<button class="item" onClick=${() => { close(); m.onClick(); }}><span>${m.label}</span><${Icon} name=${m.icon || 'external-link'} size=${14} /></button>`
@@ -120,6 +121,7 @@ export function Sidebar({ user, path }) {
       ${!current && recent.length > 0 && html`<div class="side-grp">Busiest sites</div>
         ${recent.map((s) => html`<${Link} to=${'/' + s.domain} class="side-site" title=${s.domain}><${Icon} name=${s.rollup ? 'layers' : 'globe'} size=${14} /><span class="trunc">${s.domain}</span><em>${fmtShort(s.visitors)}</em><//>`)}`}
       <div class="side-grp">Help</div>
+      <a class="side-link" href="https://support.tidemarkanalytics.com/en/docs" target="_blank" rel="noopener"><${Icon} name="book-open" size=${16} /><span>Documentation</span><${Icon} name="external-link" size=${12} class="side-ext" /></a>
       <a class="side-link" href="https://discord.gg/sCkHD3PPZh" target="_blank" rel="noopener"><${Icon} name="users" size=${16} /><span>Community</span><${Icon} name="external-link" size=${12} class="side-ext" /></a>
       ${registry.menuItems.filter((m) => !m.visible || m.visible(user)).map((m) => (m.onClick
         ? html`<button class="side-link" onClick=${m.onClick}><${Icon} name=${m.icon || 'life-buoy'} size=${16} /><span>${m.label}</span></button>`
