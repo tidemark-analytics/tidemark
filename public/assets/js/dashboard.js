@@ -5,6 +5,13 @@ import { scrollToSection } from './shell.js';
 import { LineChart, ChartTable, bucketText } from './chart.js';
 import { Sources, Pages, Locations, Devices, Behaviors } from './reports.js';
 
+/** Is this key press going into something the user is typing in? A field in the page, or a widget with its own fields (a chat widget keeps them in a shadow root, where the event's target is only the widget itself). */
+const typingIn = (e) => {
+  const t = (e.composedPath && e.composedPath()[0]) || e.target;
+  const is = (n) => n && (/input|textarea|select/i.test(n.tagName || '') || n.isContentEditable);
+  return is(t) || is(e.target) || /-/.test((e.target && e.target.tagName) || '');
+};
+
 // ------------------------------------------------------------------------------------------ metrics
 const METRICS = {
   visitors: ['Unique visitors', fmtShort], visits: ['Total visits', fmtShort], pageviews: ['Total pageviews', fmtShort],
@@ -316,7 +323,7 @@ function DatePicker({ site, scope }) {
   const canCompare = !['realtime', 'all'].includes(period);
   useEffect(() => {
     const k = (e) => {
-      if (e.metaKey || e.ctrlKey || e.altKey || /input|textarea|select/i.test(e.target.tagName || '') || e.target.isContentEditable || document.querySelector('.overlay')) return;
+      if (e.metaKey || e.ctrlKey || e.altKey || typingIn(e) || document.querySelector('.overlay')) return;
       const key = e.key.toUpperCase();
       const hit = PERIODS.find((p) => p[2] === key);
       if (hit) { e.preventDefault(); if (hit[0] === 'custom') { setOpen(true); setCustom(true); } else choose(hit[0]); }
