@@ -46,6 +46,23 @@ class BrandingTest extends TestCase
         $this->actingAs(Site::first()->members()->first())->deleteJson('/api/sites/example.com/branding/logo')->assertOk()->assertJsonPath('data.brand.logo', null);
     }
 
+    public function test_the_name_can_be_hidden_when_a_logo_carries_it(): void
+    {
+        $this->patchJson('/api/sites/example.com/branding', ['brand_name' => 'Example Co', 'brand_hide_name' => true])->assertOk()->assertJsonPath('data.branding.hide_name', true);
+
+        // with no logo there is nothing to show instead, so the name stays visible
+        $this->app['auth']->forgetGuards();
+        $this->getJson('/api/sites/example.com')->assertOk()->assertJsonPath('data.brand.name', 'Example Co')->assertJsonPath('data.brand.hide_name', false);
+
+        $owner = Site::first()->members()->first();
+        $this->actingAs($owner)->postJson('/api/sites/example.com/branding/logo', ['logo' => $this->logo()])->assertOk();
+        $this->app['auth']->forgetGuards();
+        $this->getJson('/api/sites/example.com')->assertOk()->assertJsonPath('data.brand.name', 'Example Co')->assertJsonPath('data.brand.hide_name', true);
+
+        $this->actingAs($owner)->patchJson('/api/sites/example.com/branding', ['brand_hide_name' => false])->assertOk()->assertJsonPath('data.branding.hide_name', false);
+        $this->patchJson('/api/sites/example.com/branding', ['brand_hide_name' => 'maybe'])->assertUnprocessable();
+    }
+
     public function test_invalid_colors_and_logos_are_rejected(): void
     {
         $this->patchJson('/api/sites/example.com/branding', ['brand_color' => 'red'])->assertUnprocessable();
