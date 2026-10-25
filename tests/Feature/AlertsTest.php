@@ -398,4 +398,21 @@ class AlertsTest extends TestCase
         $this->artisan('alerts:run');
         Mail::assertSent(AlertMail::class, 1);
     }
+
+    public function test_webhooks_are_delivered_by_the_queue_worker_on_a_default_install(): void
+    {
+        config(['queue.default' => 'database']); // a fresh install: deliveries are queued, not sent in the request
+        $this->usual(10);
+        $this->visits('2026-11-11', 100);
+        $hook = AlertWebhook::create(['site_id' => $this->site->id, 'name' => 'Automations', 'kind' => 'generic', 'url' => self::HOOK, 'secret' => 's']);
+        $this->rule('traffic_spike', ['percent' => 100, 'min_visitors' => 50], ['email' => false, 'webhook_ids' => [$hook->id]]);
+
+        $this->artisan('alerts:run')->assertSuccessful();
+        Http::assertNothingSent();
+        $this->assertSame(1, DB::table('jobs')->count());
+
+        $this->artisan('queue:work', ['--stop-when-empty' => true, '--queue' => 'default'])->assertSuccessful();
+        Http::assertSent(fn (Request $r) => $r->url() === self::HOOK && $r->header('Tidemark-Event')[0] === 'traffic.spike');
+        $this->assertSame(0, DB::table('jobs')->count());
+    }
 }
