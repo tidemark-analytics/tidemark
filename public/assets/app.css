@@ -730,7 +730,6 @@ kbd { font: 500 11px/1 var(--mono); padding: 3px 6px; border-radius: 5px; border
 
 /* summary */
 .pulse { padding: 22px 24px 20px; background: var(--surface); position: relative; overflow: hidden; }
-.pulse::after { content: ""; position: absolute; inset: auto 0 0 0; height: 46px; opacity: .5; pointer-events: none; background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='46' viewBox='0 0 240 46'><path d='M0 30 C 30 14, 60 14, 90 30 S 150 46, 180 30 S 225 14, 240 28' fill='none' stroke='%230e7c86' stroke-opacity='.16' stroke-width='1.5'/><path d='M0 38 C 30 22, 60 22, 90 38 S 150 54, 180 38 S 225 22, 240 36' fill='none' stroke='%230e7c86' stroke-opacity='.1' stroke-width='1.5'/></svg>") repeat-x bottom; }
 .pulse > * { position: relative; z-index: 1; }
 .pulse-t { display: flex; align-items: center; gap: 7px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--accent-ink); font-weight: 600; }
 .pulse-s { font-size: 19px; line-height: 1.5; letter-spacing: -0.012em; margin-top: 8px; max-width: 880px; color: var(--ink-2); }
