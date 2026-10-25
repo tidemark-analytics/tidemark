@@ -5,6 +5,7 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 ## [Unreleased]
 
 ### Added
+- **Small groups** (Site settings → Sharing and access): set a minimum, and public dashboards and shared links leave out rows with fewer visitors than that (countries, pages, sources, property values, journeys and the CSV export), with a note saying so. People who belong to the site always see everything. A filter that would narrow a public view down to a group smaller than the minimum shows no data, so the limit can't be sidestepped by filtering. Totals and the graph still count everyone. Off by default (`min_group_size` in the sites API; 0 is off, otherwise 2 to 1000).
 - **Privacy controls** for each site (Site settings → Tracking), so owners can collect even less:
   - Respect Global Privacy Control and Do Not Track: visitors who send the signal are not counted (each is its own switch, both off by default).
   - Location detail: keep country, country and region, or the full country, region and city.

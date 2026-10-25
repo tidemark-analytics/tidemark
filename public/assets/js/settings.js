@@ -149,6 +149,17 @@ function DataTab({ site, reload }) {
     ${confirm === 'delete' && html`<${Confirm} title=${`Delete ${site.domain}?`} message="The site and all of its data will be permanently deleted." onClose=${() => setConfirm(null)} onConfirm=${async () => { await api(`/sites/${site.domain}`, { method: 'DELETE' }); navigate('/sites'); }} />`}`;
 }
 
+/** Leave small groups out of what public dashboards and shared links list. */
+function SmallGroups({ site, reload }) {
+  const [n, setN] = useState(String(site.min_group_size || 0));
+  const [err, setErr] = useState(null);
+  const save = async () => { setErr(null); try { await api(`/sites/${site.domain}`, { method: 'PATCH', body: { min_group_size: parseInt(n, 10) || 0 } }); reload(); toast('Saved'); } catch (x) { setErr(firstError(x)); } };
+  return html`<${Section} title="Small groups" help="With few visitors, one visit from a rare country or to an obscure page can point at one person. Set a minimum and public dashboards and shared links leave out rows with fewer visitors than that. You and the people on this site still see everything.">
+    <div class="row"><label class="sr-only" for="min-group">Smallest group to show</label><input id="min-group" type="number" min="0" max="1000" value=${n} onInput=${(e) => setN(e.target.value)} style="width:96px" /><span class="muted">visitors (0 turns it off, 5 is a common choice)</span><button class="btn" type="button" disabled=${(parseInt(n, 10) || 0) === (site.min_group_size || 0)} onClick=${save}>Save</button></div>
+    <p class="muted small">Totals and the graph still count everyone. A filter that would narrow a public view down to a smaller group shows no data.</p>
+    ${err && html`<div class="alert">${err}</div>`}<//>`;
+}
+
 function Visibility({ site, reload }) {
   const links = useApi(`/sites/${site.domain}/shared-links`, null, []);
   const [adding, setAdding] = useState(false);
@@ -157,6 +168,7 @@ function Visibility({ site, reload }) {
   const url = (l) => `${window.SD.origin}/share/${site.domain}?auth=${l.slug}`;
   return html`<${Section} title="Public dashboard" help="Anyone with the address can view this site's stats — no sign-in needed."><${Toggle} label="Make the dashboard public" checked=${site.public} onChange=${setPublic} />
       ${site.public && html`<${CodeBlock} text=${`${window.SD.origin}/${site.domain}`} />`}<//>
+    <${SmallGroups} site=${site} reload=${reload} />
     <${Section} title="Shared links" help="Private, read-only links you can revoke at any time. Add a password if you like.">
       ${!adding && html`<div class="section-actions"><button class="btn primary" onClick=${() => setAdding(true)}><${Icon} name="plus" size=${14} /> New shared link</button></div>`}
       ${adding && html`<${NewLink} site=${site} onClose=${() => setAdding(false)} onDone=${() => { setAdding(false); links.reload(); toast('Shared link created'); }} />`}

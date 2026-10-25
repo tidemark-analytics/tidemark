@@ -30,6 +30,9 @@ class Filters
     public const DIRECT = 'Direct / None';
 
     /** @param array<int,array{0:string,1:string,2:array<int,string>}> $rules */
+    /** When set, every query matches nothing (a public view asked about a group smaller than the site's minimum). */
+    public bool $nothing = false;
+
     public function __construct(public array $rules = [], public ?Site $site = null) {}
 
     public static function fromRequest(Request $r, ?Site $site = null): self
@@ -94,7 +97,10 @@ class Filters
 
     public function without(string ...$dims): self
     {
-        return new self(array_values(array_filter($this->rules, fn ($r) => ! in_array($r[1], $dims, true))), $this->site);
+        $copy = new self(array_values(array_filter($this->rules, fn ($r) => ! in_array($r[1], $dims, true))), $this->site);
+        $copy->nothing = $this->nothing;
+
+        return $copy;
     }
 
     public function goalName(): ?string
@@ -112,6 +118,9 @@ class Filters
     /** Constrain a query over `visits as v`. Event-level rules become EXISTS subqueries. */
     public function applyToVisits(Builder $q): Builder
     {
+        if ($this->nothing) {
+            return $q->whereRaw('1 = 0');
+        }
         foreach ($this->rules as [$op, $dim, $values]) {
             if (isset(self::VISIT_DIMS[$dim])) {
                 $this->where($q, 'v.'.self::VISIT_DIMS[$dim], $op, $values, $dim);
@@ -130,6 +139,9 @@ class Filters
     /** Constrain a query over `events as e join visits as v`. */
     public function applyToEvents(Builder $q): Builder
     {
+        if ($this->nothing) {
+            return $q->whereRaw('1 = 0');
+        }
         foreach ($this->rules as [$op, $dim, $values]) {
             if (isset(self::VISIT_DIMS[$dim])) {
                 $this->where($q, 'v.'.self::VISIT_DIMS[$dim], $op, $values, $dim);

@@ -90,6 +90,7 @@ class SiteController extends Controller
             'track_outbound' => 'sometimes|boolean', 'track_downloads' => 'sometimes|boolean', 'track_forms' => 'sometimes|boolean',
             'honor_gpc' => 'sometimes|boolean', 'honor_dnt' => 'sometimes|boolean', 'referrer_domain_only' => 'sometimes|boolean',
             'location_precision' => 'sometimes|in:city,region,country',
+            'min_group_size' => ['sometimes', 'integer', 'between:0,1000', fn ($a, $v, $fail) => (int) $v === 1 ? $fail('Use 0 to turn this off, or at least 2.') : null],
             'url_params' => ['sometimes', 'nullable', 'string', 'max:2000', fn ($a, $v, $fail) => ($problem = UrlParams::problem($v)) ? $fail($problem) : null],
         ]);
         if (array_key_exists('url_params', $data)) {
@@ -147,7 +148,7 @@ class SiteController extends Controller
         $role ??= $site->roleOf($user);
         $first = (new Stats($site))->firstVisitAt();
 
-        return $site->only(['id', 'domain', 'timezone', 'public', 'track_outbound', 'track_downloads', 'track_forms', 'honor_gpc', 'honor_dnt', 'location_precision', 'url_params', 'referrer_domain_only']) + ['rollup' => $site->isRollup() ? ['all' => $site->rollup_all, 'sites' => $site->rollupMembers()->orderBy('domain')->get(['sites.id', 'sites.domain'])->map->only(['id', 'domain'])->all(), 'count' => count($site->memberSiteIds())] : null] + [
+        return $site->only(['id', 'domain', 'timezone', 'public', 'track_outbound', 'track_downloads', 'track_forms', 'honor_gpc', 'honor_dnt', 'location_precision', 'url_params', 'referrer_domain_only', 'min_group_size']) + ['rollup' => $site->isRollup() ? ['all' => $site->rollup_all, 'sites' => $site->rollupMembers()->orderBy('domain')->get(['sites.id', 'sites.domain'])->map->only(['id', 'domain'])->all(), 'count' => count($site->memberSiteIds())] : null] + [
             'role' => $role,
             'can_manage' => in_array($role, ['owner', 'admin'], true),
             'is_owner' => $role === 'owner',

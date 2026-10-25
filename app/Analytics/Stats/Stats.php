@@ -41,6 +41,12 @@ class Stats
     }
 
     // ------------------------------------------------------------------------------------------------ builders
+    /** Unique visitors in the period under the filters. */
+    public function visitorCount(Period $p, Filters $f): int
+    {
+        return (int) $this->visitsQ($p, $f)->selectRaw('COUNT(DISTINCT v.visitor_id) as n')->value('n');
+    }
+
     private function visitsQ(Period $p, Filters $f, bool $applyFilters = true): Builder
     {
         $col = $p->key === 'realtime' ? 'v.ended_at' : 'v.started_at';
