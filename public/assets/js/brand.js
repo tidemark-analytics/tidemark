@@ -81,7 +81,7 @@ function textOn(bg, dark) {
 export function brandTheme(hex, isDark) {
   const [h, s0, l0] = hexToHsl(hex);
   // neutrals take the hue, with the saturation kept gentle so a vivid brand color still gives a calm page
-  const ns = clamp(0.05 + s0 * 0.16, 0.05, 0.2);
+  const ns = 0; // backgrounds are always neutral; only accents carry the brand color
   const N = (sat, l) => hslToHex(h, sat, l);
 
   const n = isDark
@@ -101,7 +101,7 @@ export function brandTheme(hex, isDark) {
   // the hover shade keeps the same button text readable
   const hover = hslToHex(h, sat, nearestLightness(h, sat, hexToHsl(accent)[2] + toward * 0.07, (c) => contrast(c, onAccent) >= 4.5, toward));
 
-  const soft = hslToHex(h, Math.min(sat, isDark ? 0.5 : 0.6), isDark ? 0.15 : 0.93);
+  const soft = isDark ? '#1a1a1a' : '#f0f0f0';
   const ink = hslToHex(h, sat, nearestLightness(h, sat, hexToHsl(accent)[2], (c) => [n.bg, n.surface, n.s2, soft].every((bg) => contrast(c, bg) >= 4.5), toward));
   const [r, g, b] = hexToRgb(accent);
 
