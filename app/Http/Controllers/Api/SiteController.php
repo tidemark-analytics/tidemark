@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Analytics\Stats\Stats;
 use App\Analytics\Support\Sql;
+use App\Analytics\Support\UrlParams;
 use App\Contracts\Entitlements;
 use App\Contracts\LimitsSiteList;
 use App\Events\SiteCreated;
@@ -72,7 +73,7 @@ class SiteController extends Controller
         $site->members()->attach($user->id, ['role' => 'owner', 'id' => (string) Str::uuid()]);
         SiteCreated::dispatch($site, $user);
 
-        return response()->json(['data' => $this->present($site, $user)], 201);
+        return response()->json(['data' => $this->present($site->fresh(), $user)], 201); // fresh, so columns that take their default in the database are filled in
     }
 
     public function show(Request $request)
@@ -87,7 +88,13 @@ class SiteController extends Controller
             'timezone' => ['sometimes', 'string', fn ($a, $v, $fail) => in_array($v, \DateTimeZone::listIdentifiers(), true) || $fail('Unknown timezone')],
             'public' => 'sometimes|boolean',
             'track_outbound' => 'sometimes|boolean', 'track_downloads' => 'sometimes|boolean', 'track_forms' => 'sometimes|boolean',
+            'honor_gpc' => 'sometimes|boolean', 'honor_dnt' => 'sometimes|boolean', 'referrer_domain_only' => 'sometimes|boolean',
+            'location_precision' => 'sometimes|in:city,region,country',
+            'url_params' => ['sometimes', 'nullable', 'string', 'max:2000', fn ($a, $v, $fail) => ($problem = UrlParams::problem($v)) ? $fail($problem) : null],
         ]);
+        if (array_key_exists('url_params', $data)) {
+            $data['url_params'] = UrlParams::normalize($data['url_params']);
+        }
         $site->update($data);
         // the default tracking extensions need matching goals so their events show up in the dashboard
         foreach (Site::extensionGoals() as $flag => $goalName) {
@@ -140,7 +147,7 @@ class SiteController extends Controller
         $role ??= $site->roleOf($user);
         $first = (new Stats($site))->firstVisitAt();
 
-        return $site->only(['id', 'domain', 'timezone', 'public', 'track_outbound', 'track_downloads', 'track_forms']) + ['rollup' => $site->isRollup() ? ['all' => $site->rollup_all, 'sites' => $site->rollupMembers()->orderBy('domain')->get(['sites.id', 'sites.domain'])->map->only(['id', 'domain'])->all(), 'count' => count($site->memberSiteIds())] : null] + [
+        return $site->only(['id', 'domain', 'timezone', 'public', 'track_outbound', 'track_downloads', 'track_forms', 'honor_gpc', 'honor_dnt', 'location_precision', 'url_params', 'referrer_domain_only']) + ['rollup' => $site->isRollup() ? ['all' => $site->rollup_all, 'sites' => $site->rollupMembers()->orderBy('domain')->get(['sites.id', 'sites.domain'])->map->only(['id', 'domain'])->all(), 'count' => count($site->memberSiteIds())] : null] + [
             'role' => $role,
             'can_manage' => in_array($role, ['owner', 'admin'], true),
             'is_owner' => $role === 'owner',
