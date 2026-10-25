@@ -83,7 +83,7 @@ class PiiScrubberTest extends TestCase
         $v = DB::table('visits')->orderBy('id')->first();
         $this->assertSame('forum.example.org/t/[token]', $v->referrer);
         $this->assertSame('[email]', $v->utm_content);
-        $this->assertSame('Signup for [email]', DB::table('events')->where('id', '>', 1)->value('name'));
+        $this->assertSame('Signup for [email]', DB::table('events')->where('name', 'like', 'Signup%')->value('name'));
         $props = DB::table('event_props')->pluck('value', 'key')->all();
         $this->assertSame('pro', $props['plan']);
         $this->assertSame('[email]', $props['email']);
