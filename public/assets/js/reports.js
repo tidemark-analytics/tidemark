@@ -58,6 +58,7 @@ function DetailsModal({ title, label, dim, site, scope, onClose, source }) {
     <div class=${'tscroll ' + (res.loading ? 'stale' : '')} style="margin-top:12px"><table class="t"><thead><tr><th>${label || title}</th>${cols.map((c) => html`<th class="right">${c[1]}</th>`)}</tr></thead>
       <tbody>${(rows || []).map((r) => html`<tr class="click" onClick=${() => pick(r)}><td><span class="cell-l"><${Label} dim=${dim} name=${r.name} /></span></td>${cols.map((c) => html`<td class="right">${r[c[0]] === undefined || r[c[0]] === null ? '–' : c[2](r[c[0]])}</td>`)}</tr>`)}
       ${rows && !rows.length && html`<tr><td colspan=${cols.length + 1} class="muted" style="text-align:center;padding:28px">No results</td></tr>`}</tbody></table></div>
+    ${res.data && res.data.hidden_below && html`<p class="muted small" style="margin-top:10px">Rows with fewer than ${res.data.hidden_below} visitors are hidden.</p>`}
   <//>`;
 }
 
@@ -82,6 +83,7 @@ function DimBody({ dim, label, title, site, scope, poll, limit = 7, extra }) {
   const res = useApi(`/sites/${site.domain}/stats/breakdown/${dim}`, { ...scope.params, limit }, [], { poll });
   const rows = res.data && res.data.results;
   return html`<${RankedList} rows=${rows} dim=${dim} goalMode=${goalMode} currency=${res.data && res.data.currency} loading=${res.loading} head=${label} error=${res.error} onRetry=${res.reload} filtered=${scope.filters.length > 0} />
+    ${res.data && res.data.hidden_below && html`<p class="muted small" style="margin:8px 4px 0">Rows with fewer than ${res.data.hidden_below} visitors are hidden.</p>`}
     ${rows && rows.length > 0 && html`<div class="panel-foot"><button class="more" onClick=${() => setMore(true)}><${Icon} name="search" size=${13} /> Details</button></div>`}
     ${more && html`<${DetailsModal} title=${title || label} label=${label} dim=${dim} site=${site} scope=${scope} onClose=${() => setMore(false)} />`}`;
 }
