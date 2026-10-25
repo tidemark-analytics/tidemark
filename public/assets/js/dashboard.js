@@ -3,6 +3,7 @@ import { setBrand, html, useState, useEffect, useMemo, useRef, useApi, api, useL
 import { Pop, Modal, Loading, Empty, Field, CodeBlock, useDebounced, Sparkline } from './ui.js';
 import { scrollToSection } from './shell.js';
 import { LineChart, ChartTable, bucketText } from './chart.js';
+import { AnnotationModal, todayIn } from './annotations.js';
 import { Sources, Pages, Locations, Devices, Behaviors } from './reports.js';
 
 /** Is this key press going into something the user is typing in? A field in the page, or a widget with its own fields (a chat widget keeps them in a shadow root, where the event's target is only the widget itself). */
@@ -49,6 +50,7 @@ function rangeLabel(p) {
 function TopGraph({ site, scope, live, onIntervals }) {
   const [metric, setMetric] = useState('visitors');
   const [asTable, setAsTable] = useState(false);
+  const [noteModal, setNoteModal] = useState(null); // { date, list } while the notes dialog is open
   const base = `/sites/${site.domain}/stats`;
   const poll = live ? 5000 : 0;
   const top = useApi(`${base}/top`, scope.params, [], { poll });
@@ -76,12 +78,14 @@ function TopGraph({ site, scope, live, onIntervals }) {
     <div class="kpis" role="tablist" aria-label="Top stats">${Object.entries(defs).map(([k, d]) => kpi(k, d))}</div>
     <section class="card graph-card" aria-label="Graph">
       <div class="card-h"><h3>${name} over time</h3><div class="row"><span class="legend"><span><i style="background:var(--series-1)"></i>${name}</span>${g && g.comparison && html`<span><i style="background:var(--series-2)"></i>Comparison</span>`}</span>
+        ${site.role && !scope.goal && html`<button class="more" onClick=${() => setNoteModal({ date: todayIn(site.timezone), list: [] })}><${Icon} name="plus" size=${13} /> Add note</button>`}
         <button class="more" onClick=${() => setAsTable(!asTable)}>${asTable ? 'View as chart' : 'View as table'}</button></div></div>
       <div class=${'graph-b ' + (busy && g ? 'stale' : '')}>
         ${graph.error && !g ? html`<div class="panel-empty" style="min-height:300px"><b>Couldn't load the graph</b><p class="muted">${graph.error.message}</p><button class="btn sm" onClick=${() => { graph.reload(); top.reload(); }}>Try again</button></div>` : !g ? html`<div class="skeleton" style="height:300px"></div>` : asTable
-          ? html`<${ChartTable} labels=${g.labels} values=${g.plot[current]} prev=${(g.comparison && g.comparison.plot[current]) || null} format=${format} name=${name} interval=${g.interval} />`
-          : html`<${LineChart} labels=${g.labels} values=${g.plot[current]} prev=${g.comparison && g.comparison.plot[current] ? g.comparison.plot[current] : null} prevLabels=${g.comparison && g.comparison.labels} format=${format} name=${name} interval=${g.interval} live=${live} />`}
+          ? html`<${ChartTable} labels=${g.labels} values=${g.plot[current]} prev=${(g.comparison && g.comparison.plot[current]) || null} format=${format} name=${name} interval=${g.interval} annotations=${g.annotations} />`
+          : html`<${LineChart} labels=${g.labels} values=${g.plot[current]} prev=${g.comparison && g.comparison.plot[current] ? g.comparison.plot[current] : null} prevLabels=${g.comparison && g.comparison.labels} format=${format} name=${name} interval=${g.interval} live=${live} annotations=${g.annotations || []} onNote=${(p) => setNoteModal({ date: p.list[0].date, list: p.list })} />`}
       </div>
+      ${noteModal && html`<${AnnotationModal} site=${site} start=${noteModal} onClose=${() => setNoteModal(null)} onChanged=${() => graph.reload()} />`}
     </section>`;
 }
 

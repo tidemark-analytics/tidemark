@@ -6,6 +6,7 @@ use App\Analytics\Stats\Stats;
 use App\Analytics\Support\Filters;
 use App\Analytics\Support\Period;
 use App\Http\Controllers\Controller;
+use App\Models\Annotation;
 use App\Models\Site;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
@@ -81,6 +82,45 @@ class StatsApiController extends Controller
         $m = array_values(array_intersect(array_map('trim', explode(',', (string) $r->input('metrics', 'visitors'))), self::METRICS));
 
         return $m ?: ['visitors'];
+    }
+
+    /** Notes on the graph for the period that the key's owner may see. */
+    public function annotations(Request $r)
+    {
+        [$site, , $p] = $this->ctx($r);
+        $role = $site->roleOf($r->user());
+        $rows = Annotation::where('site_id', $site->id)->visibleTo($r->user(), $role)->whereBetween('date', [$p->start->toDateString(), $p->end->toDateString()])
+            ->orderBy('date')->orderBy('created_at')->get();
+
+        return ['results' => $rows->map(fn ($a) => ['date' => $a->date->toDateString(), 'note' => $a->note, 'visibility' => $a->visibility])->all(), 'period' => $p->toArray()];
+    }
+
+    /** Every goal's conversions in the period, with revenue for goals that report it. */
+    public function goals(Request $r)
+    {
+        [, $stats, $p, $f] = $this->ctx($r);
+
+        return ['results' => $stats->goals($p, $f), 'period' => $p->toArray()];
+    }
+
+    /** The site's funnels (when its plan includes them). */
+    public function funnels(Request $r)
+    {
+        [$site] = $this->ctx($r);
+        if (! $site->funnelsAllowed()) {
+            return ['allowed' => false, 'results' => []];
+        }
+
+        return ['allowed' => true, 'results' => $site->funnels()->withCount('steps')->orderBy('created_at')->get()->map(fn ($x) => ['id' => $x->id, 'name' => $x->name, 'steps' => $x->steps_count])->all()];
+    }
+
+    /** How many visitors got through each step of one funnel in the period. */
+    public function funnel(Request $r, string $funnel)
+    {
+        [$site, $stats, $p, $f] = $this->ctx($r);
+        abort_unless($site->funnelsAllowed(), 403, 'Funnels are not available on this plan.');
+
+        return $stats->funnel($site->funnels()->findOrFail($funnel), $p, $f) + ['period' => $p->toArray()];
     }
 
     public function realtime(Request $r)

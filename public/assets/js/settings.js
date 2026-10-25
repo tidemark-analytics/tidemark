@@ -16,7 +16,11 @@ function SettingsShell({ title, back, tabs, tab, base, children }) {
     <div class="settings"><nav class="subnav" aria-label="Settings sections">${tabs.map(([k, l, dot]) => html`<${Link} to=${base + (k === tabs[0][0] ? '' : '/' + k)} class=${k === tab ? 'active' : ''} aria-current=${k === tab ? 'page' : undefined}>${l}${dot && html`<span class="notif inline" aria-hidden="true"></span><span class="sr-only"> (update available)</span>`}<//>`)}</nav>
       <div class="stack">${children}</div></div></main>`;
 }
-const Section = ({ title, help, children, danger }) => html`<section class=${'card pad stack ' + (danger ? 'danger-zone' : '')}><div><h2>${title}</h2>${help && html`<p class="muted" style="margin-top:3px">${help}</p>`}</div>${children}</section>`;
+/** The body of a section a plan doesn't include: blurred and out of reach, with a lock and a way to upgrade (Cloud only; self-hosted installs are never locked). */
+const ProLock = ({ children, note }) => html`<div class="prolock"><div class="prolock-body" inert aria-hidden="true">${children}</div>
+  <div class="prolock-over" role="note"><span class="prolock-ico" aria-hidden="true"><${Icon} name="lock" size=${22} /></span><b>Upgrade to unlock</b>
+    <p>To access this feature, <${Link} to="/settings/billing">upgrade your plan<//>.${note ? ' ' + note : ''}</p></div></div>`;
+const Section = ({ title, help, children, danger, locked, lockNote }) => html`<section class=${'card pad stack ' + (danger ? 'danger-zone' : '')}><div><h2>${title}</h2>${help && html`<p class="muted" style="margin-top:3px">${help}</p>`}</div>${locked ? html`<${ProLock} note=${lockNote}>${children}<//>` : children}</section>`;
 
 // ----------------------------------------------------------------------------------------- site settings
 // Reads an export file in the browser (gzip or plain) and sends it in small batches, so file size never hits a server limit.
@@ -99,6 +103,43 @@ function ImportPlausible({ site, reload }) {
     ${confirm && html`<${Confirm} title="Remove imported data?" message="The days imported from Plausible will be removed from this dashboard. What Tidemark collected itself is not touched." confirmLabel="Remove" onClose=${() => setConfirm(false)} onConfirm=${async () => { await removeImported(site.domain); setState(null); reload(); toast('Imported data removed'); }} />`}<//>`;
 }
 
+/** Collect even less: per-site switches that go beyond the defaults (no cookies, no stored IP addresses, no query strings). */
+function PrivacyControls({ site, reload }) {
+  const saved = (site.url_params || '').split(',').filter(Boolean).join(', ');
+  const [params, setParams] = useState(saved);
+  const [err, setErr] = useState(null);
+  const patch = async (body) => { setErr(null); try { await api(`/sites/${site.domain}`, { method: 'PATCH', body }); reload(); toast('Saved'); } catch (x) { setErr(firstError(x)); } };
+  const places = [['city', 'Country, region and city'], ['region', 'Country and region'], ['country', 'Country only']];
+  const scrubChoice = (site.features || {}).pii_scrub !== false; // a host can require masking and hide the setting
+  const masks = useApi(`/sites/${site.domain}/pii-masks`, null, [], { enabled: scrubChoice });
+  const kinds = { email: ['email address', 'email addresses'], uuid: ['UUID', 'UUIDs'], number: ['long number', 'long numbers'], token: ['token', 'tokens'] };
+  const masked = ((masks.data && masks.data.results) || []).map((r) => { const k = kinds[r.pattern] || [r.pattern, r.pattern]; return `${r.count.toLocaleString()} ${r.count === 1 ? k[0] : k[1]}`; }).join(', ');
+  return html`<${Section} title="Privacy controls" help="Tidemark already sets no cookies, stores no IP addresses and drops query strings. These switches let you collect even less.">
+    ${scrubChoice && html`<${Toggle} label="Mask personal data sent by accident" help="Email addresses, tokens, UUIDs and long numbers in page addresses, referrers, campaign values, event names and properties are replaced with a placeholder such as [email] before anything is stored. Ordinary page names and short ids are left alone." checked=${site.pii_scrub} onChange=${(v) => patch({ pii_scrub: v })} />`}
+    ${scrubChoice && masked && html`<p class="muted small" style="margin:-4px 0 4px 46px">Masked in the last 30 days: ${masked}. Only these counts are kept, never the values.</p>`}
+    <${Toggle} label="Respect Global Privacy Control" help="Visitors whose browser sends the Global Privacy Control signal are not counted." checked=${site.honor_gpc} onChange=${(v) => patch({ honor_gpc: v })} />
+    <${Toggle} label="Respect Do Not Track" help="Visitors whose browser sends Do Not Track are not counted." checked=${site.honor_dnt} onChange=${(v) => patch({ honor_dnt: v })} />
+    <${Toggle} label="Keep only the referrer's domain" help="Record news.example.org instead of news.example.org/story/42." checked=${site.referrer_domain_only} onChange=${(v) => patch({ referrer_domain_only: v })} />
+    <${Field} label="Location detail" help="Where visitors are. Changing this affects visits recorded from now on."><select value=${site.location_precision || 'city'} onChange=${(e) => patch({ location_precision: e.target.value })} style="max-width:320px">${places.map(([k, l]) => html`<option value=${k} selected=${(site.location_precision || 'city') === k}>${l}</option>`)}</select><//>
+    <${Field} label="Query parameters to keep" help="Page addresses are stored without their query string. List the parameters you want kept (for example page, lang), separated by commas, to see them in the Pages report. Names that look like they carry a secret or personal data, such as email or token, are refused."><div class="row"><input class="grow" placeholder="page, lang" value=${params} onInput=${(e) => setParams(e.target.value)} maxlength="2000" style="max-width:420px" /><button class="btn" type="button" disabled=${params.trim() === saved} onClick=${() => patch({ url_params: params.trim() || null })}>Save</button></div><//>
+    ${err && html`<div class="alert">${err}</div>`}<//>`;
+}
+
+/** Crawlers, scripts, data center traffic, referrer spam and floods: left out of the numbers and counted here. */
+function BotFiltering({ site, reload }) {
+  const filtered = useApi(`/sites/${site.domain}/filtered`, null, []);
+  const [err, setErr] = useState(null);
+  const patch = async (body) => { setErr(null); try { await api(`/sites/${site.domain}`, { method: 'PATCH', body }); reload(); toast('Saved'); } catch (x) { setErr(firstError(x)); } };
+  const names = { crawler: 'crawlers and known bots', headless: 'headless browsers and scripts', referrer_spam: 'referrer spam', datacenter: 'data center traffic', flood: 'floods from one visitor' };
+  const rows = (filtered.data && filtered.data.results) || [];
+  const total = rows.reduce((n, r) => n + r.count, 0);
+  return html`<${Section} title="Bot and spam filtering" help="Hits that don't come from a person's browser are left out of your numbers, using only what the request already carries (never stored): known crawlers, headless browsers, addresses of cloud and hosting providers, referrer spam and sudden floods from a single visitor. Lists of providers and spam domains are updated with each release.">
+    <${Toggle} label="Filter bots and spam" help="Turn it off to count everything, for example while testing from a script or a server." checked=${site.bot_filter !== false} onChange=${(v) => patch({ bot_filter: v })} />
+    ${err && html`<div class="alert">${err}</div>`}
+    ${filtered.data && html`<p class="muted small" style="margin:-4px 0 4px 46px">${total === 0 ? 'Nothing was filtered in the last 30 days.' : `Filtered in the last 30 days: ${total.toLocaleString()} (${rows.map((r) => `${r.count.toLocaleString()} ${names[r.reason] || r.reason}`).join(', ')}). Only these counts are kept.`}</p>`}
+  <//>`;
+}
+
 /** How visits get in: the snippet, its extensions and the rules that drop traffic you don't want counted. */
 function Tracking({ site, reload }) {
   const patch = async (body) => { try { await api(`/sites/${site.domain}`, { method: 'PATCH', body }); reload(); toast('Saved'); } catch (x) { toast(firstError(x), 'err'); } };
@@ -107,6 +148,8 @@ function Tracking({ site, reload }) {
       <${Toggle} label="Outbound link clicks" checked=${site.track_outbound} onChange=${(v) => patch({ track_outbound: v })} />
       <${Toggle} label="File downloads" checked=${site.track_downloads} onChange=${(v) => patch({ track_downloads: v })} />
       <${Toggle} label="Form submissions" checked=${site.track_forms} onChange=${(v) => patch({ track_forms: v })} /><//>
+    ${!site.rollup && site.can_manage && html`<${PrivacyControls} site=${site} reload=${reload} />`}
+    ${!site.rollup && site.can_manage && html`<${BotFiltering} site=${site} reload=${reload} />`}
     <${Shields} site=${site} />`;
 }
 
@@ -132,6 +175,17 @@ function DataTab({ site, reload }) {
     ${confirm === 'delete' && html`<${Confirm} title=${`Delete ${site.domain}?`} message="The site and all of its data will be permanently deleted." onClose=${() => setConfirm(null)} onConfirm=${async () => { await api(`/sites/${site.domain}`, { method: 'DELETE' }); navigate('/sites'); }} />`}`;
 }
 
+/** Leave small groups out of what public dashboards and shared links list. */
+function SmallGroups({ site, reload }) {
+  const [n, setN] = useState(String(site.min_group_size || 0));
+  const [err, setErr] = useState(null);
+  const save = async () => { setErr(null); try { await api(`/sites/${site.domain}`, { method: 'PATCH', body: { min_group_size: parseInt(n, 10) || 0 } }); reload(); toast('Saved'); } catch (x) { setErr(firstError(x)); } };
+  return html`<${Section} title="Small groups" help="With few visitors, one visit from a rare country or to an obscure page can point at one person. Set a minimum and public dashboards and shared links leave out rows with fewer visitors than that. You and the people on this site still see everything.">
+    <div class="row"><label class="sr-only" for="min-group">Smallest group to show</label><input id="min-group" type="number" min="0" max="1000" value=${n} onInput=${(e) => setN(e.target.value)} style="width:96px" /><span class="muted">visitors (0 turns it off, 5 is a common choice)</span><button class="btn" type="button" disabled=${(parseInt(n, 10) || 0) === (site.min_group_size || 0)} onClick=${save}>Save</button></div>
+    <p class="muted small">Totals and the graph still count everyone. A filter that would narrow a public view down to a smaller group shows no data.</p>
+    ${err && html`<div class="alert">${err}</div>`}<//>`;
+}
+
 function Visibility({ site, reload }) {
   const links = useApi(`/sites/${site.domain}/shared-links`, null, []);
   const [adding, setAdding] = useState(false);
@@ -140,6 +194,7 @@ function Visibility({ site, reload }) {
   const url = (l) => `${window.SD.origin}/share/${site.domain}?auth=${l.slug}`;
   return html`<${Section} title="Public dashboard" help="Anyone with the address can view this site's stats — no sign-in needed."><${Toggle} label="Make the dashboard public" checked=${site.public} onChange=${setPublic} />
       ${site.public && html`<${CodeBlock} text=${`${window.SD.origin}/${site.domain}`} />`}<//>
+    <${SmallGroups} site=${site} reload=${reload} />
     <${Section} title="Shared links" help="Private, read-only links you can revoke at any time. Add a password if you like.">
       ${!adding && html`<div class="section-actions"><button class="btn primary" onClick=${() => setAdding(true)}><${Icon} name="plus" size=${14} /> New shared link</button></div>`}
       ${adding && html`<${NewLink} site=${site} onClose=${() => setAdding(false)} onDone=${() => { setAdding(false); links.reload(); toast('Shared link created'); }} />`}
@@ -177,8 +232,7 @@ function Branding({ site, reload }) {
   const accent = valid && color ? ((dark ? shown.dark : shown.light) || color) : '#0e7c86';
   const logo = site.brand && site.brand.logo;
   const off = !b.allowed;
-  return html`<${Section} title="Branding" help="Show your own logo, name and color to people who open the public dashboard or a shared link. A small “Analytics by Tidemark” link always stays in the footer.">
-      ${off && html`<div class="notice"><${Icon} name="info" size=${16} /><div>Custom branding is included with Pro. <${Link} to="/settings">Open your account settings<//> to upgrade.</div></div>`}
+  return html`<${Section} title="Branding" locked=${off} help="Show your own logo, name and color to people who open the public dashboard or a shared link. A small “Analytics by Tidemark” link always stays in the footer.">
       <div class="brand-grid">
         <div class="brand-form">
           <div class="bf-field"><span class="lbl">Logo</span>
@@ -292,9 +346,8 @@ function Funnels({ site }) {
   };
   const setStep = (i, v) => setForm({ ...form, steps: form.steps.map((s, j) => (j === i ? v : s)) });
   const needGoals = allowed && goals.data && list.length < 2;
-  return html`<${Section} title="Funnels" help="A funnel follows visitors through a series of goals, in order, and shows where they drop off. Chain two to eight goals.">
+  return html`<${Section} title="Funnels" locked=${!allowed} help="A funnel follows visitors through a series of goals, in order, and shows where they drop off. Chain two to eight goals.">
       ${!form && html`<div class="section-actions"><button class="btn primary" disabled=${!allowed || list.length < 2} onClick=${() => open(null)}><${Icon} name="plus" size=${14} /> New funnel</button>${needGoals && html`<span class="muted small">Add at least two goals first.</span>`}</div>`}
-      ${!allowed && html`<div class="notice"><${Icon} name="info" size=${16} /><div>Funnels are included with Pro. <${Link} to="/settings">Open your account settings<//> to upgrade.</div></div>`}
       ${err && !form && html`<div class="alert">${err}</div>`}
       ${form && html`<form class="funnel-form" onSubmit=${save}>
         ${err && html`<div class="alert">${err}</div>`}
@@ -409,11 +462,117 @@ export function SiteSettings({ domain, tab }) {
   if (!s) return html`<main class="main"><${Loading} /></main>`;
   if (!s.can_manage) return html`<main class="main"><${Empty} title="No access" icon="lock">Only site owners and admins can change settings.<//></main>`;
   // a few sections moved between tabs; older links and bookmarks still land in the right place
-  const tabs = s.rollup ? [['sites', 'Sites'], ['conversions', 'Conversions'], ['access', 'Sharing'], ['data', 'Data']] : [['tracking', 'Tracking'], ['conversions', 'Conversions'], ['access', 'Sharing and access'], ['data', 'Data']];
+  const tabs = s.rollup ? [['sites', 'Sites'], ['conversions', 'Conversions'], ['access', 'Sharing'], ['data', 'Data']] : [['tracking', 'Tracking'], ['conversions', 'Conversions'], ['alerts', 'Alerts'], ['access', 'Sharing and access'], ['data', 'Data']];
   const moved = { general: s.rollup ? 'data' : 'tracking', shields: 'tracking', goals: 'conversions', funnels: 'conversions', visibility: 'access', branding: 'access', people: 'access' };
   const t = [tab, moved[tab]].find((k) => tabs.some((x) => x[0] === k)) || tabs[0][0];
-  const Body = { tracking: Tracking, conversions: Conversions, access: Access, data: DataTab, sites: RollupSites }[t];
+  const Body = { tracking: Tracking, conversions: Conversions, alerts: Alerts, access: Access, data: DataTab, sites: RollupSites }[t];
   return html`<${SettingsShell} title=${`${domain} settings`} back=${[`/${domain}`, 'Dashboard']} tabs=${tabs} tab=${t} base=${`/${domain}/settings`}><${Body} site=${s} reload=${res.reload} /><//>`;
+}
+
+// -------------------------------------------------------------------------------------- alerts
+const ALERT_TYPES = {
+  traffic_spike: { label: 'Traffic spike', icon: 'trending-up', help: 'Visitors so far today are well above the usual for this weekday and time of day.' },
+  traffic_drop: { label: 'Traffic drop', icon: 'trending-down', help: 'Visitors so far today are well below the usual for this weekday and time of day (after 06:00).' },
+  goal_milestone: { label: 'Goal milestone', icon: 'target', help: 'A goal reaches a number of conversions today. Once a day at most.' },
+  goal_conversions: { label: 'New conversions', icon: 'mouse-pointer-click', help: 'A goal was reached since the last check (every five minutes), with totals only: no visitor details.' },
+  new_top_referrer: { label: 'New traffic source', icon: 'globe', help: 'A source that sent nothing in the last 28 days is suddenly sending visitors.' },
+};
+const ALERT_DEFAULTS = { traffic_spike: { percent: 100, min_visitors: 50 }, traffic_drop: { percent: 50, min_visitors: 50 }, goal_milestone: { count: 10 }, goal_conversions: {}, new_top_referrer: { min_visitors: 20 } };
+
+function describeRule(r, goals) {
+  const c = r.config || {};
+  const goal = (goals.find((g) => g.id === c.goal_id) || { name: 'a deleted goal' }).name;
+  return {
+    traffic_spike: `Visitors ${c.percent}% above the usual, at least ${c.min_visitors} more`,
+    traffic_drop: `Visitors ${c.percent}% below the usual, when the usual is ${c.min_visitors}+ visitors`,
+    goal_milestone: `“${goal}” reaches ${c.count} conversions in a day`,
+    goal_conversions: `New conversions of “${goal}”`,
+    new_top_referrer: `A new source sends ${c.min_visitors}+ visitors in a day`,
+  }[r.type];
+}
+
+function RuleForm({ site, goals, hooks, mail, rule, onSaved, onCancel }) {
+  const [f, setF] = useState(rule ? { ...rule, quiet: !!rule.quiet_start } : { type: 'traffic_spike', config: ALERT_DEFAULTS.traffic_spike, email: mail, webhook_ids: [], quiet: false, quiet_start: '22:00', quiet_end: '07:00', enabled: true });
+  const [err, setErr] = useState(null);
+  const c = f.config;
+  const setC = (k, v) => setF({ ...f, config: { ...c, [k]: v } });
+  const num = (k, label, help, min, max) => html`<${Field} label=${label} help=${help}><input type="number" min=${min} max=${max} required value=${c[k]} onInput=${(e) => setC(k, e.target.value === '' ? '' : Number(e.target.value))} /><//>`;
+  const needsGoal = f.type === 'goal_milestone' || f.type === 'goal_conversions';
+  const toggleHook = (id, on) => setF({ ...f, webhook_ids: on ? [...f.webhook_ids, id] : f.webhook_ids.filter((x) => x !== id) });
+  const save = async (e) => {
+    e.preventDefault(); setErr(null);
+    const body = { type: f.type, config: c, email: f.email, webhook_ids: f.webhook_ids, quiet_start: f.quiet ? f.quiet_start : null, quiet_end: f.quiet ? f.quiet_end : null, enabled: f.enabled };
+    try { await api(`/sites/${site.domain}/alert-rules${rule ? '/' + rule.id : ''}`, { method: rule ? 'PATCH' : 'POST', body }); toast('Alert saved'); onSaved(); } catch (x) { setErr(firstError(x)); }
+  };
+  return html`<form class="funnel-form" onSubmit=${save}>
+    ${err && html`<div class="alert">${err}</div>`}
+    <div class="steps-edit"><span class="lbl">When</span>
+      <div class="seg wrapseg" role="radiogroup" aria-label="Alert type">${Object.entries(ALERT_TYPES).map(([k, t]) => html`<button type="button" role="radio" aria-checked=${f.type === k} class=${f.type === k ? 'on' : ''} disabled=${!!rule && f.type !== k} onClick=${() => setF({ ...f, type: k, config: ALERT_DEFAULTS[k] })}><${Icon} name=${t.icon} size=${14} />${t.label}</button>`)}</div>
+      <span class="muted small">${ALERT_TYPES[f.type].help}</span></div>
+    ${needsGoal && html`<${Field} label="Goal"><select required value=${c.goal_id || ''} onChange=${(e) => setC('goal_id', e.target.value)}><option value="" selected=${!c.goal_id}>Choose a goal</option>${goals.map((g) => html`<option value=${g.id} selected=${g.id === c.goal_id}>${g.name}</option>`)}</select><//>`}
+    <div class="alert-nums">
+      ${(f.type === 'traffic_spike' || f.type === 'traffic_drop') && num('percent', f.type === 'traffic_spike' ? 'Percent above the usual' : 'Percent below the usual', null, 10, f.type === 'traffic_spike' ? 1000 : 95)}
+      ${f.type === 'traffic_spike' && num('min_visitors', 'At least this many more visitors', null, 1, 100000)}
+      ${f.type === 'traffic_drop' && num('min_visitors', 'Only when the usual is at least', null, 1, 100000)}
+      ${f.type === 'goal_milestone' && num('count', 'Conversions in a day', null, 1, 1000000)}
+      ${f.type === 'new_top_referrer' && num('min_visitors', 'Visitors from the source today', null, 1, 100000)}
+    </div>
+    <div class="steps-edit"><span class="lbl">Send it to</span>
+      <${Toggle} label="Email" help=${mail ? 'The site\'s owners and admins' : 'Email isn\'t set up on this installation yet'} checked=${f.email} disabled=${!mail && !f.email} onChange=${(v) => setF({ ...f, email: v })} />
+      ${hooks.map((h) => html`<${Toggle} key=${h.id} label=${h.name} help=${({ generic: 'Signed JSON webhook', slack: 'Slack', discord: 'Discord' })[h.kind]} checked=${f.webhook_ids.includes(h.id)} onChange=${(v) => toggleHook(h.id, v)} />`)}
+      ${hooks.length === 0 && html`<span class="muted small">Add a webhook below to send alerts to Slack, Discord or your own service.</span>`}</div>
+    <div class="steps-edit alert-quiet"><span class="lbl">Quiet hours</span><${Toggle} label="Don't send during set hours" help="In the site's timezone. Anything still true afterwards is sent then." checked=${f.quiet} onChange=${(v) => setF({ ...f, quiet: v })} />
+      ${f.quiet && html`<div class="alert-nums"><${Field} label="From"><input type="time" required value=${f.quiet_start} onInput=${(e) => setF({ ...f, quiet_start: e.target.value })} /><//><${Field} label="Until"><input type="time" required value=${f.quiet_end} onInput=${(e) => setF({ ...f, quiet_end: e.target.value })} /><//></div>`}</div>
+    <div class="row"><button class="btn primary">Save alert</button><button type="button" class="btn" onClick=${onCancel}>Cancel</button></div></form>`;
+}
+
+function Alerts({ site }) {
+  const res = useApi(`/sites/${site.domain}/alerts`, null, []);
+  const goalsRes = useApi(`/sites/${site.domain}/goals`, null, []);
+  const [form, setForm] = useState(null); // 'new' or the rule being edited
+  const [hook, setHook] = useState({ name: '', kind: 'generic', url: '' });
+  const [secret, setSecret] = useState(null);
+  const [err, setErr] = useState(null);
+  const [testing, setTesting] = useState(null);
+  const d = res.data;
+  const locked = !!d && d.allowed === false;
+  const rules = (d && d.rules) || [];
+  const hooks = (d && d.webhooks) || [];
+  const goals = (goalsRes.data && goalsRes.data.data) || [];
+  const base = `/sites/${site.domain}`;
+  const act = async (fn, msg) => { setErr(null); try { await fn(); if (msg) toast(msg); res.reload(); } catch (x) { setErr(firstError(x)); } };
+  const addHook = (e) => { e.preventDefault(); act(async () => { const r = await api(`${base}/alert-webhooks`, { method: 'POST', body: hook }); setHook({ name: '', kind: 'generic', url: '' }); setSecret(r.data.secret ? { name: r.data.name, value: r.data.secret } : null); }, 'Webhook added'); };
+  const test = async (h) => { setTesting(h.id); setErr(null); try { const r = await api(`${base}/alert-webhooks/${h.id}/test`, { method: 'POST' }); toast(r.ok ? 'Test alert delivered' : 'Not delivered: ' + (r.error || 'HTTP ' + r.status), r.ok ? undefined : 'err'); res.reload(); } catch (x) { setErr(firstError(x)); } setTesting(null); };
+  return html`<${Section} title="Alerts" locked=${locked} lockNote=${rules.length ? 'Your existing alerts are paused until then.' : ''} help="Get told when something is worth a look: a spike or drop in visitors, a goal reaching a number, or a brand new traffic source. Alerts carry totals only, never anything about a visitor. Rules are checked every five minutes.">
+      ${d && !d.mail && !locked && html`<div class="notice"><${Icon} name="info" size=${16} /><div>Email isn't set up on this installation, so alerts can only go to webhooks for now.</div></div>`}
+      ${err && html`<div class="alert">${err}</div>`}
+      ${form ? html`<${RuleForm} site=${site} goals=${goals} hooks=${hooks} mail=${!!(d && d.mail)} rule=${form === 'new' ? null : form} onSaved=${() => { setForm(null); res.reload(); }} onCancel=${() => setForm(null)} />`
+        : html`<div class="section-actions"><button class="btn primary" disabled=${locked} onClick=${() => setForm('new')}><${Icon} name="plus" size=${14} /> New alert</button></div>`}
+      ${locked && rules.length === 0 && html`<ul class="rows">${[['trending-up', 'Traffic spike', 'Visitors 100% above the usual'], ['target', 'Goal milestone', 'A goal reaches 25 conversions in a day']].map(([i, t, m]) => html`<li class="rowitem"><span class="ri-ico"><${Icon} name=${i} size=${16} /></span><div class="grow ri-main"><b>${t}</b><span class="muted">${m}</span></div></li>`)}</ul>`}
+      ${d && rules.length === 0 && !form && !locked && html`<div class="empty-inline"><${Icon} name="bell" size=${18} /><div><b>No alerts yet</b><span>Create one to be told when traffic jumps or drops, or when a goal is reached.</span></div></div>`}
+      ${rules.length > 0 && html`<ul class="rows" aria-label="Alerts">${rules.map((r) => html`<li class="rowitem" key=${r.id}>
+        <span class="ri-ico" aria-hidden="true"><${Icon} name=${ALERT_TYPES[r.type].icon} size=${16} /></span>
+        <div class="grow ri-main"><b class="trunc">${ALERT_TYPES[r.type].label}</b><span class="muted">${describeRule(r, goals)} · ${[r.email && 'email', ...r.webhook_ids.map((id) => (hooks.find((h) => h.id === id) || {}).name).filter(Boolean)].filter(Boolean).join(', ') || 'no destination'}${r.quiet_start ? ` · quiet ${r.quiet_start}–${r.quiet_end}` : ''}${r.last_fired_at ? ' · last sent ' + ago(r.last_fired_at) : ''}</span></div>
+        <select class="mini-select" style="width:auto" aria-label=${'Turn ' + ALERT_TYPES[r.type].label + ' on or off'} onChange=${(e) => act(() => api(`${base}/alert-rules/${r.id}`, { method: 'PATCH', body: { enabled: e.target.value === 'on' } }))}><option value="on" selected=${r.enabled}>On</option><option value="off" selected=${!r.enabled}>Off</option></select>
+        <button class="btn ghost icon sm" disabled=${locked} aria-label="Edit alert" title="Edit" onClick=${() => setForm(r)}><${Icon} name="pencil" size=${15} /></button>
+        <button class="btn ghost icon sm danger" aria-label="Delete alert" title="Delete" onClick=${() => act(() => api(`${base}/alert-rules/${r.id}`, { method: 'DELETE' }))}><${Icon} name="trash-2" size=${15} /></button></li>`)}</ul>`}
+    <//>
+    <${Section} title="Webhooks" locked=${locked} help="Where alerts go besides email. Slack and Discord take their incoming-webhook address. Your own service gets a JSON POST signed with a secret, so you can check it came from Tidemark.${d && d.private_allowed ? '' : ' Addresses must be public https URLs.'}">
+      <form class="goal-add" onSubmit=${addHook}><fieldset disabled=${locked} style="border:0;padding:0;margin:0;display:contents">
+        <div class="seg" role="radiogroup" aria-label="Webhook type">${[['generic', 'Signed JSON'], ['slack', 'Slack'], ['discord', 'Discord']].map(([k, l]) => html`<button type="button" role="radio" aria-checked=${hook.kind === k} class=${hook.kind === k ? 'on' : ''} onClick=${() => setHook({ ...hook, kind: k })}>${l}</button>`)}</div>
+        <div class="goal-add-row">
+          <input required maxlength="80" placeholder="Name, e.g. Team chat" style="width:180px" value=${hook.name} onInput=${(e) => setHook({ ...hook, name: e.target.value })} aria-label="Webhook name" />
+          <input class="grow" required type="url" placeholder=${({ generic: 'https://example.com/hooks/tidemark', slack: 'https://hooks.slack.com/services/…', discord: 'https://discord.com/api/webhooks/…' })[hook.kind]} value=${hook.url} onInput=${(e) => setHook({ ...hook, url: e.target.value })} aria-label="Webhook address" />
+          <button class="btn primary">Add webhook</button></div></fieldset></form>
+      ${secret && html`<div class="notice"><${Icon} name="info" size=${16} /><div><b>Signing secret for ${secret.name}</b>: copy it now, it is not shown again.<${CodeBlock} text=${secret.value} />
+        <p class="muted small">Each request has a <code>Tidemark-Signature: t=timestamp,v1=signature</code> header. The signature is the hex HMAC-SHA256 of <code>timestamp.body</code> with this secret.</p>
+        <button class="btn sm" onClick=${() => setSecret(null)}>Done</button></div></div>`}
+      ${hooks.length > 0 && html`<ul class="rows" aria-label="Webhooks">${hooks.map((h) => html`<li class="rowitem" key=${h.id}>
+        <span class="ri-ico" aria-hidden="true"><${Icon} name="send" size=${16} /></span>
+        <div class="grow ri-main"><b class="trunc">${h.name}</b><span class="muted trunc">${({ generic: 'Signed JSON', slack: 'Slack', discord: 'Discord' })[h.kind]} · ${h.url}${h.last_at ? (h.last_error ? ` · last delivery failed (${h.last_error})` : ' · last delivery ok ' + ago(h.last_at)) : ''}</span></div>
+        <button class="btn sm" disabled=${locked || testing === h.id} onClick=${() => test(h)}>Send test</button>
+        <button class="btn ghost icon sm danger" aria-label=${'Delete webhook ' + h.name} title="Delete" onClick=${() => act(() => api(`${base}/alert-webhooks/${h.id}`, { method: 'DELETE' }))}><${Icon} name="trash-2" size=${15} /></button></li>`)}</ul>`}
+    <//>`;
 }
 
 // -------------------------------------------------------------------------------------- account settings
@@ -438,6 +597,25 @@ function Profile() {
         <div class="row"><button class="btn primary" disabled=${!changed}>Save changes</button>${changed && html`<span class="muted small">Unsaved changes</span>`}</div></form><//>
     <${Section} title="Appearance" help="System follows your device and switches with it.">
       <div class="theme-opts" role="radiogroup" aria-label="Theme">${THEMES.map(([k, l]) => html`<button type="button" role="radio" aria-checked=${theme === k} class=${'theme-opt ' + k + (theme === k ? ' on' : '')} onClick=${() => pick(k)}><span class="tp" aria-hidden="true"><i></i><i></i><i></i></span><span>${l}</span></button>`)}</div><//>`;
+}
+
+function EmailReports() {
+  const res = useApi('/me/reports', null, []);
+  const [busy, setBusy] = useState(null);
+  const sites = (res.data && res.data.data) || [];
+  const choose = async (s, frequency) => {
+    setBusy(s.id);
+    try { await api('/me/reports/' + s.id, { method: 'PUT', body: { frequency } }); res.reload(); toast(frequency === 'off' ? 'Reports turned off for ' + s.domain : (frequency === 'weekly' ? 'Weekly' : 'Monthly') + ' reports on for ' + s.domain); } catch (x) { toast(firstError(x), 'err'); }
+    setBusy(null);
+  };
+  return html`<${Section} title="Email reports" help="A short summary of each site: visitors, pageviews, top pages, sources and countries, goals and the notes on your graph, compared with the period before. Weekly reports arrive on Monday morning and monthly ones on the 1st, at 08:00 in each site's timezone.">
+      ${res.data && !res.data.mail && html`<div class="alert">This installation can't send email yet. Reports will start going out once outgoing email is set up (see MAIL_MAILER in the environment file).</div>`}
+      ${res.loading && !res.data ? html`<p class="muted">Loading…</p>` : sites.length === 0 ? html`<p class="muted">You don't have any sites yet.</p>`
+        : html`<div class="rows">${sites.map((s) => html`<div class="rowitem boxed" key=${s.id}><span class="ri-ico" aria-hidden="true"><${Icon} name="mail" size=${16} /></span>
+          <div class="grow ri-main"><b>${s.domain}</b><span class="muted">${s.frequency === 'weekly' ? 'Every Monday' : s.frequency === 'monthly' ? 'On the 1st of each month' : 'No email'}</span></div>
+          <select style="width:auto;flex:none" aria-label=${'Email reports for ' + s.domain} disabled=${busy === s.id} value=${s.frequency || 'off'} onChange=${(e) => choose(s, e.target.value)}>
+            <option value="off" selected=${!s.frequency}>Off</option><option value="weekly" selected=${s.frequency === 'weekly'}>Weekly</option><option value="monthly" selected=${s.frequency === 'monthly'}>Monthly</option></select></div>`)}</div>`}
+      <p class="muted small">The emails hold only totals, with no tracking pixels or tracked links, and every one has an unsubscribe link.</p><//>`;
 }
 
 function Security() {
@@ -475,20 +653,29 @@ function Security() {
 function ApiKeys() {
   const res = useApi('/me/keys', null, []);
   const [name, setName] = useState('');
+  const [scope, setScope] = useState('read');
   const [token, setToken] = useState(null);
   const [err, setErr] = useState(null);
   const keys = (res.data && res.data.data) || [];
-  const create = async (e) => { e.preventDefault(); setErr(null); try { const r = await api('/me/keys', { method: 'POST', body: { name } }); setToken(r.token); setName(''); res.reload(); } catch (x) { setErr(firstError(x)); } };
+  const origin = window.location.origin;
+  const create = async (e) => { e.preventDefault(); setErr(null); try { const r = await api('/me/keys', { method: 'POST', body: { name, scope } }); setToken({ value: r.token, scope: r.data.scope }); setName(''); res.reload(); } catch (x) { setErr(firstError(x)); } };
   const revoke = async (k) => { setErr(null); try { await api('/me/keys/' + k.id, { method: 'DELETE' }); res.reload(); } catch (x) { setErr(firstError(x)); } };
-  return html`<${Section} title="API keys" help="Use a key as a Bearer token with the Stats API (/api/v1/stats/…). A key has the same access as you.">
-    <form class="goal-add" onSubmit=${create}><div class="goal-add-row"><input class="grow" required placeholder="Key name, e.g. Reporting script" aria-label="Key name" value=${name} onInput=${(e) => setName(e.target.value)} /><button class="btn primary" disabled=${!name.trim()}>Create key</button></div></form>
-    ${token && html`<div class="notice"><${Icon} name="key" size=${16} /><div><b>Copy your key now. It won't be shown again.</b><${CodeBlock} text=${token} /></div></div>`}
+  const mcp = JSON.stringify({ mcpServers: { tidemark: { url: origin + '/api/mcp', headers: { Authorization: 'Bearer ' + (token ? token.value : '<your key>') } } } }, null, 2);
+  return html`<${Section} title="API keys" help="Use a key as a Bearer token with the Stats API (/api/v1/stats/…) or to connect an AI assistant through MCP. A read-only key can only read statistics; a full-access key has the same access as you.">
+    <form class="goal-add" onSubmit=${create}>
+      <div class="seg" role="radiogroup" aria-label="Key access">${[['read', 'Read-only', 'eye'], ['full', 'Full access', 'key']].map(([k, l, i]) => html`<button type="button" role="radio" aria-checked=${scope === k} class=${scope === k ? 'on' : ''} onClick=${() => setScope(k)}><${Icon} name=${i} size=${14} />${l}</button>`)}</div>
+      <div class="goal-add-row"><input class="grow" required placeholder="Key name, e.g. Claude or Reporting script" aria-label="Key name" value=${name} onInput=${(e) => setName(e.target.value)} /><button class="btn primary" disabled=${!name.trim()}>Create key</button></div></form>
+    ${token && html`<div class="notice"><${Icon} name="key" size=${16} /><div><b>Copy your key now. It won't be shown again.</b><${CodeBlock} text=${token.value} /></div></div>`}
     ${err && html`<div class="alert">${err}</div>`}
-    ${res.data && !keys.length && html`<div class="empty-inline"><${Icon} name="key" size=${18} /><div><b>No keys yet</b><span>Create one to read your stats from a script or another tool.</span></div></div>`}
+    ${res.data && !keys.length && html`<div class="empty-inline"><${Icon} name="key" size=${18} /><div><b>No keys yet</b><span>Create one to read your stats from a script or an AI assistant.</span></div></div>`}
     ${keys.length > 0 && html`<ul class="rows" aria-label="API keys">${keys.map((k) => html`<li class="rowitem">
       <span class="ri-ico" aria-hidden="true"><${Icon} name="key" size=${16} /></span>
-      <div class="grow ri-main"><b class="trunc">${k.name}</b><span class="muted">${k.last_used_at ? 'Last used ' + ago(k.last_used_at.replace('T', ' ').slice(0, 19)) : 'Never used'}</span></div>
+      <div class="grow ri-main"><b class="trunc">${k.name}</b><span class="muted">${k.scope === 'read' ? 'Read-only' : 'Full access'} · ${k.last_used_at ? 'last used ' + ago(k.last_used_at.replace('T', ' ').slice(0, 19)) : 'never used'}</span></div>
       <button class="btn ghost icon sm danger" aria-label=${'Revoke key ' + k.name} title="Revoke key" onClick=${() => revoke(k)}><${Icon} name="trash-2" size=${15} /></button></li>`)}</ul>`}
+  <//>
+  <${Section} title="Connect an AI assistant" help="Tidemark has a read-only MCP server, so assistants such as Claude can answer questions about your stats. Add this to the assistant's MCP settings with a key from above. It can read totals, trends, top pages and sources, goals and funnels for your sites, and never anything about a single visitor.">
+    <${CodeBlock} text=${mcp} />
+    <p class="muted small">The Stats API and MCP are described in an <a href="/api/v1/openapi.json" target="_blank" rel="noopener">OpenAPI document</a> you can feed to any API client or code generator.</p>
   <//>`;
 }
 
@@ -606,11 +793,11 @@ export function AccountSettings({ tab }) {
   useDocTitle('Settings');
   const { user } = useContext(UserCtx);
   const extra = registry.accountTabs.filter((x) => !x.visible || x.visible(user));
-  const tabs = [['profile', 'Profile'], ['security', 'Security'], ...extra.map((x) => [x.key, x.label, !!(x.dot && x.dot(user))]), ...(user.is_admin && !registry.adminUi ? [['users', 'Users'], ...(user.updater_enabled === false ? [] : [['updates', 'Updates', !!user.update]])] : [])];
+  const tabs = [['profile', 'Profile'], ['reports', 'Email reports'], ['security', 'Security'], ...extra.map((x) => [x.key, x.label, !!(x.dot && x.dot(user))]), ...(user.is_admin && !registry.adminUi ? [['users', 'Users'], ...(user.updater_enabled === false ? [] : [['updates', 'Updates', !!user.update]])] : [])];
   // administration lives in its own interface when an extension provides one
   if (registry.adminUi && user.is_admin && ['users', 'updates', 'customers'].includes(tab)) { window.location.replace(registry.adminUi.href + (tab === 'customers' ? '' : '/' + tab)); return null; }
   const moved = { preferences: 'profile', keys: 'security' }; // older links still land in the right place
   const t = [tab, moved[tab]].find((k) => tabs.some((x) => x[0] === k)) || 'profile';
-  const Body = { profile: Profile, security: Security, users: Users, updates: Updates, ...Object.fromEntries(extra.map((x) => [x.key, x.component])) }[t];
+  const Body = { profile: Profile, reports: EmailReports, security: Security, users: Users, updates: Updates, ...Object.fromEntries(extra.map((x) => [x.key, x.component])) }[t];
   return html`<${SettingsShell} title="Account settings" back=${['/sites', 'Your sites']} tabs=${tabs} tab=${t} base="/settings"><${Body} /><//>`;
 }

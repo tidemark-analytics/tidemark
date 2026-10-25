@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use App\Contracts\AllowsAlerts;
 use App\Contracts\AllowsBranding;
 use App\Contracts\AllowsConversionReports;
 use App\Contracts\AllowsExploration;
 use App\Contracts\AllowsRollups;
+use App\Contracts\EnforcesPiiScrubbing;
 use App\Contracts\Entitlements;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
@@ -16,13 +18,13 @@ class Site extends Model
 {
     use HasUuids;
 
-    protected $fillable = ['kind', 'rollup_all', 'domain', 'timezone', 'public', 'track_outbound', 'track_downloads', 'track_forms', 'brand_name', 'brand_hide_name', 'brand_color', 'brand_logo', 'brand_logo_mime'];
+    protected $fillable = ['kind', 'rollup_all', 'domain', 'timezone', 'public', 'track_outbound', 'track_downloads', 'track_forms', 'brand_name', 'brand_hide_name', 'brand_color', 'brand_logo', 'brand_logo_mime', 'honor_gpc', 'honor_dnt', 'location_precision', 'url_params', 'referrer_domain_only', 'min_group_size', 'pii_scrub', 'bot_filter'];
 
     protected $hidden = ['brand_logo'];
 
     protected function casts(): array
     {
-        return ['rollup_all' => 'boolean', 'public' => 'boolean', 'track_outbound' => 'boolean', 'track_downloads' => 'boolean', 'track_forms' => 'boolean', 'brand_hide_name' => 'boolean', 'imported_start' => 'date', 'imported_end' => 'date'];
+        return ['rollup_all' => 'boolean', 'public' => 'boolean', 'track_outbound' => 'boolean', 'track_downloads' => 'boolean', 'track_forms' => 'boolean', 'brand_hide_name' => 'boolean', 'honor_gpc' => 'boolean', 'honor_dnt' => 'boolean', 'referrer_domain_only' => 'boolean', 'pii_scrub' => 'boolean', 'bot_filter' => 'boolean', 'imported_start' => 'date', 'imported_end' => 'date'];
     }
 
     public function members(): BelongsToMany
@@ -156,6 +158,22 @@ class Site extends Model
         $entitlements = app(Entitlements::class);
 
         return ! ($entitlements instanceof AllowsExploration) || $entitlements->allowsJourneys($this);
+    }
+
+    /** Whether this site may use alert rules and webhooks (always true unless an extension limits it). */
+    public function alertsAllowed(): bool
+    {
+        $entitlements = app(Entitlements::class);
+
+        return ! ($entitlements instanceof AllowsAlerts) || $entitlements->allowsAlerts($this);
+    }
+
+    /** Whether masking of personal data is always on and not the owner's choice (never, unless an extension requires it). */
+    public static function piiScrubEnforced(): bool
+    {
+        $entitlements = app(Entitlements::class);
+
+        return $entitlements instanceof EnforcesPiiScrubbing && $entitlements->enforcesPiiScrubbing();
     }
 
     /** Whether this site may show its own branding on public pages (always true unless an extension limits it). */

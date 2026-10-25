@@ -41,6 +41,7 @@ return Application::configure(basePath: $root)
             AddQueuedCookiesToResponse::class,
             StartSession::class,
         ]);
+        $middleware->validateCsrfTokens(except: ['reports/unsubscribe/*']);
         $middleware->trustProxies(at: '*');
         $middleware->prepend(RunPendingUpdate::class);
     })

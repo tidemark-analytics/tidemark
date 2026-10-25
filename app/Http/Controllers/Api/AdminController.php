@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ReportSubscription;
 use App\Models\User;
 use Illuminate\Http\Request;
 
@@ -48,6 +49,7 @@ class AdminController extends Controller
         $u = User::findOrFail($user);
         $u->sites()->detach();
         $u->apiKeys()->delete();
+        ReportSubscription::where('user_id', $u->id)->delete();
         $u->delete();
 
         return ['ok' => true];

@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Analytics\Support\FilteredHits;
+use App\Analytics\Support\PiiMasks;
 use App\Analytics\Support\Sql;
 use App\Http\Controllers\Controller;
 use App\Models\Funnel;
@@ -9,6 +11,7 @@ use App\Models\FunnelStep;
 use App\Models\Goal;
 use App\Models\SharedLink;
 use App\Models\ShieldRule;
+use App\Models\Site;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -186,6 +189,20 @@ class SettingsController extends Controller
     }
 
     // ---- shields (block lists) ---------------------------------------------------------------------------
+    /** How many values were masked in the last 30 days, by kind (never the values). */
+    public function piiMasks(Request $request)
+    {
+        abort_if(Site::piiScrubEnforced(), 404);
+
+        return ['days' => 30, 'results' => PiiMasks::recent($request->attributes->get('site')->id)];
+    }
+
+    /** How many hits bot filtering left out in the last 30 days, by reason (never anything about who sent them). */
+    public function filtered(Request $request)
+    {
+        return ['days' => 30, 'results' => FilteredHits::recent($request->attributes->get('site')->id)];
+    }
+
     public function shields(Request $r)
     {
         return ['data' => $r->attributes->get('site')->shields()->orderBy('created_at')->get()];

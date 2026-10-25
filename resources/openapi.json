@@ -1,0 +1,1345 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Tidemark API",
+    "version": "dev",
+    "summary": "Stats, Events and MCP endpoints of a Tidemark installation.",
+    "description": "Read your analytics with the **Stats API**, which follows Plausible's Stats API v1 and adds goals, funnels and annotations; send events with the **Events API**; or let an AI assistant read the same numbers through the **MCP** endpoint.\n\nAuthenticate with an API key created in Account settings → Security, sent as `Authorization: Bearer <key>`. A **read-only** key can use the Stats API and MCP, which only read; it cannot change anything. All numbers are aggregates, never visitor-level data.",
+    "contact": {
+      "name": "Tidemark",
+      "url": "https://tidemarkanalytics.com"
+    },
+    "license": {
+      "name": "AGPL-3.0-only",
+      "identifier": "AGPL-3.0-only"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://tidemark.example.com",
+      "description": "Your Tidemark installation"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Stats",
+      "description": "Aggregate numbers for a site."
+    },
+    {
+      "name": "Events",
+      "description": "Recording page views and events."
+    },
+    {
+      "name": "MCP",
+      "description": "Model Context Protocol server for AI assistants."
+    },
+    {
+      "name": "Meta",
+      "description": "This description."
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/api/v1/stats/realtime/visitors": {
+      "get": {
+        "operationId": "getRealtimeVisitors",
+        "summary": "Current visitors",
+        "description": "The number of visitors on the site in the last five minutes.",
+        "tags": [
+          "Stats"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/site_id"
+          },
+          {
+            "$ref": "#/components/parameters/filters"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A single number.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "example": 3
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/api/v1/stats/aggregate": {
+      "get": {
+        "operationId": "getAggregate",
+        "summary": "Totals for a period",
+        "description": "Top stats such as visitors and bounce rate. With an `event:goal` filter the numbers are conversions.",
+        "tags": [
+          "Stats"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/site_id"
+          },
+          {
+            "$ref": "#/components/parameters/period"
+          },
+          {
+            "$ref": "#/components/parameters/date"
+          },
+          {
+            "$ref": "#/components/parameters/filters"
+          },
+          {
+            "$ref": "#/components/parameters/metrics"
+          },
+          {
+            "$ref": "#/components/parameters/compare"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The value of each requested metric.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AggregateResponse"
+                },
+                "example": {
+                  "results": {
+                    "visitors": {
+                      "value": 5710,
+                      "change": 12
+                    },
+                    "bounce_rate": {
+                      "value": 34,
+                      "change": -3
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/api/v1/stats/timeseries": {
+      "get": {
+        "operationId": "getTimeseries",
+        "summary": "Numbers over time",
+        "description": "One row per bucket across the period.",
+        "tags": [
+          "Stats"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/site_id"
+          },
+          {
+            "$ref": "#/components/parameters/period"
+          },
+          {
+            "$ref": "#/components/parameters/date"
+          },
+          {
+            "$ref": "#/components/parameters/filters"
+          },
+          {
+            "$ref": "#/components/parameters/metrics"
+          },
+          {
+            "$ref": "#/components/parameters/interval"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Rows ordered by date.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimeseriesResponse"
+                },
+                "example": {
+                  "results": [
+                    {
+                      "date": "2026-10-01",
+                      "visitors": 212
+                    },
+                    {
+                      "date": "2026-10-02",
+                      "visitors": 198
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/api/v1/stats/breakdown": {
+      "get": {
+        "operationId": "getBreakdown",
+        "summary": "Top values of a property",
+        "description": "Group by a property such as the page, source or country, ordered by visitors.",
+        "tags": [
+          "Stats"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/site_id"
+          },
+          {
+            "$ref": "#/components/parameters/period"
+          },
+          {
+            "$ref": "#/components/parameters/date"
+          },
+          {
+            "$ref": "#/components/parameters/filters"
+          },
+          {
+            "$ref": "#/components/parameters/property"
+          },
+          {
+            "$ref": "#/components/parameters/metrics"
+          },
+          {
+            "$ref": "#/components/parameters/limit"
+          },
+          {
+            "$ref": "#/components/parameters/page"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One row per value; each row has the property as a key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BreakdownResponse"
+                },
+                "example": {
+                  "results": [
+                    {
+                      "page": "/pricing",
+                      "visitors": 1212
+                    },
+                    {
+                      "page": "/blog",
+                      "visitors": 946
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/api/v1/stats/goals": {
+      "get": {
+        "operationId": "getGoals",
+        "summary": "Goal conversions",
+        "description": "Every goal of the site with its conversions in the period.",
+        "tags": [
+          "Stats"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/site_id"
+          },
+          {
+            "$ref": "#/components/parameters/period"
+          },
+          {
+            "$ref": "#/components/parameters/date"
+          },
+          {
+            "$ref": "#/components/parameters/filters"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Goals ordered by visitors.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoalsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/api/v1/stats/funnels": {
+      "get": {
+        "operationId": "listFunnels",
+        "summary": "List funnels",
+        "description": "The funnels of the site, when its plan includes them.",
+        "tags": [
+          "Stats"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/site_id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Funnels with their number of steps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FunnelsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/api/v1/stats/funnels/{funnel}": {
+      "get": {
+        "operationId": "getFunnel",
+        "summary": "Funnel results",
+        "description": "How many visitors got through each step of a funnel in the period.",
+        "tags": [
+          "Stats"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "funnel",
+            "in": "path",
+            "required": true,
+            "description": "A funnel id from the funnels list.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/site_id"
+          },
+          {
+            "$ref": "#/components/parameters/period"
+          },
+          {
+            "$ref": "#/components/parameters/date"
+          },
+          {
+            "$ref": "#/components/parameters/filters"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The steps with drop-off and conversion rates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FunnelResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/api/v1/stats/annotations": {
+      "get": {
+        "operationId": "getAnnotations",
+        "summary": "Notes on the graph",
+        "description": "The notes added to dates in the period that the key's owner may see.",
+        "tags": [
+          "Stats"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/site_id"
+          },
+          {
+            "$ref": "#/components/parameters/period"
+          },
+          {
+            "$ref": "#/components/parameters/date"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Notes ordered by date.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnotationsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/api/event": {
+      "post": {
+        "operationId": "sendEvent",
+        "summary": "Record a page view or event",
+        "description": "What the tracking script calls. No authentication; the `d` domain must be a site on this installation. Send the body as JSON (the script uses `text/plain` so browsers skip a preflight request). Hits from crawlers, headless browsers, data centers and referrer spam are accepted and counted apart, not stored.",
+        "tags": [
+          "Events"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Event"
+              },
+              "example": {
+                "n": "pageview",
+                "u": "https://example.com/pricing",
+                "d": "example.com",
+                "r": "https://news.example.org/",
+                "w": 1440
+              }
+            },
+            "text/plain": {
+              "schema": {
+                "$ref": "#/components/schemas/Event"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted. The body is `ok`, also when the hit was left out.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "const": "ok"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The name, url or domain is missing, or the url is not http(s).",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No site with that domain.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mcp": {
+      "post": {
+        "operationId": "mcp",
+        "summary": "MCP endpoint",
+        "description": "A read-only [Model Context Protocol](https://modelcontextprotocol.io) server over Streamable HTTP. Send JSON-RPC 2.0 messages (`initialize`, `tools/list`, `tools/call`, `ping`); each POST gets one JSON reply, and notifications get `202`. Tools: `list_sites`, `get_stats`, `get_timeseries`, `get_breakdown`, `get_goals`, `list_funnels`, `get_funnel`, `get_current_visitors`, `get_annotations`. It needs an API key; browser sessions are refused.",
+        "tags": [
+          "MCP"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JsonRpcRequest"
+              },
+              "example": {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {
+                  "name": "get_stats",
+                  "arguments": {
+                    "site_id": "example.com",
+                    "period": "7d",
+                    "metrics": [
+                      "visitors",
+                      "pageviews"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "A JSON-RPC response with a `result` or an `error`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JsonRpcResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "A notification was received; there is no reply."
+          },
+          "400": {
+            "description": "The body is not valid JSON.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JsonRpcResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/openapi.json": {
+      "get": {
+        "operationId": "getOpenApi",
+        "summary": "This description",
+        "description": "The OpenAPI document you are reading, with this installation's address.",
+        "tags": [
+          "Meta"
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "An OpenAPI 3.1 document.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "An API key from Account settings → Security. Read-only keys can read statistics and use MCP; full keys have the same access as their owner."
+      }
+    },
+    "parameters": {
+      "site_id": {
+        "name": "site_id",
+        "in": "query",
+        "required": true,
+        "description": "The site's domain, for example `example.com`.",
+        "schema": {
+          "type": "string"
+        },
+        "example": "example.com"
+      },
+      "period": {
+        "name": "period",
+        "in": "query",
+        "description": "The window to report on, in the site's timezone. `custom` needs `date` as `YYYY-MM-DD,YYYY-MM-DD`.",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "day",
+            "7d",
+            "30d",
+            "month",
+            "6mo",
+            "12mo",
+            "year",
+            "custom"
+          ],
+          "default": "30d"
+        }
+      },
+      "date": {
+        "name": "date",
+        "in": "query",
+        "description": "For `custom` periods `YYYY-MM-DD,YYYY-MM-DD`; otherwise the day the period is counted back from (default today).",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "filters": {
+        "name": "filters",
+        "in": "query",
+        "description": "Filters like `visit:country==US;event:page==/blog/*;visit:source==Google|Bing`. Operators `==`, `!=` and `=~` (contains); `|` separates alternatives and `;` separates filters. Properties: `event:page`, `visit:entry_page`, `visit:exit_page`, `visit:source`, `visit:referrer`, `visit:channel`, `visit:utm_medium`, `visit:utm_source`, `visit:utm_campaign`, `visit:utm_content`, `visit:utm_term`, `visit:country`, `visit:region`, `visit:city`, `visit:browser`, `visit:os`, `visit:device`, `event:goal` and `event:props:<name>`.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "metrics": {
+        "name": "metrics",
+        "in": "query",
+        "description": "Comma-separated metrics. Default `visitors`.",
+        "schema": {
+          "type": "string"
+        },
+        "example": "visitors,pageviews,bounce_rate"
+      },
+      "compare": {
+        "name": "compare",
+        "in": "query",
+        "description": "Add the percentage change against the previous period.",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "previous_period"
+          ]
+        }
+      },
+      "interval": {
+        "name": "interval",
+        "in": "query",
+        "description": "Bucket size; only sizes that make sense for the period are used.",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "minute",
+            "hour",
+            "day",
+            "week",
+            "month"
+          ]
+        }
+      },
+      "property": {
+        "name": "property",
+        "in": "query",
+        "required": true,
+        "description": "What to group by.",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "event:page",
+            "visit:entry_page",
+            "visit:exit_page",
+            "visit:source",
+            "visit:referrer",
+            "visit:channel",
+            "visit:utm_medium",
+            "visit:utm_source",
+            "visit:utm_campaign",
+            "visit:utm_content",
+            "visit:utm_term",
+            "visit:country",
+            "visit:region",
+            "visit:city",
+            "visit:browser",
+            "visit:os",
+            "visit:device"
+          ]
+        }
+      },
+      "limit": {
+        "name": "limit",
+        "in": "query",
+        "description": "Rows per page, 1 to 1000.",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000,
+          "default": 100
+        }
+      },
+      "page": {
+        "name": "page",
+        "in": "query",
+        "description": "Page number, starting at 1.",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1
+        }
+      }
+    },
+    "responses": {
+      "Unauthorized": {
+        "description": "No API key, or an invalid one.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "The key is read-only and this is not a statistics endpoint, or the plan does not include the feature.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "No such site, or the key's owner cannot read it.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Invalid": {
+        "description": "A parameter is not supported.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "TooManyRequests": {
+        "description": "Too many requests; wait and retry.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "Period": {
+        "type": "object",
+        "properties": {
+          "period": {
+            "type": "string"
+          },
+          "interval": {
+            "type": "string"
+          },
+          "intervals": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "from": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "to": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AggregateResponse": {
+        "type": "object",
+        "required": [
+          "results"
+        ],
+        "properties": {
+          "results": {
+            "type": "object",
+            "description": "A value for each requested metric.",
+            "propertyNames": {
+              "enum": [
+                "visitors",
+                "visits",
+                "pageviews",
+                "views_per_visit",
+                "bounce_rate",
+                "visit_duration",
+                "events",
+                "conversion_rate",
+                "total_revenue",
+                "average_revenue"
+              ]
+            },
+            "additionalProperties": {
+              "type": "object",
+              "required": [
+                "value"
+              ],
+              "properties": {
+                "value": {
+                  "type": "number"
+                },
+                "change": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "description": "Percentage change against the previous period, when compare was asked for."
+                }
+              }
+            }
+          }
+        }
+      },
+      "TimeseriesResponse": {
+        "type": "object",
+        "required": [
+          "results"
+        ],
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "date"
+              ],
+              "properties": {
+                "date": {
+                  "type": "string",
+                  "description": "`YYYY-MM-DD`, or `YYYY-MM-DD HH:MM:SS` for hourly buckets."
+                }
+              },
+              "additionalProperties": {
+                "type": "number"
+              }
+            }
+          }
+        }
+      },
+      "BreakdownResponse": {
+        "type": "object",
+        "required": [
+          "results"
+        ],
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "The value of the property under its name (for example `page` or `country`), plus the requested metrics.",
+              "additionalProperties": {
+                "type": [
+                  "string",
+                  "number",
+                  "null"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "Goal": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "type",
+          "visitors",
+          "events",
+          "conversion_rate"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "event",
+              "page"
+            ]
+          },
+          "visitors": {
+            "type": "integer",
+            "description": "Unique visitors who converted."
+          },
+          "events": {
+            "type": "integer",
+            "description": "Total conversions."
+          },
+          "conversion_rate": {
+            "type": "number",
+            "description": "Percent of visitors."
+          },
+          "currency": {
+            "type": "string"
+          },
+          "revenue": {
+            "type": "number"
+          },
+          "average_revenue": {
+            "type": "number"
+          }
+        }
+      },
+      "GoalsResponse": {
+        "type": "object",
+        "required": [
+          "results"
+        ],
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Goal"
+            }
+          },
+          "period": {
+            "$ref": "#/components/schemas/Period"
+          }
+        }
+      },
+      "FunnelsResponse": {
+        "type": "object",
+        "required": [
+          "allowed",
+          "results"
+        ],
+        "properties": {
+          "allowed": {
+            "type": "boolean",
+            "description": "False when the plan has no funnels."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "name",
+                "steps"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "steps": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        }
+      },
+      "FunnelResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "steps",
+          "conversion_rate"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "conversion_rate": {
+            "type": "number",
+            "description": "Percent of those who started the funnel and finished it."
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "visitors": {
+                  "type": "integer"
+                },
+                "conversion_rate": {
+                  "type": "number"
+                },
+                "conversion_rate_step": {
+                  "type": "number"
+                },
+                "dropoff": {
+                  "type": "integer"
+                },
+                "dropoff_percentage": {
+                  "type": "number"
+                }
+              }
+            }
+          },
+          "period": {
+            "$ref": "#/components/schemas/Period"
+          }
+        }
+      },
+      "AnnotationsResponse": {
+        "type": "object",
+        "required": [
+          "results"
+        ],
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "date",
+                "note",
+                "visibility"
+              ],
+              "properties": {
+                "date": {
+                  "type": "string",
+                  "format": "date"
+                },
+                "note": {
+                  "type": "string"
+                },
+                "visibility": {
+                  "type": "string",
+                  "enum": [
+                    "private",
+                    "team",
+                    "public"
+                  ]
+                }
+              }
+            }
+          },
+          "period": {
+            "$ref": "#/components/schemas/Period"
+          }
+        }
+      },
+      "Event": {
+        "type": "object",
+        "required": [
+          "n",
+          "u",
+          "d"
+        ],
+        "properties": {
+          "n": {
+            "type": "string",
+            "maxLength": 120,
+            "description": "Event name; `pageview` for a page view."
+          },
+          "u": {
+            "type": "string",
+            "format": "uri",
+            "description": "The page address."
+          },
+          "d": {
+            "type": "string",
+            "description": "The site's domain."
+          },
+          "r": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The referrer."
+          },
+          "w": {
+            "type": "integer",
+            "description": "Screen width in pixels, to tell phones from desktops."
+          },
+          "p": {
+            "type": "object",
+            "description": "Custom properties.",
+            "additionalProperties": true
+          },
+          "$": {
+            "type": "object",
+            "description": "Revenue: `{\"amount\": 29.99, \"currency\": \"USD\"}`.",
+            "properties": {
+              "amount": {
+                "type": "number"
+              },
+              "currency": {
+                "type": "string"
+              }
+            }
+          },
+          "h": {
+            "type": "integer",
+            "description": "1 when the site uses hash-based routing."
+          }
+        }
+      },
+      "JsonRpcRequest": {
+        "type": "object",
+        "required": [
+          "jsonrpc",
+          "method"
+        ],
+        "properties": {
+          "jsonrpc": {
+            "const": "2.0"
+          },
+          "id": {
+            "type": [
+              "string",
+              "integer"
+            ]
+          },
+          "method": {
+            "type": "string",
+            "examples": [
+              "initialize",
+              "tools/list",
+              "tools/call",
+              "ping"
+            ]
+          },
+          "params": {
+            "type": "object"
+          }
+        }
+      },
+      "JsonRpcResponse": {
+        "type": "object",
+        "required": [
+          "jsonrpc"
+        ],
+        "properties": {
+          "jsonrpc": {
+            "const": "2.0"
+          },
+          "id": {
+            "type": [
+              "string",
+              "integer",
+              "null"
+            ]
+          },
+          "result": {
+            "type": "object"
+          },
+          "error": {
+            "type": "object",
+            "required": [
+              "code",
+              "message"
+            ],
+            "properties": {
+              "code": {
+                "type": "integer"
+              },
+              "message": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

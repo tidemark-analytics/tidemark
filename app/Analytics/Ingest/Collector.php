@@ -3,7 +3,11 @@
 namespace App\Analytics\Ingest;
 
 use App\Analytics\Support\ExchangeRates;
+use App\Analytics\Support\FilteredHits;
+use App\Analytics\Support\PiiMasks;
+use App\Analytics\Support\PiiScrubber;
 use App\Analytics\Support\Sources;
+use App\Analytics\Support\UrlParams;
 use App\Contracts\Entitlements;
 use App\Models\Site;
 use Illuminate\Http\Request;
@@ -41,12 +45,25 @@ class Collector
             return ['status' => 404, 'body' => 'Unknown site'];
         }
 
-        $ua = (string) $request->userAgent();
-        $agent = UserAgent::parse($ua);
-        if ($agent['bot'] && ! config('tidemark.disable_bot_filter')) {
+        // a visitor who asked not to be measured (Global Privacy Control, or Do Not Track) is not, when the site owner chose to honor it
+        if ((($site['honor_gpc'] ?? false) && $request->header('Sec-GPC') === '1') || (($site['honor_dnt'] ?? false) && $request->header('DNT') === '1')) {
             return ['status' => 202, 'body' => 'ok'];
         }
+
+        $ua = (string) $request->userAgent();
+        $agent = UserAgent::parse($ua);
         $ip = Geo::clientIp($request);
+        parse_str($parts['query'] ?? '', $q);
+        $q = array_map(fn ($v) => is_string($v) ? mb_substr($v, 0, 255) : null, $q);
+        $referrer = $q['ref'] ?? $q['source'] ?? $q['utm_source'] ?? null;
+        $referrer = isset($p['r']) && $p['r'] ? (string) $p['r'] : ($referrer && str_contains($referrer, '.') ? $referrer : null);
+        $visitorId = $this->visitorId($site['id'], $ip, $ua);
+        // crawlers, scripts, data center traffic, referrer spam and floods are left out and only counted, unless the owner turned the filter off
+        if (($site['bot_filter'] ?? true) && ! config('tidemark.disable_bot_filter') && ($why = BotFilter::verdict($request, $ua, $agent, $ip, $referrer, $visitorId))) {
+            FilteredHits::record($site['id'], $why);
+
+            return ['status' => 202, 'body' => 'ok'];
+        }
         $hostname = strtolower($parts['host'] ?? '');
         $pathname = ($parts['path'] ?? '') === '' ? '/' : $parts['path'];
         if (! empty($p['h']) && ! empty($parts['fragment'])) {
@@ -55,6 +72,13 @@ class Collector
         $pathname = mb_substr($pathname, 0, 500);
 
         $geo = Geo::resolve($request, $ip);
+        $precision = $site['location_precision'] ?? 'city'; // (a site cached before this setting existed has none)
+        if ($precision !== 'city') {
+            $geo['city'] = null;
+            if ($precision === 'country') {
+                $geo['region'] = null;
+            }
+        }
         if ($this->shielded($site, $ip, $geo['country'], $pathname, $hostname)) {
             return ['status' => 202, 'body' => 'ok'];
         }
@@ -62,28 +86,36 @@ class Collector
             return ['status' => 202, 'body' => 'ok'];
         }
 
-        parse_str($parts['query'] ?? '', $q);
-        $q = array_map(fn ($v) => is_string($v) ? mb_substr($v, 0, 255) : null, $q);
-        $referrer = $q['ref'] ?? $q['source'] ?? $q['utm_source'] ?? null;
-        $referrer = isset($p['r']) && $p['r'] ? (string) $p['r'] : ($referrer && str_contains($referrer, '.') ? $referrer : null);
+        $pathname = UrlParams::apply($pathname, $q, $site['url_params'] ?? []); // only what the owner allow-listed; none by default
+        // personal data sites send by accident (an email in a URL, a token in a path) is masked before it is stored; only counts are kept
+        $masked = [];
+        $clean = function (?string $v) use ($site, &$masked) {
+            return ($site['pii_scrub'] ?? true) && $v ? PiiScrubber::scrub($v, $masked) : $v;
+        };
+        $pathname = (string) $clean($pathname);
         $utm = ['source' => $q['utm_source'] ?? null, 'medium' => $q['utm_medium'] ?? null, 'campaign' => $q['utm_campaign'] ?? null, 'content' => $q['utm_content'] ?? null, 'term' => $q['utm_term'] ?? null];
+        $utm = array_map($clean, $utm);
         $src = Sources::classify($referrer, $utm, $site['domain']);
+        $src['referrer'] = $clean($src['referrer']);
         $revenue = $name === 'pageview' ? null : $this->revenue($p['revenue'] ?? $p['$'] ?? null, $site['currencies'][$name] ?? null);
 
         $this->sink->record([
             'site_id' => $site['id'],
-            'visitor_id' => $this->visitorId($site['id'], $ip, $ua),
+            'visitor_id' => $visitorId,
             'at' => now()->format('Y-m-d H:i:s'),
-            'name' => mb_substr($name, 0, 120),
+            'name' => mb_substr((string) $clean($name), 0, 120),
             'pathname' => $pathname,
             'hostname' => mb_substr($hostname, 0, 100),
-            'referrer' => $src['referrer'], 'source' => $src['source'], 'channel' => $src['channel'], 'utm' => $utm,
+            'referrer' => ($site['referrer_domain_only'] ?? false) && $src['referrer'] ? strtok($src['referrer'], '/') : $src['referrer'], 'source' => $src['source'], 'channel' => $src['channel'], 'utm' => $utm,
             'country' => $geo['country'], 'region' => $geo['region'], 'city' => $geo['city'],
             'browser' => $agent['browser'], 'os' => $agent['os'],
             'device' => Sources::deviceFromWidth(isset($p['w']) ? (int) $p['w'] : null, $agent['mobile'], $agent['tablet']),
-            'props' => $this->props($p['p'] ?? $p['props'] ?? null),
+            'props' => $this->scrubProps($this->props($p['p'] ?? $p['props'] ?? null), $clean),
             'revenue' => $revenue,
         ]);
+        if ($masked) {
+            PiiMasks::record($site['id'], $masked);
+        }
 
         return ['status' => 202, 'body' => 'ok'];
     }
@@ -120,6 +152,20 @@ class Collector
         return ['amount' => $amount, 'currency' => $currency, 'reporting' => $reporting === null ? null : round($reporting, 4)];
     }
 
+    /**
+     * @param  array<string,string>  $props
+     * @return array<string,string>
+     */
+    private function scrubProps(array $props, \Closure $clean): array
+    {
+        $out = [];
+        foreach ($props as $k => $v) {
+            $out[mb_substr((string) $clean((string) $k), 0, 120)] = mb_substr((string) $clean($v), 0, 500);
+        }
+
+        return $out;
+    }
+
     /** @return array<string,string> */
     private function props(mixed $raw): array
     {
@@ -145,7 +191,7 @@ class Collector
             $found = Cache::remember('tdm:site:'.$candidate, 60, function () use ($candidate) {
                 $site = Site::real()->where('domain', $candidate)->first();
 
-                return $site ? ['id' => $site->id, 'domain' => $site->domain, 'owner_id' => $site->members()->wherePivot('role', 'owner')->value('users.id'), 'shields' => $site->shields()->get()->groupBy('type')->map(fn ($g) => $g->pluck('value')->all())->all(), 'currencies' => Schema::hasColumn('goals', 'currency') ? $site->goals()->where('type', 'event')->whereNotNull('currency')->pluck('currency', 'value')->all() : []] : 0;
+                return $site ? ['id' => $site->id, 'domain' => $site->domain, 'owner_id' => $site->members()->wherePivot('role', 'owner')->value('users.id'), 'honor_gpc' => (bool) $site->honor_gpc, 'honor_dnt' => (bool) $site->honor_dnt, 'location_precision' => $site->location_precision ?: 'city', 'url_params' => UrlParams::parse($site->url_params), 'referrer_domain_only' => (bool) $site->referrer_domain_only, 'pii_scrub' => Site::piiScrubEnforced() || (bool) ($site->pii_scrub ?? true), 'bot_filter' => (bool) ($site->bot_filter ?? true), 'shields' => $site->shields()->get()->groupBy('type')->map(fn ($g) => $g->pluck('value')->all())->all(), 'currencies' => Schema::hasColumn('goals', 'currency') ? $site->goals()->where('type', 'event')->whereNotNull('currency')->pluck('currency', 'value')->all() : []] : 0;
             });
             if ($found) {
                 return $found;

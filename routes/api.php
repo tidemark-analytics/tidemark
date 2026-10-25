@@ -1,10 +1,15 @@
 <?php
 
 use App\Http\Controllers\Api\AdminController;
+use App\Http\Controllers\Api\AlertController;
+use App\Http\Controllers\Api\AnnotationController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BrandingController;
 use App\Http\Controllers\Api\DataController;
+use App\Http\Controllers\Api\McpController;
+use App\Http\Controllers\Api\OpenApiController;
 use App\Http\Controllers\Api\PlausibleImportController;
+use App\Http\Controllers\Api\ReportSubscriptionController;
 use App\Http\Controllers\Api\RollupController;
 use App\Http\Controllers\Api\SegmentController;
 use App\Http\Controllers\Api\SettingsController as S;
@@ -24,6 +29,9 @@ Route::withoutMiddleware(['throttle:api', StartSession::class, EncryptCookies::c
     Route::match(['post', 'options'], '/event', [EventController::class, 'store'])->name('event');
 });
 
+// ---- the API description, public --------------------------------------------------------------------------------
+Route::get('/v1/openapi.json', [OpenApiController::class, 'show']);
+
 // ---- auth & public config --------------------------------------------------------------------------------------
 Route::get('/config', [AuthController::class, 'config']);
 Route::middleware('api.auth:optional')->group(function () {
@@ -42,6 +50,7 @@ Route::middleware('api.auth:optional')->group(function () {
         Route::get('/stats/breakdown/{dim}', [StatsController::class, 'breakdown']);
         Route::get('/stats/goals', [StatsController::class, 'goals']);
         Route::get('/segments', [SegmentController::class, 'index']);
+        Route::get('/annotations', [AnnotationController::class, 'index']);
         Route::get('/stats/journeys', [StatsController::class, 'journeys']);
         Route::get('/stats/funnels', [StatsController::class, 'funnels']);
         Route::get('/stats/funnels/{funnel}', [StatsController::class, 'funnel']);
@@ -61,6 +70,8 @@ Route::middleware('api.auth')->group(function () {
     Route::post('/me/two-factor', [AuthController::class, 'twoFactorSetup']);
     Route::post('/me/two-factor/confirm', [AuthController::class, 'twoFactorConfirm']);
     Route::delete('/me/two-factor', [AuthController::class, 'twoFactorDisable']);
+    Route::get('/me/reports', [ReportSubscriptionController::class, 'index']);
+    Route::put('/me/reports/{site}', [ReportSubscriptionController::class, 'update']);
     Route::get('/me/keys', [AuthController::class, 'keys']);
     Route::post('/me/keys', [AuthController::class, 'createKey']);
     Route::delete('/me/keys/{id}', [AuthController::class, 'deleteKey']);
@@ -72,6 +83,9 @@ Route::middleware('api.auth')->group(function () {
 
     // Anyone with access to a site (viewers included) may keep personal segments; owners and admins may also share them with everyone.
     Route::middleware('site:view')->prefix('/sites/{site}')->group(function () {
+        Route::post('/annotations', [AnnotationController::class, 'store']);
+        Route::patch('/annotations/{annotation}', [AnnotationController::class, 'update']);
+        Route::delete('/annotations/{annotation}', [AnnotationController::class, 'destroy']);
         Route::post('/segments', [SegmentController::class, 'store']);
         Route::patch('/segments/{segment}', [SegmentController::class, 'update']);
         Route::delete('/segments/{segment}', [SegmentController::class, 'destroy']);
@@ -102,6 +116,16 @@ Route::middleware('api.auth')->group(function () {
         Route::post('/shared-links', [S::class, 'createSharedLink']);
         Route::patch('/shared-links/{link}', [S::class, 'updateSharedLink']);
         Route::delete('/shared-links/{link}', [S::class, 'deleteSharedLink']);
+        Route::get('/alerts', [AlertController::class, 'index']);
+        Route::post('/alert-rules', [AlertController::class, 'storeRule']);
+        Route::patch('/alert-rules/{rule}', [AlertController::class, 'updateRule']);
+        Route::delete('/alert-rules/{rule}', [AlertController::class, 'destroyRule']);
+        Route::post('/alert-webhooks', [AlertController::class, 'storeWebhook']);
+        Route::patch('/alert-webhooks/{webhook}', [AlertController::class, 'updateWebhook']);
+        Route::delete('/alert-webhooks/{webhook}', [AlertController::class, 'destroyWebhook']);
+        Route::post('/alert-webhooks/{webhook}/test', [AlertController::class, 'testWebhook'])->middleware('throttle:10,1');
+        Route::get('/pii-masks', [S::class, 'piiMasks']);
+        Route::get('/filtered', [S::class, 'filtered']);
         Route::get('/shields', [S::class, 'shields']);
         Route::post('/shields', [S::class, 'createShield']);
         Route::delete('/shields/{rule}', [S::class, 'deleteShield']);
@@ -124,11 +148,19 @@ Route::middleware('api.auth')->group(function () {
     Route::post('/admin/update/apply', [UpdateController::class, 'apply']);
     Route::delete('/admin/update', [UpdateController::class, 'discard']);
 
+    // MCP server (read-only tools over the Stats API)
+    Route::post('/mcp', [McpController::class, 'handle'])->middleware('throttle:120,1');
+    Route::get('/mcp', [McpController::class, 'stream']);
+
     // Stats API v1 (Plausible-compatible subset)
     Route::prefix('/v1/stats')->group(function () {
         Route::get('/realtime/visitors', [StatsApiController::class, 'realtime']);
         Route::get('/aggregate', [StatsApiController::class, 'aggregate']);
         Route::get('/timeseries', [StatsApiController::class, 'timeseries']);
         Route::get('/breakdown', [StatsApiController::class, 'breakdown']);
+        Route::get('/annotations', [StatsApiController::class, 'annotations']);
+        Route::get('/goals', [StatsApiController::class, 'goals']);
+        Route::get('/funnels', [StatsApiController::class, 'funnels']);
+        Route::get('/funnels/{funnel}', [StatsApiController::class, 'funnel']);
     });
 });
