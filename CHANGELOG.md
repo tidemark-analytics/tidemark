@@ -4,6 +4,14 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Added
+- **Privacy controls** for each site (Site settings → Tracking), so owners can collect even less:
+  - Respect Global Privacy Control and Do Not Track: visitors who send the signal are not counted (each is its own switch, both off by default).
+  - Location detail: keep country, country and region, or the full country, region and city.
+  - Keep only the referrer's domain, without the path of the page that linked to you.
+  - Query parameters to keep: page addresses are still stored without their query string, but an owner can allow-list parameters (such as `page` or `lang`) to see them in the Pages report. They are stored sorted by name so one page is one row, and names that look like they carry a secret or personal data (such as `email` or `token`) are refused.
+  - New site settings fields `honor_gpc`, `honor_dnt`, `location_precision`, `url_params` and `referrer_domain_only` in the sites API. Nothing changes for existing sites until a switch is turned on.
+
 ## [0.30.2] - 2026-10-25
 
 ### Fixed

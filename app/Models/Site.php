@@ -16,13 +16,13 @@ class Site extends Model
 {
     use HasUuids;
 
-    protected $fillable = ['kind', 'rollup_all', 'domain', 'timezone', 'public', 'track_outbound', 'track_downloads', 'track_forms', 'brand_name', 'brand_hide_name', 'brand_color', 'brand_logo', 'brand_logo_mime'];
+    protected $fillable = ['kind', 'rollup_all', 'domain', 'timezone', 'public', 'track_outbound', 'track_downloads', 'track_forms', 'brand_name', 'brand_hide_name', 'brand_color', 'brand_logo', 'brand_logo_mime', 'honor_gpc', 'honor_dnt', 'location_precision', 'url_params', 'referrer_domain_only'];
 
     protected $hidden = ['brand_logo'];
 
     protected function casts(): array
     {
-        return ['rollup_all' => 'boolean', 'public' => 'boolean', 'track_outbound' => 'boolean', 'track_downloads' => 'boolean', 'track_forms' => 'boolean', 'brand_hide_name' => 'boolean', 'imported_start' => 'date', 'imported_end' => 'date'];
+        return ['rollup_all' => 'boolean', 'public' => 'boolean', 'track_outbound' => 'boolean', 'track_downloads' => 'boolean', 'track_forms' => 'boolean', 'brand_hide_name' => 'boolean', 'honor_gpc' => 'boolean', 'honor_dnt' => 'boolean', 'referrer_domain_only' => 'boolean', 'imported_start' => 'date', 'imported_end' => 'date'];
     }
 
     public function members(): BelongsToMany

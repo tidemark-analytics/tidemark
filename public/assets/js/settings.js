@@ -99,6 +99,22 @@ function ImportPlausible({ site, reload }) {
     ${confirm && html`<${Confirm} title="Remove imported data?" message="The days imported from Plausible will be removed from this dashboard. What Tidemark collected itself is not touched." confirmLabel="Remove" onClose=${() => setConfirm(false)} onConfirm=${async () => { await removeImported(site.domain); setState(null); reload(); toast('Imported data removed'); }} />`}<//>`;
 }
 
+/** Collect even less: per-site switches that go beyond the defaults (no cookies, no stored IP addresses, no query strings). */
+function PrivacyControls({ site, reload }) {
+  const saved = (site.url_params || '').split(',').filter(Boolean).join(', ');
+  const [params, setParams] = useState(saved);
+  const [err, setErr] = useState(null);
+  const patch = async (body) => { setErr(null); try { await api(`/sites/${site.domain}`, { method: 'PATCH', body }); reload(); toast('Saved'); } catch (x) { setErr(firstError(x)); } };
+  const places = [['city', 'Country, region and city'], ['region', 'Country and region'], ['country', 'Country only']];
+  return html`<${Section} title="Privacy controls" help="Tidemark already sets no cookies, stores no IP addresses and drops query strings. These switches let you collect even less.">
+    <${Toggle} label="Respect Global Privacy Control" help="Visitors whose browser sends the Global Privacy Control signal are not counted." checked=${site.honor_gpc} onChange=${(v) => patch({ honor_gpc: v })} />
+    <${Toggle} label="Respect Do Not Track" help="Visitors whose browser sends Do Not Track are not counted." checked=${site.honor_dnt} onChange=${(v) => patch({ honor_dnt: v })} />
+    <${Toggle} label="Keep only the referrer's domain" help="Record news.example.org instead of news.example.org/story/42." checked=${site.referrer_domain_only} onChange=${(v) => patch({ referrer_domain_only: v })} />
+    <${Field} label="Location detail" help="Where visitors are. Changing this affects visits recorded from now on."><select value=${site.location_precision || 'city'} onChange=${(e) => patch({ location_precision: e.target.value })} style="max-width:320px">${places.map(([k, l]) => html`<option value=${k} selected=${(site.location_precision || 'city') === k}>${l}</option>`)}</select><//>
+    <${Field} label="Query parameters to keep" help="Page addresses are stored without their query string. List the parameters you want kept (for example page, lang), separated by commas, to see them in the Pages report. Names that look like they carry a secret or personal data, such as email or token, are refused."><div class="row"><input class="grow" placeholder="page, lang" value=${params} onInput=${(e) => setParams(e.target.value)} maxlength="2000" style="max-width:420px" /><button class="btn" type="button" disabled=${params.trim() === saved} onClick=${() => patch({ url_params: params.trim() || null })}>Save</button></div><//>
+    ${err && html`<div class="alert">${err}</div>`}<//>`;
+}
+
 /** How visits get in: the snippet, its extensions and the rules that drop traffic you don't want counted. */
 function Tracking({ site, reload }) {
   const patch = async (body) => { try { await api(`/sites/${site.domain}`, { method: 'PATCH', body }); reload(); toast('Saved'); } catch (x) { toast(firstError(x), 'err'); } };
@@ -107,6 +123,7 @@ function Tracking({ site, reload }) {
       <${Toggle} label="Outbound link clicks" checked=${site.track_outbound} onChange=${(v) => patch({ track_outbound: v })} />
       <${Toggle} label="File downloads" checked=${site.track_downloads} onChange=${(v) => patch({ track_downloads: v })} />
       <${Toggle} label="Form submissions" checked=${site.track_forms} onChange=${(v) => patch({ track_forms: v })} /><//>
+    ${!site.rollup && site.can_manage && html`<${PrivacyControls} site=${site} reload=${reload} />`}
     <${Shields} site=${site} />`;
 }
 
