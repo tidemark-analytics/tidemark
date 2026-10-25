@@ -443,11 +443,111 @@ export function SiteSettings({ domain, tab }) {
   if (!s) return html`<main class="main"><${Loading} /></main>`;
   if (!s.can_manage) return html`<main class="main"><${Empty} title="No access" icon="lock">Only site owners and admins can change settings.<//></main>`;
   // a few sections moved between tabs; older links and bookmarks still land in the right place
-  const tabs = s.rollup ? [['sites', 'Sites'], ['conversions', 'Conversions'], ['access', 'Sharing'], ['data', 'Data']] : [['tracking', 'Tracking'], ['conversions', 'Conversions'], ['access', 'Sharing and access'], ['data', 'Data']];
+  const tabs = s.rollup ? [['sites', 'Sites'], ['conversions', 'Conversions'], ['access', 'Sharing'], ['data', 'Data']] : [['tracking', 'Tracking'], ['conversions', 'Conversions'], ['alerts', 'Alerts'], ['access', 'Sharing and access'], ['data', 'Data']];
   const moved = { general: s.rollup ? 'data' : 'tracking', shields: 'tracking', goals: 'conversions', funnels: 'conversions', visibility: 'access', branding: 'access', people: 'access' };
   const t = [tab, moved[tab]].find((k) => tabs.some((x) => x[0] === k)) || tabs[0][0];
-  const Body = { tracking: Tracking, conversions: Conversions, access: Access, data: DataTab, sites: RollupSites }[t];
+  const Body = { tracking: Tracking, conversions: Conversions, alerts: Alerts, access: Access, data: DataTab, sites: RollupSites }[t];
   return html`<${SettingsShell} title=${`${domain} settings`} back=${[`/${domain}`, 'Dashboard']} tabs=${tabs} tab=${t} base=${`/${domain}/settings`}><${Body} site=${s} reload=${res.reload} /><//>`;
+}
+
+// -------------------------------------------------------------------------------------- alerts
+const ALERT_TYPES = {
+  traffic_spike: { label: 'Traffic spike', icon: 'trending-up', help: 'Visitors so far today are well above the usual for this weekday and time of day.' },
+  traffic_drop: { label: 'Traffic drop', icon: 'trending-down', help: 'Visitors so far today are well below the usual for this weekday and time of day (after 06:00).' },
+  goal_milestone: { label: 'Goal milestone', icon: 'target', help: 'A goal reaches a number of conversions today. Once a day at most.' },
+  goal_conversions: { label: 'New conversions', icon: 'mouse-pointer-click', help: 'A goal was reached since the last check (every five minutes), with totals only: no visitor details.' },
+  new_top_referrer: { label: 'New traffic source', icon: 'globe', help: 'A source that sent nothing in the last 28 days is suddenly sending visitors.' },
+};
+const ALERT_DEFAULTS = { traffic_spike: { percent: 100, min_visitors: 50 }, traffic_drop: { percent: 50, min_visitors: 50 }, goal_milestone: { count: 10 }, goal_conversions: {}, new_top_referrer: { min_visitors: 20 } };
+
+function describeRule(r, goals) {
+  const c = r.config || {};
+  const goal = (goals.find((g) => g.id === c.goal_id) || { name: 'a deleted goal' }).name;
+  return {
+    traffic_spike: `Visitors ${c.percent}% above the usual, at least ${c.min_visitors} more`,
+    traffic_drop: `Visitors ${c.percent}% below the usual, when the usual is ${c.min_visitors}+ visitors`,
+    goal_milestone: `“${goal}” reaches ${c.count} conversions in a day`,
+    goal_conversions: `New conversions of “${goal}”`,
+    new_top_referrer: `A new source sends ${c.min_visitors}+ visitors in a day`,
+  }[r.type];
+}
+
+function RuleForm({ site, goals, hooks, mail, rule, onSaved, onCancel }) {
+  const [f, setF] = useState(rule ? { ...rule, quiet: !!rule.quiet_start } : { type: 'traffic_spike', config: ALERT_DEFAULTS.traffic_spike, email: mail, webhook_ids: [], quiet: false, quiet_start: '22:00', quiet_end: '07:00', enabled: true });
+  const [err, setErr] = useState(null);
+  const c = f.config;
+  const setC = (k, v) => setF({ ...f, config: { ...c, [k]: v } });
+  const num = (k, label, help, min, max) => html`<${Field} label=${label} help=${help}><input type="number" min=${min} max=${max} required value=${c[k]} onInput=${(e) => setC(k, e.target.value === '' ? '' : Number(e.target.value))} /><//>`;
+  const needsGoal = f.type === 'goal_milestone' || f.type === 'goal_conversions';
+  const toggleHook = (id, on) => setF({ ...f, webhook_ids: on ? [...f.webhook_ids, id] : f.webhook_ids.filter((x) => x !== id) });
+  const save = async (e) => {
+    e.preventDefault(); setErr(null);
+    const body = { type: f.type, config: c, email: f.email, webhook_ids: f.webhook_ids, quiet_start: f.quiet ? f.quiet_start : null, quiet_end: f.quiet ? f.quiet_end : null, enabled: f.enabled };
+    try { await api(`/sites/${site.domain}/alert-rules${rule ? '/' + rule.id : ''}`, { method: rule ? 'PATCH' : 'POST', body }); toast('Alert saved'); onSaved(); } catch (x) { setErr(firstError(x)); }
+  };
+  return html`<form class="goal-add stack" onSubmit=${save}>
+    ${err && html`<div class="alert">${err}</div>`}
+    <${Field} label="When" help=${ALERT_TYPES[f.type].help}><select value=${f.type} disabled=${!!rule} onChange=${(e) => setF({ ...f, type: e.target.value, config: ALERT_DEFAULTS[e.target.value] })}>${Object.entries(ALERT_TYPES).map(([k, t]) => html`<option value=${k} selected=${k === f.type}>${t.label}</option>`)}</select><//>
+    ${needsGoal && html`<${Field} label="Goal"><select required value=${c.goal_id || ''} onChange=${(e) => setC('goal_id', e.target.value)}><option value="" selected=${!c.goal_id}>Choose a goal…</option>${goals.map((g) => html`<option value=${g.id} selected=${g.id === c.goal_id}>${g.name}</option>`)}</select><//>`}
+    <div class="fields2">
+      ${(f.type === 'traffic_spike' || f.type === 'traffic_drop') && num('percent', f.type === 'traffic_spike' ? 'Percent above the usual' : 'Percent below the usual', null, 10, f.type === 'traffic_spike' ? 1000 : 95)}
+      ${(f.type === 'traffic_spike') && num('min_visitors', 'At least this many more visitors', 'Keeps a quiet site from alerting on a handful of visits.', 1, 100000)}
+      ${(f.type === 'traffic_drop') && num('min_visitors', 'Only when the usual is at least', 'Visitors by this time on this weekday, on average over the last four weeks.', 1, 100000)}
+      ${f.type === 'goal_milestone' && num('count', 'Conversions in a day', null, 1, 1000000)}
+      ${f.type === 'new_top_referrer' && num('min_visitors', 'Visitors from the source today', null, 1, 100000)}
+    </div>
+    <div class="stack" role="group" aria-label="Send it to"><b>Send it to</b>
+      <${Toggle} label="Email" help=${mail ? 'The site\'s owners and admins.' : 'Email isn\'t set up on this installation yet.'} checked=${f.email} disabled=${!mail && !f.email} onChange=${(v) => setF({ ...f, email: v })} />
+      ${hooks.map((h) => html`<${Toggle} key=${h.id} label=${h.name} help=${({ generic: 'Signed JSON', slack: 'Slack', discord: 'Discord' })[h.kind]} checked=${f.webhook_ids.includes(h.id)} onChange=${(v) => toggleHook(h.id, v)} />`)}
+      ${hooks.length === 0 && html`<p class="muted small">Add a webhook below to send alerts to Slack, Discord or your own service.</p>`}</div>
+    <${Toggle} label="Quiet hours" help="Nothing is checked or sent in this window (in the site's timezone). Anything still true afterwards is sent then." checked=${f.quiet} onChange=${(v) => setF({ ...f, quiet: v })} />
+    ${f.quiet && html`<div class="fields2"><${Field} label="From"><input type="time" required value=${f.quiet_start} onInput=${(e) => setF({ ...f, quiet_start: e.target.value })} /><//><${Field} label="Until"><input type="time" required value=${f.quiet_end} onInput=${(e) => setF({ ...f, quiet_end: e.target.value })} /><//></div>`}
+    <div class="row"><button class="btn primary">Save alert</button><button type="button" class="btn" onClick=${onCancel}>Cancel</button></div></form>`;
+}
+
+function Alerts({ site }) {
+  const res = useApi(`/sites/${site.domain}/alerts`, null, []);
+  const goalsRes = useApi(`/sites/${site.domain}/goals`, null, []);
+  const [form, setForm] = useState(null); // 'new' or the rule being edited
+  const [hook, setHook] = useState({ name: '', kind: 'generic', url: '' });
+  const [secret, setSecret] = useState(null);
+  const [err, setErr] = useState(null);
+  const [testing, setTesting] = useState(null);
+  const d = res.data;
+  const rules = (d && d.rules) || [];
+  const hooks = (d && d.webhooks) || [];
+  const goals = (goalsRes.data && goalsRes.data.data) || [];
+  const base = `/sites/${site.domain}`;
+  const act = async (fn, msg) => { setErr(null); try { await fn(); if (msg) toast(msg); res.reload(); } catch (x) { setErr(firstError(x)); } };
+  const addHook = (e) => { e.preventDefault(); act(async () => { const r = await api(`${base}/alert-webhooks`, { method: 'POST', body: hook }); setHook({ name: '', kind: 'generic', url: '' }); setSecret(r.data.secret ? { name: r.data.name, value: r.data.secret } : null); }, 'Webhook added'); };
+  const test = async (h) => { setTesting(h.id); setErr(null); try { const r = await api(`${base}/alert-webhooks/${h.id}/test`, { method: 'POST' }); toast(r.ok ? 'Test alert delivered' : 'Not delivered: ' + (r.error || 'HTTP ' + r.status), r.ok ? undefined : 'err'); res.reload(); } catch (x) { setErr(firstError(x)); } setTesting(null); };
+  return html`<${Section} title="Alerts" help="Get told when something is worth a look: a spike or drop in visitors, a goal reaching a number, or a brand new traffic source. Alerts carry totals only, never anything about a visitor. Rules are checked every five minutes.">
+      ${d && !d.mail && html`<div class="notice"><${Icon} name="info" size=${16} /><div>Email isn't set up on this installation, so alerts can only go to webhooks for now.</div></div>`}
+      ${err && html`<div class="alert">${err}</div>`}
+      ${form ? html`<${RuleForm} site=${site} goals=${goals} hooks=${hooks} mail=${!!(d && d.mail)} rule=${form === 'new' ? null : form} onSaved=${() => { setForm(null); res.reload(); }} onCancel=${() => setForm(null)} />`
+        : html`<div class="section-actions"><button class="btn primary" onClick=${() => setForm('new')}><${Icon} name="plus" size=${14} /> New alert</button></div>`}
+      ${d && rules.length === 0 && !form && html`<div class="empty-inline"><${Icon} name="bell" size=${18} /><div><b>No alerts yet</b><span>Create one to be told when traffic jumps or drops, or when a goal is reached.</span></div></div>`}
+      ${rules.length > 0 && html`<ul class="rows" aria-label="Alerts">${rules.map((r) => html`<li class="rowitem" key=${r.id}>
+        <span class="ri-ico" aria-hidden="true"><${Icon} name=${ALERT_TYPES[r.type].icon} size=${16} /></span>
+        <div class="grow ri-main"><b class="trunc">${ALERT_TYPES[r.type].label}${!r.enabled ? ' (off)' : ''}</b><span class="muted">${describeRule(r, goals)} · ${[r.email && 'email', ...r.webhook_ids.map((id) => (hooks.find((h) => h.id === id) || {}).name).filter(Boolean)].filter(Boolean).join(', ') || 'no destination'}${r.quiet_start ? ` · quiet ${r.quiet_start}–${r.quiet_end}` : ''}${r.last_fired_at ? ' · last sent ' + ago(r.last_fired_at) : ''}</span></div>
+        <button class="btn sm" onClick=${() => act(() => api(`${base}/alert-rules/${r.id}`, { method: 'PATCH', body: { enabled: !r.enabled } }))}>${r.enabled ? 'Turn off' : 'Turn on'}</button>
+        <button class="btn ghost icon sm" aria-label="Edit alert" title="Edit" onClick=${() => setForm(r)}><${Icon} name="pencil" size=${15} /></button>
+        <button class="btn ghost icon sm danger" aria-label="Delete alert" title="Delete" onClick=${() => act(() => api(`${base}/alert-rules/${r.id}`, { method: 'DELETE' }))}><${Icon} name="trash-2" size=${15} /></button></li>`)}</ul>`}
+    <//>
+    <${Section} title="Webhooks" help="Where alerts go besides email. Slack and Discord take their incoming-webhook address. Your own service gets a JSON POST signed with a secret, so you can check it came from Tidemark.${d && d.private_allowed ? '' : ' Addresses must be public https URLs.'}">
+      <form class="goal-add stack" onSubmit=${addHook}>
+        <div class="fields2"><${Field} label="Name"><input required maxlength="80" placeholder="Team chat" value=${hook.name} onInput=${(e) => setHook({ ...hook, name: e.target.value })} /><//>
+          <${Field} label="Type"><select value=${hook.kind} onChange=${(e) => setHook({ ...hook, kind: e.target.value })}><option value="generic" selected=${hook.kind === 'generic'}>Signed JSON</option><option value="slack" selected=${hook.kind === 'slack'}>Slack</option><option value="discord" selected=${hook.kind === 'discord'}>Discord</option></select><//></div>
+        <div class="goal-add-row"><input class="grow" required type="url" placeholder="https://hooks.slack.com/services/…" value=${hook.url} onInput=${(e) => setHook({ ...hook, url: e.target.value })} aria-label="Webhook address" /><button class="btn primary">Add webhook</button></div></form>
+      ${secret && html`<div class="notice"><${Icon} name="info" size=${16} /><div><b>Signing secret for ${secret.name}</b>: copy it now, it is not shown again.<${CodeBlock} text=${secret.value} />
+        <p class="muted small">Each request has a <code>Tidemark-Signature: t=timestamp,v1=signature</code> header. The signature is the hex HMAC-SHA256 of <code>timestamp.body</code> with this secret.</p>
+        <button class="btn sm" onClick=${() => setSecret(null)}>Done</button></div></div>`}
+      ${hooks.length > 0 && html`<ul class="rows" aria-label="Webhooks">${hooks.map((h) => html`<li class="rowitem" key=${h.id}>
+        <span class="ri-ico" aria-hidden="true"><${Icon} name="send" size=${16} /></span>
+        <div class="grow ri-main"><b class="trunc">${h.name}</b><span class="muted trunc">${({ generic: 'Signed JSON', slack: 'Slack', discord: 'Discord' })[h.kind]} · ${h.url}${h.last_at ? (h.last_error ? ` · last delivery failed (${h.last_error})` : ' · last delivery ok ' + ago(h.last_at)) : ''}</span></div>
+        <button class="btn sm" disabled=${testing === h.id} onClick=${() => test(h)}>Send test</button>
+        <button class="btn ghost icon sm danger" aria-label=${'Delete webhook ' + h.name} title="Delete" onClick=${() => act(() => api(`${base}/alert-webhooks/${h.id}`, { method: 'DELETE' }))}><${Icon} name="trash-2" size=${15} /></button></li>`)}</ul>`}
+    <//>`;
 }
 
 // -------------------------------------------------------------------------------------- account settings

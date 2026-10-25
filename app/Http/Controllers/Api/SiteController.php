@@ -117,6 +117,8 @@ class SiteController extends Controller
         FunnelStep::whereIn('funnel_id', $site->funnels()->pluck('id'))->delete();
         DB::table('annotations')->where('site_id', $site->id)->delete();
         DB::table('report_subscriptions')->where('site_id', $site->id)->delete();
+        DB::table('alert_rules')->where('site_id', $site->id)->delete();
+        DB::table('alert_webhooks')->where('site_id', $site->id)->delete();
         foreach (['funnels', 'segments', 'goals', 'sharedLinks', 'shields'] as $rel) {
             $site->{$rel}()->delete();
         }

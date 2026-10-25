@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AdminController;
+use App\Http\Controllers\Api\AlertController;
 use App\Http\Controllers\Api\AnnotationController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BrandingController;
@@ -110,6 +111,14 @@ Route::middleware('api.auth')->group(function () {
         Route::post('/shared-links', [S::class, 'createSharedLink']);
         Route::patch('/shared-links/{link}', [S::class, 'updateSharedLink']);
         Route::delete('/shared-links/{link}', [S::class, 'deleteSharedLink']);
+        Route::get('/alerts', [AlertController::class, 'index']);
+        Route::post('/alert-rules', [AlertController::class, 'storeRule']);
+        Route::patch('/alert-rules/{rule}', [AlertController::class, 'updateRule']);
+        Route::delete('/alert-rules/{rule}', [AlertController::class, 'destroyRule']);
+        Route::post('/alert-webhooks', [AlertController::class, 'storeWebhook']);
+        Route::patch('/alert-webhooks/{webhook}', [AlertController::class, 'updateWebhook']);
+        Route::delete('/alert-webhooks/{webhook}', [AlertController::class, 'destroyWebhook']);
+        Route::post('/alert-webhooks/{webhook}/test', [AlertController::class, 'testWebhook'])->middleware('throttle:10,1');
         Route::get('/pii-masks', [S::class, 'piiMasks']);
         Route::get('/shields', [S::class, 'shields']);
         Route::post('/shields', [S::class, 'createShield']);

@@ -11,6 +11,10 @@ return [
     // show an "update available" dot. Only the latest version number is requested; nothing about your sites or visitors is sent.
     // Daily euro reference rates from the European Central Bank, only fetched when a goal reports revenue, to add up revenue sent in different currencies.
     'exchange_rates' => (bool) env('TIDEMARK_EXCHANGE_RATES', true),
+    // Alert webhooks only reach public internet addresses, so a rule can't be used to probe the network the server runs on.
+    // Self-hosters who deliver to a service on their own network (a local Slack bridge, Home Assistant…) can allow that here.
+    'webhooks' => ['allow_private' => (bool) env('TIDEMARK_WEBHOOKS_ALLOW_PRIVATE', false)],
+
     'update_check' => (bool) env('TIDEMARK_UPDATE_CHECK', true),
 
     'update_repo' => env('TIDEMARK_UPDATE_REPO', 'tidemark-analytics/tidemark'),
