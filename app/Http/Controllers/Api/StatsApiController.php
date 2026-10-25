@@ -6,6 +6,7 @@ use App\Analytics\Stats\Stats;
 use App\Analytics\Support\Filters;
 use App\Analytics\Support\Period;
 use App\Http\Controllers\Controller;
+use App\Models\Annotation;
 use App\Models\Site;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
@@ -81,6 +82,17 @@ class StatsApiController extends Controller
         $m = array_values(array_intersect(array_map('trim', explode(',', (string) $r->input('metrics', 'visitors'))), self::METRICS));
 
         return $m ?: ['visitors'];
+    }
+
+    /** Notes on the graph for the period that the key's owner may see. */
+    public function annotations(Request $r)
+    {
+        [$site, , $p] = $this->ctx($r);
+        $role = $site->roleOf($r->user());
+        $rows = Annotation::where('site_id', $site->id)->visibleTo($r->user(), $role)->whereBetween('date', [$p->start->toDateString(), $p->end->toDateString()])
+            ->orderBy('date')->orderBy('created_at')->get();
+
+        return ['results' => $rows->map(fn ($a) => ['date' => $a->date->toDateString(), 'note' => $a->note, 'visibility' => $a->visibility])->all(), 'period' => $p->toArray()];
     }
 
     public function realtime(Request $r)
