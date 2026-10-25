@@ -1017,3 +1017,18 @@ button.fact:hover { border-color: var(--accent); background: var(--surface); }
 .side-ext { margin-left: auto; color: var(--harbor-mute); }
 .side-link .notif.inline { margin-left: auto; }
 .side-nav { overflow-y: auto; }
+
+/* Goal lists with revenue have five numeric columns: on a phone they would squeeze the name away and widen the page,
+   so the columns get narrower and the name takes its own line above them. */
+@media (max-width: 560px) {
+  .mrow .r .cr, .mhead .cr { min-width: 52px; }
+  .mrow .r .cr.w, .mhead .cr.w { min-width: 64px; }
+  .mhead .cr2, .mrow .cr2, .mrow .r small.cr2 { min-width: 40px; }
+  .mlist:has(.r > :nth-child(4)) .mrow, .mlist:has(.r > :nth-child(4)) .mhead { flex-wrap: wrap; row-gap: 2px; }
+  .mlist:has(.r > :nth-child(4)) .mrow { padding-top: 6px; padding-bottom: 6px; }
+  .mlist:has(.r > :nth-child(4)) .l { flex: 1 1 100%; }
+  .mlist:has(.r > :nth-child(4)) .r { flex: 1 1 100%; justify-content: flex-end; }
+}
+@media (max-width: 380px) {
+  .mlist:has(.r > :nth-child(5)) .r > :nth-child(4) { display: none; } /* Average, still in the Details view */
+}
