@@ -3,6 +3,7 @@
 use App\Console\Commands\CheckUpdates;
 use App\Console\Commands\PruneEvents;
 use App\Console\Commands\RefreshExchangeRates;
+use App\Console\Commands\RunAlerts;
 use App\Console\Commands\SendReports;
 use Illuminate\Support\Facades\Schedule;
 
@@ -16,3 +17,5 @@ Schedule::command(CheckUpdates::class)->dailyAt('04:'.str_pad((string) (crc32((s
 Schedule::command(RefreshExchangeRates::class)->dailyAt('16:30');
 // E-mail reports go out at 08:00 in each site's timezone, so look for due ones every hour (and catch up after downtime).
 Schedule::command(SendReports::class)->hourly()->withoutOverlapping();
+// Alert rules are checked every five minutes.
+Schedule::command(RunAlerts::class)->everyFiveMinutes()->withoutOverlapping();
