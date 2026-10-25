@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BrandingController;
 use App\Http\Controllers\Api\DataController;
 use App\Http\Controllers\Api\PlausibleImportController;
+use App\Http\Controllers\Api\ReportSubscriptionController;
 use App\Http\Controllers\Api\RollupController;
 use App\Http\Controllers\Api\SegmentController;
 use App\Http\Controllers\Api\SettingsController as S;
@@ -63,6 +64,8 @@ Route::middleware('api.auth')->group(function () {
     Route::post('/me/two-factor', [AuthController::class, 'twoFactorSetup']);
     Route::post('/me/two-factor/confirm', [AuthController::class, 'twoFactorConfirm']);
     Route::delete('/me/two-factor', [AuthController::class, 'twoFactorDisable']);
+    Route::get('/me/reports', [ReportSubscriptionController::class, 'index']);
+    Route::put('/me/reports/{site}', [ReportSubscriptionController::class, 'update']);
     Route::get('/me/keys', [AuthController::class, 'keys']);
     Route::post('/me/keys', [AuthController::class, 'createKey']);
     Route::delete('/me/keys/{id}', [AuthController::class, 'deleteKey']);
