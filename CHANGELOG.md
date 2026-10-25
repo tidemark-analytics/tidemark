@@ -4,6 +4,11 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [0.28.2] - 2026-11-07
+
+### Fixed
+- On phones, a goal list with revenue columns no longer pushes the page wider than the screen: the columns are narrower, the goal name gets its own line, and the Average column is hidden on very small screens (it stays in Details).
+
 ## [0.28.1] - 2026-11-07
 
 ### Changed
