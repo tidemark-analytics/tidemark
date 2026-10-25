@@ -4,6 +4,11 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [0.31.1] - 2026-10-25
+
+### Fixed
+- Alert webhooks are now delivered on a default install. They are queued, and the scheduler only ran the queue worker when events were buffered through the queue, so deliveries waited in the queue forever (the Send test button was not affected). The scheduler now runs the worker every minute whenever the queue is not `sync`.
+
 ## [0.31.0] - 2026-10-25
 
 ### Added

@@ -8,8 +8,9 @@ use App\Console\Commands\SendReports;
 use Illuminate\Support\Facades\Schedule;
 
 // Shared hosting needs one cron entry:  * * * * * php /path/to/artisan schedule:run
+// Queued work (buffered events, alert webhook deliveries) is picked up by the scheduler too, so one cron entry is all a shared host needs.
 Schedule::command('queue:work --stop-when-empty --max-time=50 --queue='.config('tidemark.ingest_queue').',default')
-    ->everyMinute()->withoutOverlapping()->when(fn () => config('tidemark.ingest') === 'queue');
+    ->everyMinute()->withoutOverlapping()->when(fn () => config('tidemark.ingest') === 'queue' || config('queue.default') !== 'sync');
 Schedule::command(PruneEvents::class)->dailyAt('03:15')->when(fn () => config('tidemark.retention_days') > 0);
 Schedule::command('cache:prune-stale-tags')->hourly()->when(fn () => config('cache.default') === 'redis');
 // Looks for a new release once a day, at a minute derived from the install's key so installs don't all call GitHub together.
