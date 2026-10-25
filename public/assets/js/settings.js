@@ -485,23 +485,25 @@ function RuleForm({ site, goals, hooks, mail, rule, onSaved, onCancel }) {
     const body = { type: f.type, config: c, email: f.email, webhook_ids: f.webhook_ids, quiet_start: f.quiet ? f.quiet_start : null, quiet_end: f.quiet ? f.quiet_end : null, enabled: f.enabled };
     try { await api(`/sites/${site.domain}/alert-rules${rule ? '/' + rule.id : ''}`, { method: rule ? 'PATCH' : 'POST', body }); toast('Alert saved'); onSaved(); } catch (x) { setErr(firstError(x)); }
   };
-  return html`<form class="goal-add stack" onSubmit=${save}>
+  return html`<form class="funnel-form" onSubmit=${save}>
     ${err && html`<div class="alert">${err}</div>`}
-    <${Field} label="When" help=${ALERT_TYPES[f.type].help}><select value=${f.type} disabled=${!!rule} onChange=${(e) => setF({ ...f, type: e.target.value, config: ALERT_DEFAULTS[e.target.value] })}>${Object.entries(ALERT_TYPES).map(([k, t]) => html`<option value=${k} selected=${k === f.type}>${t.label}</option>`)}</select><//>
-    ${needsGoal && html`<${Field} label="Goal"><select required value=${c.goal_id || ''} onChange=${(e) => setC('goal_id', e.target.value)}><option value="" selected=${!c.goal_id}>Choose a goal…</option>${goals.map((g) => html`<option value=${g.id} selected=${g.id === c.goal_id}>${g.name}</option>`)}</select><//>`}
-    <div class="fields2">
+    <div class="steps-edit"><span class="lbl">When</span>
+      <div class="seg wrapseg" role="radiogroup" aria-label="Alert type">${Object.entries(ALERT_TYPES).map(([k, t]) => html`<button type="button" role="radio" aria-checked=${f.type === k} class=${f.type === k ? 'on' : ''} disabled=${!!rule && f.type !== k} onClick=${() => setF({ ...f, type: k, config: ALERT_DEFAULTS[k] })}><${Icon} name=${t.icon} size=${14} />${t.label}</button>`)}</div>
+      <span class="muted small">${ALERT_TYPES[f.type].help}</span></div>
+    ${needsGoal && html`<${Field} label="Goal"><select required value=${c.goal_id || ''} onChange=${(e) => setC('goal_id', e.target.value)}><option value="" selected=${!c.goal_id}>Choose a goal</option>${goals.map((g) => html`<option value=${g.id} selected=${g.id === c.goal_id}>${g.name}</option>`)}</select><//>`}
+    <div class="alert-nums">
       ${(f.type === 'traffic_spike' || f.type === 'traffic_drop') && num('percent', f.type === 'traffic_spike' ? 'Percent above the usual' : 'Percent below the usual', null, 10, f.type === 'traffic_spike' ? 1000 : 95)}
-      ${(f.type === 'traffic_spike') && num('min_visitors', 'At least this many more visitors', 'Keeps a quiet site from alerting on a handful of visits.', 1, 100000)}
-      ${(f.type === 'traffic_drop') && num('min_visitors', 'Only when the usual is at least', 'Visitors by this time on this weekday, on average over the last four weeks.', 1, 100000)}
+      ${f.type === 'traffic_spike' && num('min_visitors', 'At least this many more visitors', null, 1, 100000)}
+      ${f.type === 'traffic_drop' && num('min_visitors', 'Only when the usual is at least', null, 1, 100000)}
       ${f.type === 'goal_milestone' && num('count', 'Conversions in a day', null, 1, 1000000)}
       ${f.type === 'new_top_referrer' && num('min_visitors', 'Visitors from the source today', null, 1, 100000)}
     </div>
-    <div class="stack" role="group" aria-label="Send it to"><b>Send it to</b>
-      <${Toggle} label="Email" help=${mail ? 'The site\'s owners and admins.' : 'Email isn\'t set up on this installation yet.'} checked=${f.email} disabled=${!mail && !f.email} onChange=${(v) => setF({ ...f, email: v })} />
-      ${hooks.map((h) => html`<${Toggle} key=${h.id} label=${h.name} help=${({ generic: 'Signed JSON', slack: 'Slack', discord: 'Discord' })[h.kind]} checked=${f.webhook_ids.includes(h.id)} onChange=${(v) => toggleHook(h.id, v)} />`)}
-      ${hooks.length === 0 && html`<p class="muted small">Add a webhook below to send alerts to Slack, Discord or your own service.</p>`}</div>
-    <${Toggle} label="Quiet hours" help="Nothing is checked or sent in this window (in the site's timezone). Anything still true afterwards is sent then." checked=${f.quiet} onChange=${(v) => setF({ ...f, quiet: v })} />
-    ${f.quiet && html`<div class="fields2"><${Field} label="From"><input type="time" required value=${f.quiet_start} onInput=${(e) => setF({ ...f, quiet_start: e.target.value })} /><//><${Field} label="Until"><input type="time" required value=${f.quiet_end} onInput=${(e) => setF({ ...f, quiet_end: e.target.value })} /><//></div>`}
+    <div class="steps-edit"><span class="lbl">Send it to</span>
+      <${Toggle} label="Email" help=${mail ? 'The site\'s owners and admins' : 'Email isn\'t set up on this installation yet'} checked=${f.email} disabled=${!mail && !f.email} onChange=${(v) => setF({ ...f, email: v })} />
+      ${hooks.map((h) => html`<${Toggle} key=${h.id} label=${h.name} help=${({ generic: 'Signed JSON webhook', slack: 'Slack', discord: 'Discord' })[h.kind]} checked=${f.webhook_ids.includes(h.id)} onChange=${(v) => toggleHook(h.id, v)} />`)}
+      ${hooks.length === 0 && html`<span class="muted small">Add a webhook below to send alerts to Slack, Discord or your own service.</span>`}</div>
+    <div class="steps-edit"><${Toggle} label="Quiet hours" help="Nothing is sent in this window, in the site's timezone. Anything still true afterwards is sent then." checked=${f.quiet} onChange=${(v) => setF({ ...f, quiet: v })} />
+      ${f.quiet && html`<div class="alert-nums"><${Field} label="From"><input type="time" required value=${f.quiet_start} onInput=${(e) => setF({ ...f, quiet_start: e.target.value })} /><//><${Field} label="Until"><input type="time" required value=${f.quiet_end} onInput=${(e) => setF({ ...f, quiet_end: e.target.value })} /><//></div>`}</div>
     <div class="row"><button class="btn primary">Save alert</button><button type="button" class="btn" onClick=${onCancel}>Cancel</button></div></form>`;
 }
 
@@ -529,16 +531,18 @@ function Alerts({ site }) {
       ${d && rules.length === 0 && !form && html`<div class="empty-inline"><${Icon} name="bell" size=${18} /><div><b>No alerts yet</b><span>Create one to be told when traffic jumps or drops, or when a goal is reached.</span></div></div>`}
       ${rules.length > 0 && html`<ul class="rows" aria-label="Alerts">${rules.map((r) => html`<li class="rowitem" key=${r.id}>
         <span class="ri-ico" aria-hidden="true"><${Icon} name=${ALERT_TYPES[r.type].icon} size=${16} /></span>
-        <div class="grow ri-main"><b class="trunc">${ALERT_TYPES[r.type].label}${!r.enabled ? ' (off)' : ''}</b><span class="muted">${describeRule(r, goals)} · ${[r.email && 'email', ...r.webhook_ids.map((id) => (hooks.find((h) => h.id === id) || {}).name).filter(Boolean)].filter(Boolean).join(', ') || 'no destination'}${r.quiet_start ? ` · quiet ${r.quiet_start}–${r.quiet_end}` : ''}${r.last_fired_at ? ' · last sent ' + ago(r.last_fired_at) : ''}</span></div>
-        <button class="btn sm" onClick=${() => act(() => api(`${base}/alert-rules/${r.id}`, { method: 'PATCH', body: { enabled: !r.enabled } }))}>${r.enabled ? 'Turn off' : 'Turn on'}</button>
+        <div class="grow ri-main"><b class="trunc">${ALERT_TYPES[r.type].label}</b><span class="muted">${describeRule(r, goals)} · ${[r.email && 'email', ...r.webhook_ids.map((id) => (hooks.find((h) => h.id === id) || {}).name).filter(Boolean)].filter(Boolean).join(', ') || 'no destination'}${r.quiet_start ? ` · quiet ${r.quiet_start}–${r.quiet_end}` : ''}${r.last_fired_at ? ' · last sent ' + ago(r.last_fired_at) : ''}</span></div>
+        <select class="mini-select" style="width:auto" aria-label=${'Turn ' + ALERT_TYPES[r.type].label + ' on or off'} onChange=${(e) => act(() => api(`${base}/alert-rules/${r.id}`, { method: 'PATCH', body: { enabled: e.target.value === 'on' } }))}><option value="on" selected=${r.enabled}>On</option><option value="off" selected=${!r.enabled}>Off</option></select>
         <button class="btn ghost icon sm" aria-label="Edit alert" title="Edit" onClick=${() => setForm(r)}><${Icon} name="pencil" size=${15} /></button>
         <button class="btn ghost icon sm danger" aria-label="Delete alert" title="Delete" onClick=${() => act(() => api(`${base}/alert-rules/${r.id}`, { method: 'DELETE' }))}><${Icon} name="trash-2" size=${15} /></button></li>`)}</ul>`}
     <//>
     <${Section} title="Webhooks" help="Where alerts go besides email. Slack and Discord take their incoming-webhook address. Your own service gets a JSON POST signed with a secret, so you can check it came from Tidemark.${d && d.private_allowed ? '' : ' Addresses must be public https URLs.'}">
-      <form class="goal-add stack" onSubmit=${addHook}>
-        <div class="fields2"><${Field} label="Name"><input required maxlength="80" placeholder="Team chat" value=${hook.name} onInput=${(e) => setHook({ ...hook, name: e.target.value })} /><//>
-          <${Field} label="Type"><select value=${hook.kind} onChange=${(e) => setHook({ ...hook, kind: e.target.value })}><option value="generic" selected=${hook.kind === 'generic'}>Signed JSON</option><option value="slack" selected=${hook.kind === 'slack'}>Slack</option><option value="discord" selected=${hook.kind === 'discord'}>Discord</option></select><//></div>
-        <div class="goal-add-row"><input class="grow" required type="url" placeholder="https://hooks.slack.com/services/…" value=${hook.url} onInput=${(e) => setHook({ ...hook, url: e.target.value })} aria-label="Webhook address" /><button class="btn primary">Add webhook</button></div></form>
+      <form class="goal-add" onSubmit=${addHook}>
+        <div class="seg" role="radiogroup" aria-label="Webhook type">${[['generic', 'Signed JSON'], ['slack', 'Slack'], ['discord', 'Discord']].map(([k, l]) => html`<button type="button" role="radio" aria-checked=${hook.kind === k} class=${hook.kind === k ? 'on' : ''} onClick=${() => setHook({ ...hook, kind: k })}>${l}</button>`)}</div>
+        <div class="goal-add-row">
+          <input required maxlength="80" placeholder="Name, e.g. Team chat" style="width:180px" value=${hook.name} onInput=${(e) => setHook({ ...hook, name: e.target.value })} aria-label="Webhook name" />
+          <input class="grow" required type="url" placeholder=${({ generic: 'https://example.com/hooks/tidemark', slack: 'https://hooks.slack.com/services/…', discord: 'https://discord.com/api/webhooks/…' })[hook.kind]} value=${hook.url} onInput=${(e) => setHook({ ...hook, url: e.target.value })} aria-label="Webhook address" />
+          <button class="btn primary">Add webhook</button></div></form>
       ${secret && html`<div class="notice"><${Icon} name="info" size=${16} /><div><b>Signing secret for ${secret.name}</b>: copy it now, it is not shown again.<${CodeBlock} text=${secret.value} />
         <p class="muted small">Each request has a <code>Tidemark-Signature: t=timestamp,v1=signature</code> header. The signature is the hex HMAC-SHA256 of <code>timestamp.body</code> with this secret.</p>
         <button class="btn sm" onClick=${() => setSecret(null)}>Done</button></div></div>`}
