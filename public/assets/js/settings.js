@@ -106,7 +106,12 @@ function PrivacyControls({ site, reload }) {
   const [err, setErr] = useState(null);
   const patch = async (body) => { setErr(null); try { await api(`/sites/${site.domain}`, { method: 'PATCH', body }); reload(); toast('Saved'); } catch (x) { setErr(firstError(x)); } };
   const places = [['city', 'Country, region and city'], ['region', 'Country and region'], ['country', 'Country only']];
+  const masks = useApi(`/sites/${site.domain}/pii-masks`, null, []);
+  const kinds = { email: ['email address', 'email addresses'], uuid: ['UUID', 'UUIDs'], number: ['long number', 'long numbers'], token: ['token', 'tokens'] };
+  const masked = ((masks.data && masks.data.results) || []).map((r) => { const k = kinds[r.pattern] || [r.pattern, r.pattern]; return `${r.count.toLocaleString()} ${r.count === 1 ? k[0] : k[1]}`; }).join(', ');
   return html`<${Section} title="Privacy controls" help="Tidemark already sets no cookies, stores no IP addresses and drops query strings. These switches let you collect even less.">
+    <${Toggle} label="Mask personal data sent by accident" help="Email addresses, tokens, UUIDs and long numbers in page addresses, referrers, campaign values, event names and properties are replaced with a placeholder such as [email] before anything is stored. Ordinary page names and short ids are left alone." checked=${site.pii_scrub} onChange=${(v) => patch({ pii_scrub: v })} />
+    ${masked && html`<p class="muted small" style="margin:-4px 0 4px 46px">Masked in the last 30 days: ${masked}. Only these counts are kept, never the values.</p>`}
     <${Toggle} label="Respect Global Privacy Control" help="Visitors whose browser sends the Global Privacy Control signal are not counted." checked=${site.honor_gpc} onChange=${(v) => patch({ honor_gpc: v })} />
     <${Toggle} label="Respect Do Not Track" help="Visitors whose browser sends Do Not Track are not counted." checked=${site.honor_dnt} onChange=${(v) => patch({ honor_dnt: v })} />
     <${Toggle} label="Keep only the referrer's domain" help="Record news.example.org instead of news.example.org/story/42." checked=${site.referrer_domain_only} onChange=${(v) => patch({ referrer_domain_only: v })} />

@@ -102,6 +102,7 @@ Route::middleware('api.auth')->group(function () {
         Route::post('/shared-links', [S::class, 'createSharedLink']);
         Route::patch('/shared-links/{link}', [S::class, 'updateSharedLink']);
         Route::delete('/shared-links/{link}', [S::class, 'deleteSharedLink']);
+        Route::get('/pii-masks', [S::class, 'piiMasks']);
         Route::get('/shields', [S::class, 'shields']);
         Route::post('/shields', [S::class, 'createShield']);
         Route::delete('/shields/{rule}', [S::class, 'deleteShield']);
