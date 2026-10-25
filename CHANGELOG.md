@@ -22,7 +22,7 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
   - Keep only the referrer's domain, without the path of the page that linked to you.
   - Query parameters to keep: page addresses are still stored without their query string, but an owner can allow-list parameters (such as `page` or `lang`) to see them in the Pages report. They are stored sorted by name so one page is one row, and names that look like they carry a secret or personal data (such as `email` or `token`) are refused.
   - New site settings fields `honor_gpc`, `honor_dnt`, `location_precision`, `url_params` and `referrer_domain_only` in the sites API. Nothing changes for existing sites until a switch is turned on.
-- **Extension points** for hosts that limit features by plan: `App\Contracts\AllowsAlerts` (alert rules and webhooks) and `App\Contracts\EnforcesPiiScrubbing` (masking of personal data always on, with the setting hidden). Without them every site has both, as before.
+- **Extension points** for hosts that limit features by plan: `App\Contracts\AllowsAlerts` (alert rules and webhooks) and `App\Contracts\EnforcesPiiScrubbing` (masking of personal data always on, with the setting hidden). Without them every site has both, as before. Sections a plan doesn't include (alerts, webhooks, funnels, branding) now show blurred under a lock with an upgrade link, instead of a notice.
 
 ## [0.30.2] - 2026-10-25
 

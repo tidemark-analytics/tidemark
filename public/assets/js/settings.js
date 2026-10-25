@@ -16,7 +16,11 @@ function SettingsShell({ title, back, tabs, tab, base, children }) {
     <div class="settings"><nav class="subnav" aria-label="Settings sections">${tabs.map(([k, l, dot]) => html`<${Link} to=${base + (k === tabs[0][0] ? '' : '/' + k)} class=${k === tab ? 'active' : ''} aria-current=${k === tab ? 'page' : undefined}>${l}${dot && html`<span class="notif inline" aria-hidden="true"></span><span class="sr-only"> (update available)</span>`}<//>`)}</nav>
       <div class="stack">${children}</div></div></main>`;
 }
-const Section = ({ title, help, children, danger }) => html`<section class=${'card pad stack ' + (danger ? 'danger-zone' : '')}><div><h2>${title}</h2>${help && html`<p class="muted" style="margin-top:3px">${help}</p>`}</div>${children}</section>`;
+/** The body of a section a plan doesn't include: blurred and out of reach, with a lock and a way to upgrade (Cloud only; self-hosted installs are never locked). */
+const ProLock = ({ children, note }) => html`<div class="prolock"><div class="prolock-body" inert aria-hidden="true">${children}</div>
+  <div class="prolock-over" role="note"><span class="prolock-ico" aria-hidden="true"><${Icon} name="lock" size=${22} /></span><b>Upgrade to unlock</b>
+    <p>To access this feature, <${Link} to="/settings/billing">upgrade your plan<//>.${note ? ' ' + note : ''}</p></div></div>`;
+const Section = ({ title, help, children, danger, locked, lockNote }) => html`<section class=${'card pad stack ' + (danger ? 'danger-zone' : '')}><div><h2>${title}</h2>${help && html`<p class="muted" style="margin-top:3px">${help}</p>`}</div>${locked ? html`<${ProLock} note=${lockNote}>${children}<//>` : children}</section>`;
 
 // ----------------------------------------------------------------------------------------- site settings
 // Reads an export file in the browser (gzip or plain) and sends it in small batches, so file size never hits a server limit.
@@ -228,8 +232,7 @@ function Branding({ site, reload }) {
   const accent = valid && color ? ((dark ? shown.dark : shown.light) || color) : '#0e7c86';
   const logo = site.brand && site.brand.logo;
   const off = !b.allowed;
-  return html`<${Section} title="Branding" help="Show your own logo, name and color to people who open the public dashboard or a shared link. A small “Analytics by Tidemark” link always stays in the footer.">
-      ${off && html`<div class="notice"><${Icon} name="info" size=${16} /><div>Custom branding is included with Pro. <${Link} to="/settings">Open your account settings<//> to upgrade.</div></div>`}
+  return html`<${Section} title="Branding" locked=${off} help="Show your own logo, name and color to people who open the public dashboard or a shared link. A small “Analytics by Tidemark” link always stays in the footer.">
       <div class="brand-grid">
         <div class="brand-form">
           <div class="bf-field"><span class="lbl">Logo</span>
@@ -343,9 +346,8 @@ function Funnels({ site }) {
   };
   const setStep = (i, v) => setForm({ ...form, steps: form.steps.map((s, j) => (j === i ? v : s)) });
   const needGoals = allowed && goals.data && list.length < 2;
-  return html`<${Section} title="Funnels" help="A funnel follows visitors through a series of goals, in order, and shows where they drop off. Chain two to eight goals.">
+  return html`<${Section} title="Funnels" locked=${!allowed} help="A funnel follows visitors through a series of goals, in order, and shows where they drop off. Chain two to eight goals.">
       ${!form && html`<div class="section-actions"><button class="btn primary" disabled=${!allowed || list.length < 2} onClick=${() => open(null)}><${Icon} name="plus" size=${14} /> New funnel</button>${needGoals && html`<span class="muted small">Add at least two goals first.</span>`}</div>`}
-      ${!allowed && html`<div class="notice"><${Icon} name="info" size=${16} /><div>Funnels are included with Pro. <${Link} to="/settings">Open your account settings<//> to upgrade.</div></div>`}
       ${err && !form && html`<div class="alert">${err}</div>`}
       ${form && html`<form class="funnel-form" onSubmit=${save}>
         ${err && html`<div class="alert">${err}</div>`}
@@ -541,12 +543,12 @@ function Alerts({ site }) {
   const act = async (fn, msg) => { setErr(null); try { await fn(); if (msg) toast(msg); res.reload(); } catch (x) { setErr(firstError(x)); } };
   const addHook = (e) => { e.preventDefault(); act(async () => { const r = await api(`${base}/alert-webhooks`, { method: 'POST', body: hook }); setHook({ name: '', kind: 'generic', url: '' }); setSecret(r.data.secret ? { name: r.data.name, value: r.data.secret } : null); }, 'Webhook added'); };
   const test = async (h) => { setTesting(h.id); setErr(null); try { const r = await api(`${base}/alert-webhooks/${h.id}/test`, { method: 'POST' }); toast(r.ok ? 'Test alert delivered' : 'Not delivered: ' + (r.error || 'HTTP ' + r.status), r.ok ? undefined : 'err'); res.reload(); } catch (x) { setErr(firstError(x)); } setTesting(null); };
-  return html`<${Section} title="Alerts" help="Get told when something is worth a look: a spike or drop in visitors, a goal reaching a number, or a brand new traffic source. Alerts carry totals only, never anything about a visitor. Rules are checked every five minutes.">
-      ${locked && html`<div class="notice"><${Icon} name="info" size=${16} /><div>Alerts and webhooks are included with Pro. <${Link} to="/settings">Open your account settings to upgrade<//>.${rules.length > 0 ? ' Your existing alerts are paused until then.' : ''}</div></div>`}
+  return html`<${Section} title="Alerts" locked=${locked} lockNote=${rules.length ? 'Your existing alerts are paused until then.' : ''} help="Get told when something is worth a look: a spike or drop in visitors, a goal reaching a number, or a brand new traffic source. Alerts carry totals only, never anything about a visitor. Rules are checked every five minutes.">
       ${d && !d.mail && !locked && html`<div class="notice"><${Icon} name="info" size=${16} /><div>Email isn't set up on this installation, so alerts can only go to webhooks for now.</div></div>`}
       ${err && html`<div class="alert">${err}</div>`}
       ${form ? html`<${RuleForm} site=${site} goals=${goals} hooks=${hooks} mail=${!!(d && d.mail)} rule=${form === 'new' ? null : form} onSaved=${() => { setForm(null); res.reload(); }} onCancel=${() => setForm(null)} />`
         : html`<div class="section-actions"><button class="btn primary" disabled=${locked} onClick=${() => setForm('new')}><${Icon} name="plus" size=${14} /> New alert</button></div>`}
+      ${locked && rules.length === 0 && html`<ul class="rows">${[['trending-up', 'Traffic spike', 'Visitors 100% above the usual'], ['target', 'Goal milestone', 'A goal reaches 25 conversions in a day']].map(([i, t, m]) => html`<li class="rowitem"><span class="ri-ico"><${Icon} name=${i} size=${16} /></span><div class="grow ri-main"><b>${t}</b><span class="muted">${m}</span></div></li>`)}</ul>`}
       ${d && rules.length === 0 && !form && !locked && html`<div class="empty-inline"><${Icon} name="bell" size=${18} /><div><b>No alerts yet</b><span>Create one to be told when traffic jumps or drops, or when a goal is reached.</span></div></div>`}
       ${rules.length > 0 && html`<ul class="rows" aria-label="Alerts">${rules.map((r) => html`<li class="rowitem" key=${r.id}>
         <span class="ri-ico" aria-hidden="true"><${Icon} name=${ALERT_TYPES[r.type].icon} size=${16} /></span>
@@ -555,7 +557,7 @@ function Alerts({ site }) {
         <button class="btn ghost icon sm" disabled=${locked} aria-label="Edit alert" title="Edit" onClick=${() => setForm(r)}><${Icon} name="pencil" size=${15} /></button>
         <button class="btn ghost icon sm danger" aria-label="Delete alert" title="Delete" onClick=${() => act(() => api(`${base}/alert-rules/${r.id}`, { method: 'DELETE' }))}><${Icon} name="trash-2" size=${15} /></button></li>`)}</ul>`}
     <//>
-    <${Section} title="Webhooks" help="Where alerts go besides email. Slack and Discord take their incoming-webhook address. Your own service gets a JSON POST signed with a secret, so you can check it came from Tidemark.${d && d.private_allowed ? '' : ' Addresses must be public https URLs.'}">
+    <${Section} title="Webhooks" locked=${locked} help="Where alerts go besides email. Slack and Discord take their incoming-webhook address. Your own service gets a JSON POST signed with a secret, so you can check it came from Tidemark.${d && d.private_allowed ? '' : ' Addresses must be public https URLs.'}">
       <form class="goal-add" onSubmit=${addHook}><fieldset disabled=${locked} style="border:0;padding:0;margin:0;display:contents">
         <div class="seg" role="radiogroup" aria-label="Webhook type">${[['generic', 'Signed JSON'], ['slack', 'Slack'], ['discord', 'Discord']].map(([k, l]) => html`<button type="button" role="radio" aria-checked=${hook.kind === k} class=${hook.kind === k ? 'on' : ''} onClick=${() => setHook({ ...hook, kind: k })}>${l}</button>`)}</div>
         <div class="goal-add-row">
