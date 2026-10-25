@@ -6,6 +6,8 @@ use App\Http\Controllers\Api\AnnotationController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BrandingController;
 use App\Http\Controllers\Api\DataController;
+use App\Http\Controllers\Api\McpController;
+use App\Http\Controllers\Api\OpenApiController;
 use App\Http\Controllers\Api\PlausibleImportController;
 use App\Http\Controllers\Api\ReportSubscriptionController;
 use App\Http\Controllers\Api\RollupController;
@@ -26,6 +28,9 @@ use Illuminate\Support\Facades\Route;
 Route::withoutMiddleware(['throttle:api', StartSession::class, EncryptCookies::class, AddQueuedCookiesToResponse::class])->middleware('cors.collect')->group(function () {
     Route::match(['post', 'options'], '/event', [EventController::class, 'store'])->name('event');
 });
+
+// ---- the API description, public --------------------------------------------------------------------------------
+Route::get('/v1/openapi.json', [OpenApiController::class, 'show']);
 
 // ---- auth & public config --------------------------------------------------------------------------------------
 Route::get('/config', [AuthController::class, 'config']);
@@ -143,6 +148,10 @@ Route::middleware('api.auth')->group(function () {
     Route::post('/admin/update/apply', [UpdateController::class, 'apply']);
     Route::delete('/admin/update', [UpdateController::class, 'discard']);
 
+    // MCP server (read-only tools over the Stats API)
+    Route::post('/mcp', [McpController::class, 'handle'])->middleware('throttle:120,1');
+    Route::get('/mcp', [McpController::class, 'stream']);
+
     // Stats API v1 (Plausible-compatible subset)
     Route::prefix('/v1/stats')->group(function () {
         Route::get('/realtime/visitors', [StatsApiController::class, 'realtime']);
@@ -150,5 +159,8 @@ Route::middleware('api.auth')->group(function () {
         Route::get('/timeseries', [StatsApiController::class, 'timeseries']);
         Route::get('/breakdown', [StatsApiController::class, 'breakdown']);
         Route::get('/annotations', [StatsApiController::class, 'annotations']);
+        Route::get('/goals', [StatsApiController::class, 'goals']);
+        Route::get('/funnels', [StatsApiController::class, 'funnels']);
+        Route::get('/funnels/{funnel}', [StatsApiController::class, 'funnel']);
     });
 });

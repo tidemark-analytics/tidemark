@@ -95,6 +95,34 @@ class StatsApiController extends Controller
         return ['results' => $rows->map(fn ($a) => ['date' => $a->date->toDateString(), 'note' => $a->note, 'visibility' => $a->visibility])->all(), 'period' => $p->toArray()];
     }
 
+    /** Every goal's conversions in the period, with revenue for goals that report it. */
+    public function goals(Request $r)
+    {
+        [, $stats, $p, $f] = $this->ctx($r);
+
+        return ['results' => $stats->goals($p, $f), 'period' => $p->toArray()];
+    }
+
+    /** The site's funnels (when its plan includes them). */
+    public function funnels(Request $r)
+    {
+        [$site] = $this->ctx($r);
+        if (! $site->funnelsAllowed()) {
+            return ['allowed' => false, 'results' => []];
+        }
+
+        return ['allowed' => true, 'results' => $site->funnels()->withCount('steps')->orderBy('created_at')->get()->map(fn ($x) => ['id' => $x->id, 'name' => $x->name, 'steps' => $x->steps_count])->all()];
+    }
+
+    /** How many visitors got through each step of one funnel in the period. */
+    public function funnel(Request $r, string $funnel)
+    {
+        [$site, $stats, $p, $f] = $this->ctx($r);
+        abort_unless($site->funnelsAllowed(), 403, 'Funnels are not available on this plan.');
+
+        return $stats->funnel($site->funnels()->findOrFail($funnel), $p, $f) + ['period' => $p->toArray()];
+    }
+
     public function realtime(Request $r)
     {
         [, $stats, , $f] = $this->ctx($r);

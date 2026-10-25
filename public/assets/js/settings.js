@@ -648,20 +648,29 @@ function Security() {
 function ApiKeys() {
   const res = useApi('/me/keys', null, []);
   const [name, setName] = useState('');
+  const [scope, setScope] = useState('read');
   const [token, setToken] = useState(null);
   const [err, setErr] = useState(null);
   const keys = (res.data && res.data.data) || [];
-  const create = async (e) => { e.preventDefault(); setErr(null); try { const r = await api('/me/keys', { method: 'POST', body: { name } }); setToken(r.token); setName(''); res.reload(); } catch (x) { setErr(firstError(x)); } };
+  const origin = window.location.origin;
+  const create = async (e) => { e.preventDefault(); setErr(null); try { const r = await api('/me/keys', { method: 'POST', body: { name, scope } }); setToken({ value: r.token, scope: r.data.scope }); setName(''); res.reload(); } catch (x) { setErr(firstError(x)); } };
   const revoke = async (k) => { setErr(null); try { await api('/me/keys/' + k.id, { method: 'DELETE' }); res.reload(); } catch (x) { setErr(firstError(x)); } };
-  return html`<${Section} title="API keys" help="Use a key as a Bearer token with the Stats API (/api/v1/stats/…). A key has the same access as you.">
-    <form class="goal-add" onSubmit=${create}><div class="goal-add-row"><input class="grow" required placeholder="Key name, e.g. Reporting script" aria-label="Key name" value=${name} onInput=${(e) => setName(e.target.value)} /><button class="btn primary" disabled=${!name.trim()}>Create key</button></div></form>
-    ${token && html`<div class="notice"><${Icon} name="key" size=${16} /><div><b>Copy your key now. It won't be shown again.</b><${CodeBlock} text=${token} /></div></div>`}
+  const mcp = JSON.stringify({ mcpServers: { tidemark: { url: origin + '/api/mcp', headers: { Authorization: 'Bearer ' + (token ? token.value : '<your key>') } } } }, null, 2);
+  return html`<${Section} title="API keys" help="Use a key as a Bearer token with the Stats API (/api/v1/stats/…) or to connect an AI assistant through MCP. A read-only key can only read statistics; a full-access key has the same access as you.">
+    <form class="goal-add" onSubmit=${create}>
+      <div class="seg" role="radiogroup" aria-label="Key access">${[['read', 'Read-only', 'eye'], ['full', 'Full access', 'key']].map(([k, l, i]) => html`<button type="button" role="radio" aria-checked=${scope === k} class=${scope === k ? 'on' : ''} onClick=${() => setScope(k)}><${Icon} name=${i} size=${14} />${l}</button>`)}</div>
+      <div class="goal-add-row"><input class="grow" required placeholder="Key name, e.g. Claude or Reporting script" aria-label="Key name" value=${name} onInput=${(e) => setName(e.target.value)} /><button class="btn primary" disabled=${!name.trim()}>Create key</button></div></form>
+    ${token && html`<div class="notice"><${Icon} name="key" size=${16} /><div><b>Copy your key now. It won't be shown again.</b><${CodeBlock} text=${token.value} /></div></div>`}
     ${err && html`<div class="alert">${err}</div>`}
-    ${res.data && !keys.length && html`<div class="empty-inline"><${Icon} name="key" size=${18} /><div><b>No keys yet</b><span>Create one to read your stats from a script or another tool.</span></div></div>`}
+    ${res.data && !keys.length && html`<div class="empty-inline"><${Icon} name="key" size=${18} /><div><b>No keys yet</b><span>Create one to read your stats from a script or an AI assistant.</span></div></div>`}
     ${keys.length > 0 && html`<ul class="rows" aria-label="API keys">${keys.map((k) => html`<li class="rowitem">
       <span class="ri-ico" aria-hidden="true"><${Icon} name="key" size=${16} /></span>
-      <div class="grow ri-main"><b class="trunc">${k.name}</b><span class="muted">${k.last_used_at ? 'Last used ' + ago(k.last_used_at.replace('T', ' ').slice(0, 19)) : 'Never used'}</span></div>
+      <div class="grow ri-main"><b class="trunc">${k.name}</b><span class="muted">${k.scope === 'read' ? 'Read-only' : 'Full access'} · ${k.last_used_at ? 'last used ' + ago(k.last_used_at.replace('T', ' ').slice(0, 19)) : 'never used'}</span></div>
       <button class="btn ghost icon sm danger" aria-label=${'Revoke key ' + k.name} title="Revoke key" onClick=${() => revoke(k)}><${Icon} name="trash-2" size=${15} /></button></li>`)}</ul>`}
+  <//>
+  <${Section} title="Connect an AI assistant" help="Tidemark has a read-only MCP server, so assistants such as Claude can answer questions about your stats. Add this to the assistant's MCP settings with a key from above. It can read totals, trends, top pages and sources, goals and funnels for your sites, and never anything about a single visitor.">
+    <${CodeBlock} text=${mcp} />
+    <p class="muted small">The Stats API and MCP are described in an <a href="/api/v1/openapi.json" target="_blank" rel="noopener">OpenAPI document</a> you can feed to any API client or code generator.</p>
   <//>`;
 }
 

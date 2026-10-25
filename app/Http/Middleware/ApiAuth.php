@@ -21,6 +21,9 @@ class ApiAuth
             if (! $key) {
                 return response()->json(['error' => 'Invalid API key'], 401);
             }
+            if (! $key->allows($request)) {
+                return response()->json(['error' => 'This API key is read-only. It can read statistics through the Stats API and MCP, nothing else.'], 403);
+            }
             if (! $key->last_used_at || $key->last_used_at->lt(now()->subMinutes(5))) {
                 $key->forceFill(['last_used_at' => now()])->save();
             }

@@ -20,6 +20,13 @@ jobs:
       - run: composer install --no-interaction --prefer-dist
       - run: vendor/bin/pint --test
 
+  openapi:
+    name: OpenAPI description
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: npx --yes @stoplight/spectral-cli@6 lint resources/openapi.json --fail-severity warn
+
   tests:
     name: Tests (PHP ${{ matrix.php }}, SQLite)
     runs-on: ubuntu-latest
