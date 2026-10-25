@@ -5,7 +5,9 @@ import { Lockup } from './logo.js';
 import { registry } from './extensions.js';
 
 const NOT_A_SITE = new Set(['', 'sites', 'settings', 'login', 'register', 'forgot-password', 'reset-password', 'share']);
-export const siteFromPath = (path) => { const seg = path.split('/')[1] || ''; return NOT_A_SITE.has(seg) ? null : decodeURIComponent(seg); };
+// the first segment of an extension's page ('/support' for '/support/:number?') is not a site either
+const isExtensionPage = (seg) => registry.routes.some(([pattern]) => pattern.split('/')[1] === seg);
+export const siteFromPath = (path) => { const seg = path.split('/')[1] || ''; return NOT_A_SITE.has(seg) || isExtensionPage(seg) ? null : decodeURIComponent(seg); };
 
 /** The sections of a site's dashboard. They stay in the sidebar on every page of the site, so the menu doesn't change under you. */
 const SECTIONS = [{ id: 'overview', label: 'Overview', icon: 'chart-column' }, { id: 'traffic', label: 'Traffic', icon: 'compass' }, { id: 'audience', label: 'Audience', icon: 'users' }, { id: 'conversions', label: 'Conversions', icon: 'target' }];
