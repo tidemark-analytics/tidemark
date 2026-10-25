@@ -34,7 +34,7 @@ class SegmentsAndJourneysTest extends TestCase
     /** One visit with events in order: [name, path] pairs, 'pageview' for pages. */
     private function visit(string $visitor, array $events, string $country = 'DE'): void
     {
-        $at = now()->subHour();
+        $at = now()->subHour()->max(now()->startOfDay()); // never yesterday, so the suite also passes between 00:00 and 01:00 UTC
         $visit = (string) Str::uuid();
         DB::table('visits')->insert([
             'id' => $visit, 'site_id' => $this->site->id, 'visitor_id' => str_pad($visitor, 32, '0'), 'started_at' => $at, 'ended_at' => $at, 'entry_page' => '/', 'exit_page' => '/',

@@ -38,7 +38,7 @@ class RollupTest extends TestCase
     /** One visit per visitor with the given events, a second apart, started an hour ago. @param array<int,array{0:string,1:string}> $events */
     private function visit(Site $site, string $visitor, array $events = [['pageview', '/']]): void
     {
-        $at = now()->subHour();
+        $at = now()->subHour()->max(now()->startOfDay()); // never yesterday, so the suite also passes between 00:00 and 01:00 UTC
         $visit = (string) Str::uuid();
         DB::table('visits')->insert([
             'id' => $visit, 'site_id' => $site->id, 'visitor_id' => str_pad($visitor, 32, '0'), 'started_at' => $at, 'ended_at' => $at, 'entry_page' => $events[0][1], 'exit_page' => '/',
