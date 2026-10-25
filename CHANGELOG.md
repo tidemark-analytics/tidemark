@@ -4,6 +4,8 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [0.30.0] - 2026-10-25
+
 ### Added
 - A Documentation link in the sidebar and the account menu.
 
