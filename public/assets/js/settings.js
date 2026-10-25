@@ -474,6 +474,25 @@ function Profile() {
       <div class="theme-opts" role="radiogroup" aria-label="Theme">${THEMES.map(([k, l]) => html`<button type="button" role="radio" aria-checked=${theme === k} class=${'theme-opt ' + k + (theme === k ? ' on' : '')} onClick=${() => pick(k)}><span class="tp" aria-hidden="true"><i></i><i></i><i></i></span><span>${l}</span></button>`)}</div><//>`;
 }
 
+function EmailReports() {
+  const res = useApi('/me/reports', null, []);
+  const [busy, setBusy] = useState(null);
+  const sites = (res.data && res.data.data) || [];
+  const choose = async (s, frequency) => {
+    setBusy(s.id);
+    try { await api('/me/reports/' + s.id, { method: 'PUT', body: { frequency } }); res.reload(); toast(frequency === 'off' ? 'Reports turned off for ' + s.domain : (frequency === 'weekly' ? 'Weekly' : 'Monthly') + ' reports on for ' + s.domain); } catch (x) { toast(firstError(x), 'err'); }
+    setBusy(null);
+  };
+  return html`<${Section} title="Email reports" help="A short summary of each site: visitors, pageviews, top pages, sources and countries, goals and the notes on your graph, compared with the period before. Weekly reports arrive on Monday morning and monthly ones on the 1st, at 08:00 in each site's timezone.">
+      ${res.data && !res.data.mail && html`<div class="alert">This installation can't send email yet. Reports will start going out once outgoing email is set up (see MAIL_MAILER in the environment file).</div>`}
+      ${res.loading && !res.data ? html`<p class="muted">Loading…</p>` : sites.length === 0 ? html`<p class="muted">You don't have any sites yet.</p>`
+        : html`<div class="rows">${sites.map((s) => html`<div class="rowitem boxed" key=${s.id}><span class="ri-ico" aria-hidden="true"><${Icon} name="mail" size=${16} /></span>
+          <div class="grow ri-main"><b>${s.domain}</b><span class="muted">${s.frequency === 'weekly' ? 'Every Monday' : s.frequency === 'monthly' ? 'On the 1st of each month' : 'No email'}</span></div>
+          <select style="width:auto;flex:none" aria-label=${'Email reports for ' + s.domain} disabled=${busy === s.id} value=${s.frequency || 'off'} onChange=${(e) => choose(s, e.target.value)}>
+            <option value="off" selected=${!s.frequency}>Off</option><option value="weekly" selected=${s.frequency === 'weekly'}>Weekly</option><option value="monthly" selected=${s.frequency === 'monthly'}>Monthly</option></select></div>`)}</div>`}
+      <p class="muted small">The emails hold only totals, with no tracking pixels or tracked links, and every one has an unsubscribe link.</p><//>`;
+}
+
 function Security() {
   const { user, setUser } = useContext(UserCtx);
   const blank = { current_password: '', password: '', password_confirmation: '' };
@@ -640,11 +659,11 @@ export function AccountSettings({ tab }) {
   useDocTitle('Settings');
   const { user } = useContext(UserCtx);
   const extra = registry.accountTabs.filter((x) => !x.visible || x.visible(user));
-  const tabs = [['profile', 'Profile'], ['security', 'Security'], ...extra.map((x) => [x.key, x.label, !!(x.dot && x.dot(user))]), ...(user.is_admin && !registry.adminUi ? [['users', 'Users'], ...(user.updater_enabled === false ? [] : [['updates', 'Updates', !!user.update]])] : [])];
+  const tabs = [['profile', 'Profile'], ['reports', 'Email reports'], ['security', 'Security'], ...extra.map((x) => [x.key, x.label, !!(x.dot && x.dot(user))]), ...(user.is_admin && !registry.adminUi ? [['users', 'Users'], ...(user.updater_enabled === false ? [] : [['updates', 'Updates', !!user.update]])] : [])];
   // administration lives in its own interface when an extension provides one
   if (registry.adminUi && user.is_admin && ['users', 'updates', 'customers'].includes(tab)) { window.location.replace(registry.adminUi.href + (tab === 'customers' ? '' : '/' + tab)); return null; }
   const moved = { preferences: 'profile', keys: 'security' }; // older links still land in the right place
   const t = [tab, moved[tab]].find((k) => tabs.some((x) => x[0] === k)) || 'profile';
-  const Body = { profile: Profile, security: Security, users: Users, updates: Updates, ...Object.fromEntries(extra.map((x) => [x.key, x.component])) }[t];
+  const Body = { profile: Profile, reports: EmailReports, security: Security, users: Users, updates: Updates, ...Object.fromEntries(extra.map((x) => [x.key, x.component])) }[t];
   return html`<${SettingsShell} title="Account settings" back=${['/sites', 'Your sites']} tabs=${tabs} tab=${t} base="/settings"><${Body} /><//>`;
 }
