@@ -114,7 +114,7 @@ export function AccountMenu({ user, align = 'right', btnClass = 'btn ghost avata
 function HelpMenu() {
   return html`<${Pop} align="right" ariaLabel="Help" btnClass="btn ghost icon" label=${html`<${Icon} name="circle-help" size=${17} />`}>
     ${(close) => html`<div style="min-width:220px">
-      <a class="item" href="https://support.tidemarkanalytics.com/en/docs" target="_blank" rel="noopener" onClick=${close}><span>Documentation</span><${Icon} name="book-open" size=${14} /></a>
+      <a class="item" href="https://www.tidemarkanalytics.com/docs/" target="_blank" rel="noopener" onClick=${close}><span>Documentation</span><${Icon} name="book-open" size=${14} /></a>
       <button class="item" onClick=${() => { close(); openShortcuts(); }}><span>Keyboard shortcuts</span><kbd>?</kbd></button>
       <a class="item" href="https://discord.gg/sCkHD3PPZh" target="_blank" rel="noopener" onClick=${close}><span>Community (Discord)</span><${Icon} name="users" size=${14} /></a></div>`}<//>`;
 }
@@ -259,7 +259,7 @@ export function Sidebar({ user, path, sites, side }) {
       ${tabs.map(([k, l, dot]) => html`<${SideLink} to=${tabPath(k)} icon=${ACCOUNT_ICONS[k] || 'settings'} label=${l} on=${accountOn(k)}>${dot && html`<span class="notif inline" aria-hidden="true"></span><span class="sr-only"> (update available)</span>`}<//>`)}
       ${user.is_admin && registry.adminUi && html`<a class="side-link" title=${registry.adminUi.label} href=${BASE + registry.adminUi.href}><${Icon} name="shield-check" size=${16} /><span>${registry.adminUi.label}</span><${Icon} name="chevron-right" size=${13} class="side-ext" /></a>`}
       <div class="side-grp">Resources</div>
-      <${SideExt} href="https://support.tidemarkanalytics.com/en/docs" icon="book-open" label="Documentation" />
+      <${SideExt} href="https://www.tidemarkanalytics.com/docs/" icon="book-open" label="Documentation" />
       ${registry.menuItems.filter((m) => !m.visible || m.visible(user)).map((m) => (m.onClick
         ? html`<button class="side-link" title=${m.label} onClick=${m.onClick}><${Icon} name=${m.icon || 'life-buoy'} size=${16} /><span>${m.label}</span></button>`
         : html`<${SideExt} href=${m.href} icon=${m.icon || 'external-link'} label=${m.label} external=${!!m.external} />`))}
@@ -314,7 +314,7 @@ export function CommandPalette({ path, sites }) {
     out.push({ group: 'Go to', icon: 'layout-dashboard', label: 'All sites', hint: 'g a', run: go('/sites') }, { group: 'Go to', icon: 'plus', label: 'Add a site', run: go('/sites/new') });
     if (user) accountTabs(user).forEach(([k, l]) => out.push({ group: 'Account', icon: ACCOUNT_ICONS[k] || 'settings', label: l, run: go(k === 'profile' ? '/settings' : '/settings/' + k) }));
     out.push({ group: 'Preferences', icon: 'sun', label: 'Theme: light', run: () => setTheme('light') }, { group: 'Preferences', icon: 'moon', label: 'Theme: dark', run: () => setTheme('dark') }, { group: 'Preferences', icon: 'monitor', label: 'Theme: match system', run: () => setTheme('system') },
-      { group: 'Preferences', icon: 'keyboard', label: 'Keyboard shortcuts', hint: '?', run: openShortcuts }, { group: 'Preferences', icon: 'book-open', label: 'Documentation', run: () => window.open('https://support.tidemarkanalytics.com/en/docs', '_blank', 'noopener') });
+      { group: 'Preferences', icon: 'keyboard', label: 'Keyboard shortcuts', hint: '?', run: openShortcuts }, { group: 'Preferences', icon: 'book-open', label: 'Documentation', run: () => window.open('https://www.tidemarkanalytics.com/docs/', '_blank', 'noopener') });
     return out;
   }, [domain, list, user && user.is_admin]);
   const shown = useMemo(() => {

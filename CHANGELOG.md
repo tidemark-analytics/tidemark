@@ -4,6 +4,11 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [0.33.1] - 2026-10-26
+
+### Changed
+- The Documentation links in the app point at the new docs at tidemarkanalytics.com/docs. The old links keep redirecting.
+
 ## [0.33.0] - 2026-10-26
 
 ### Added
