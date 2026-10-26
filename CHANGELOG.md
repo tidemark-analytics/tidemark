@@ -4,6 +4,11 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [0.34.0] - 2026-10-26
+
+### Added
+- Extensions can place a menu item in the Help (?) menu instead of the account menu (`help: true`), and show a count beside it (`badge`, with an optional `badgeLabel`): in the sidebar and the Help menu, as a dot on the Help button, and as a dot on the collapsed sidebar. The count refreshes on every page change, when the window regains focus and every minute.
+
 ## [0.33.1] - 2026-10-26
 
 ### Changed
