@@ -4,6 +4,8 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [0.33.0] - 2026-10-26
+
 ### Added
 - Each site's snippet now uses its own randomized script name and collection address (for example `/js/3fa91c0b2e.outbound-links.js` posting to `/e/3fa91c0b2e`) instead of Plausible-style `script.js` and `/api/event`, so blocklists written for those names miss it. The code is a keyed hash of the site, so nothing is stored and it never changes. Existing snippets keep working: `script.js` and `/api/event` are unchanged.
 - A test now fails if a file in the dashboard's assets carries a name that content blockers match on sight (such as plausible or analytics).
