@@ -54,9 +54,12 @@ class Favicon
             }
         }
         $candidates[] = "https://{$domain}/favicon.ico";
-        foreach (array_slice(array_values(array_unique(array_filter($candidates))), 0, 4) as $url) {
+        // PNGs first (sharper, never an empty placeholder), then whatever else the page names, the classic .ico last
+        $candidates = array_values(array_unique(array_filter($candidates)));
+        usort($candidates, fn ($a, $b) => self::rank($a) <=> self::rank($b));
+        foreach (array_slice($candidates, 0, 4) as $url) {
             $res = self::get($url, self::MAX_BYTES);
-            if ($res && ($type = self::imageType($res['body']))) {
+            if ($res && ($type = self::imageType($res['body'])) && ! self::isBlank($res['body'], $type)) {
                 return ['type' => $type, 'body' => $res['body']];
             }
         }
@@ -146,6 +149,38 @@ class Favicon
         $dir = rtrim(dirname(($b['path'] ?? '/').'x'), '/');
 
         return $origin.$dir.'/'.$href;
+    }
+
+    private static function rank(string $url): int
+    {
+        return preg_match('/\.png(\?|$)|apple-touch/i', $url) ? 0 : (preg_match('/\.ico(\?|$)/i', $url) ? 2 : 1);
+    }
+
+    /** True for an .ico whose bitmap is entirely transparent: some sites ship one, and it would show as an empty square. */
+    private static function isBlank(string $body, string $type): bool
+    {
+        if ($type !== 'image/x-icon' || strlen($body) < 22 || ! ($entries = unpack('v', substr($body, 4, 2))[1] ?? 0)) {
+            return false;
+        }
+        for ($i = 0; $i < min($entries, 8); $i++) {
+            $e = unpack('Vsize/Voffset', substr($body, 6 + 16 * $i + 8, 8));
+            $image = substr($body, $e['offset'], $e['size']);
+            if (str_starts_with($image, "\x89PNG") || strlen($image) < 40) {
+                return false; // PNG entries are not inspected
+            }
+            $h = unpack('Vhdr/lw/lh/vplanes/vbits', substr($image, 0, 16));
+            if ($h['bits'] !== 32) {
+                return false;
+            }
+            $pixels = intdiv(abs($h['h']), 2) * abs($h['w']);
+            for ($p = 0; $p < $pixels; $p++) {
+                if (isset($image[40 + $p * 4 + 3]) && $image[40 + $p * 4 + 3] !== "\x00") {
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 
     /** The image type judged by the file's own first bytes, never by what the site claims; vector images are left out. */

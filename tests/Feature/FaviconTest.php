@@ -91,4 +91,35 @@ class FaviconTest extends TestCase
         }
         $this->assertNull(Favicon::for('example.com'));
     }
+
+    public function test_an_icon_that_is_entirely_transparent_is_not_used(): void
+    {
+        $blank = "\x00\x00\x01\x00\x01\x00\x02\x02\x00\x00\x01\x00\x20\x00".pack('VV', 40 + 4 + 4, 22).pack('VllvvVVllVV', 40, 2, 4, 1, 32, 0, 16, 0, 0, 0, 0).str_repeat("\x00", 4 * 4);
+        Http::fake(function (Request $r) use ($blank) {
+            return match ($r->url()) {
+                'https://example.com/' => Http::response('<link rel="icon" href="/favicon.ico">'),
+                'https://example.com/favicon.ico' => Http::response($blank),
+                default => Http::response('', 404),
+            };
+        });
+        if (! gethostbynamel('example.com')) {
+            $this->markTestSkipped('No DNS available.');
+        }
+        $this->assertNull(Favicon::for('example.com'));
+    }
+
+    public function test_a_png_is_preferred_over_the_classic_ico(): void
+    {
+        Http::fake(function (Request $r) {
+            return match ($r->url()) {
+                'https://example.com/' => Http::response('<link rel="icon" href="/favicon.ico"><link rel="apple-touch-icon" href="/touch.png">'),
+                'https://example.com/touch.png' => Http::response(self::PNG),
+                default => Http::response("\x00\x00\x01\x00".str_repeat('x', 40)),
+            };
+        });
+        if (! gethostbynamel('example.com')) {
+            $this->markTestSkipped('No DNS available.');
+        }
+        $this->assertSame('image/png', Favicon::for('example.com')['type']);
+    }
 }
