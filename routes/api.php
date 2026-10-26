@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\AnnotationController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BrandingController;
 use App\Http\Controllers\Api\DataController;
+use App\Http\Controllers\Api\FaviconController;
 use App\Http\Controllers\Api\McpController;
 use App\Http\Controllers\Api\OpenApiController;
 use App\Http\Controllers\Api\PlausibleImportController;
@@ -83,6 +84,7 @@ Route::middleware('api.auth')->group(function () {
 
     // Anyone with access to a site (viewers included) may keep personal segments; owners and admins may also share them with everyone.
     Route::middleware('site:view')->prefix('/sites/{site}')->group(function () {
+        Route::get('/favicon', [FaviconController::class, 'show']);
         Route::post('/annotations', [AnnotationController::class, 'store']);
         Route::patch('/annotations/{annotation}', [AnnotationController::class, 'update']);
         Route::delete('/annotations/{annotation}', [AnnotationController::class, 'destroy']);

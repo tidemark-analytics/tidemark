@@ -1,26 +1,30 @@
 // Site settings (General, Visibility, Branding, Goals, People, Shields) and account settings (Preferences, Security, API keys, Users).
 import { html, useState, useEffect, useApi, api, navigate, Link, Icon, toast, copy, toggleTheme, setTheme, currentTheme, UserCtx, useContext, useDocTitle, ago, countryName, flag, BASE } from './lib.js';
-import { Loading, Empty, ErrorBox, Field, Confirm, Modal, Toggle, CodeBlock } from './ui.js';
+import { Loading, Empty, ErrorBox, Field, Confirm, TypedConfirm, Modal, Toggle, CodeBlock, Breadcrumb, Badge } from './ui.js';
 import { Snippet } from './dashboard.js';
 import { registry } from './extensions.js';
+import { accountTabs } from './shell.js';
 import { brandTheme } from './brand.js';
-import { importPlausible, removeImported } from './plausible.js';
+import { importPlausible, removeImported } from './data-import.js';
 
 const zones = () => { try { return ['UTC', ...Intl.supportedValuesOf('timeZone')]; } catch (e) { return ['UTC']; } };
 const firstError = (x) => (x.errors && Object.values(x.errors)[0][0]) || x.message;
 
-function SettingsShell({ title, back, tabs, tab, base, children }) {
+function SettingsShell({ title, back, tabs, tab, base, children, scope, dup }) {
   // on phones the section list scrolls sideways: bring the active section into view
   useEffect(() => { const a = document.querySelector('.subnav a.active'); if (a && a.scrollIntoView) a.scrollIntoView({ block: 'nearest', inline: 'center' }); }, [tab]);
-  return html`<main class="main"><header class="page-head"><div class="grow"><div class="crumb crumb-back"><${Link} to=${back[0]}><${Icon} name="chevron-left" size=${14} /> ${back[1]}<//></div><h1>${title}</h1></div></header>
-    <div class="settings"><nav class="subnav" aria-label="Settings sections">${tabs.map(([k, l, dot]) => html`<${Link} to=${base + (k === tabs[0][0] ? '' : '/' + k)} class=${k === tab ? 'active' : ''} aria-current=${k === tab ? 'page' : undefined}>${l}${dot && html`<span class="notif inline" aria-hidden="true"></span><span class="sr-only"> (update available)</span>`}<//>`)}</nav>
-      <div class="stack">${children}</div></div></main>`;
+  const label = (tabs.find((x) => x[0] === tab) || [])[1];
+  return html`<main class="main"><header class="page-head"><div class="grow"><${Breadcrumb} items=${[{ label: scope || back[1], to: back[0] }, { label: 'Settings' }]} /><h1 style="margin-top:8px">${title}</h1></div></header>
+    <div class=${'settings' + (dup ? ' dup' : '')}><nav class="subnav" aria-label="Settings sections">${tabs.map(([k, l, dot]) => html`<${Link} to=${base + (k === tabs[0][0] ? '' : '/' + k)} class=${k === tab ? 'active' : ''} aria-current=${k === tab ? 'page' : undefined}>${l}${dot && html`<span class="notif inline" aria-hidden="true"></span><span class="sr-only"> (update available)</span>`}<//>`)}</nav>
+      <div class="stack" aria-label=${label}>${children}</div></div></main>`;
 }
 /** The body of a section a plan doesn't include: blurred and out of reach, with a lock and a way to upgrade (Cloud only; self-hosted installs are never locked). */
 const ProLock = ({ children, note }) => html`<div class="prolock"><div class="prolock-body" inert aria-hidden="true">${children}</div>
   <div class="prolock-over" role="note"><span class="prolock-ico" aria-hidden="true"><${Icon} name="lock" size=${22} /></span><b>Upgrade to unlock</b>
     <p>To access this feature, <${Link} to="/settings/billing">upgrade your plan<//>.${note ? ' ' + note : ''}</p></div></div>`;
-const Section = ({ title, help, children, danger, locked, lockNote }) => html`<section class=${'card pad stack ' + (danger ? 'danger-zone' : '')}><div><h2>${title}</h2>${help && html`<p class="muted" style="margin-top:3px">${help}</p>`}</div>${locked ? html`<${ProLock} note=${lockNote}>${children}<//>` : children}</section>`;
+/** A setting card: title, description, body and an optional footer (helper text left, Save right). */
+const Section = ({ title, help, children, danger, locked, lockNote, footer }) => html`<section class=${'card setting ' + (danger ? 'danger-zone' : '')}><div class="setting-h"><h2>${title}</h2>${help && html`<p>${help}</p>`}</div>${children && html`<div class="setting-b">${locked ? html`<${ProLock} note=${lockNote}>${children}<//>` : children}</div>`}${footer && !locked && html`<div class="setting-f">${footer}</div>`}</section>`;
+const SaveFooter = ({ help, dirty, onSave, busy, label = 'Save' }) => html`<span class="help">${dirty ? 'You have unsaved changes.' : help}</span><button class="btn primary sm" type="button" disabled=${!dirty || busy} onClick=${onSave}>${label}</button>`;
 
 // ----------------------------------------------------------------------------------------- site settings
 // Reads an export file in the browser (gzip or plain) and sends it in small batches, so file size never hits a server limit.
@@ -116,7 +120,7 @@ function PrivacyControls({ site, reload }) {
   const masked = ((masks.data && masks.data.results) || []).map((r) => { const k = kinds[r.pattern] || [r.pattern, r.pattern]; return `${r.count.toLocaleString()} ${r.count === 1 ? k[0] : k[1]}`; }).join(', ');
   return html`<${Section} title="Privacy controls" help="Tidemark already sets no cookies, stores no IP addresses and drops query strings. These switches let you collect even less.">
     ${scrubChoice && html`<${Toggle} label="Mask personal data sent by accident" help="Email addresses, tokens, UUIDs and long numbers in page addresses, referrers, campaign values, event names and properties are replaced with a placeholder such as [email] before anything is stored. Ordinary page names and short ids are left alone." checked=${site.pii_scrub} onChange=${(v) => patch({ pii_scrub: v })} />`}
-    ${scrubChoice && masked && html`<p class="muted small" style="margin:-4px 0 4px 46px">Masked in the last 30 days: ${masked}. Only these counts are kept, never the values.</p>`}
+    ${scrubChoice && masked && html`<p class="muted small" style="margin:-4px 0 4px 48px">Masked in the last 30 days: ${masked}. Only these counts are kept, never the values.</p>`}
     <${Toggle} label="Respect Global Privacy Control" help="Visitors whose browser sends the Global Privacy Control signal are not counted." checked=${site.honor_gpc} onChange=${(v) => patch({ honor_gpc: v })} />
     <${Toggle} label="Respect Do Not Track" help="Visitors whose browser sends Do Not Track are not counted." checked=${site.honor_dnt} onChange=${(v) => patch({ honor_dnt: v })} />
     <${Toggle} label="Keep only the referrer's domain" help="Record news.example.org instead of news.example.org/story/42." checked=${site.referrer_domain_only} onChange=${(v) => patch({ referrer_domain_only: v })} />
@@ -136,7 +140,7 @@ function BotFiltering({ site, reload }) {
   return html`<${Section} title="Bot and spam filtering" help="Hits that don't come from a person's browser are left out of your numbers, using only what the request already carries (never stored): known crawlers, headless browsers, addresses of cloud and hosting providers, referrer spam and sudden floods from a single visitor. Lists of providers and spam domains are updated with each release.">
     <${Toggle} label="Filter bots and spam" help="Turn it off to count everything, for example while testing from a script or a server." checked=${site.bot_filter !== false} onChange=${(v) => patch({ bot_filter: v })} />
     ${err && html`<div class="alert">${err}</div>`}
-    ${filtered.data && html`<p class="muted small" style="margin:-4px 0 4px 46px">${total === 0 ? 'Nothing was filtered in the last 30 days.' : `Filtered in the last 30 days: ${total.toLocaleString()} (${rows.map((r) => `${r.count.toLocaleString()} ${names[r.reason] || r.reason}`).join(', ')}). Only these counts are kept.`}</p>`}
+    ${filtered.data && html`<p class="muted small" style="margin:-4px 0 4px 48px">${total === 0 ? 'Nothing was filtered in the last 30 days.' : `Filtered in the last 30 days: ${total.toLocaleString()} (${rows.map((r) => `${r.count.toLocaleString()} ${names[r.reason] || r.reason}`).join(', ')}). Only these counts are kept.`}</p>`}
   <//>`;
 }
 
@@ -163,27 +167,33 @@ function DataTab({ site, reload }) {
   const [tz, setTz] = useState(site.timezone);
   const [confirm, setConfirm] = useState(null);
   const patch = async (body) => { try { await api(`/sites/${site.domain}`, { method: 'PATCH', body }); reload(); toast('Saved'); } catch (x) { toast(firstError(x), 'err'); } };
- if (site.rollup) return html`<${Section} title="Reporting timezone" help="Days start and end at midnight in this timezone. It starts as the timezone most of the rollup's sites use."><div class="row"><select value=${tz} onChange=${(e) => setTz(e.target.value)} style="max-width:320px">${zones().map((z) => html`<option value=${z} selected=${z === tz}>${z}</option>`)}</select><button class="btn" disabled=${tz === site.timezone} onClick=${() => patch({ timezone: tz })}>Save</button></div><//>
-    ${site.is_owner && html`<${Section} danger title="Danger zone"><div class="row spread wrap"><div><b>Delete rollup</b><div class="muted">Removes this dashboard and its goals. Your sites and their data are not touched.</div></div><button class="btn danger" onClick=${() => setConfirm('delete')}>Delete rollup</button></div><//>`}
-    ${confirm === 'delete' && html`<${Confirm} title=${`Delete ${site.domain}?`} message="The rollup and its goals will be deleted. The sites it adds up are not affected." onClose=${() => setConfirm(null)} onConfirm=${async () => { await api(`/sites/${site.domain}`, { method: 'DELETE' }); navigate('/sites'); }} />`}`;
-  return html`<${Section} title="Reporting timezone" help="Days start and end at midnight in this timezone."><div class="row"><select value=${tz} onChange=${(e) => setTz(e.target.value)} style="max-width:320px">${zones().map((z) => html`<option value=${z} selected=${z === tz}>${z}</option>`)}</select><button class="btn" disabled=${tz === site.timezone} onClick=${() => patch({ timezone: tz })}>Save</button></div><//>
+  const tzCard = html`<${Section} title="Reporting timezone" help=${site.rollup ? 'Days start and end at midnight in this timezone. It starts as the timezone most of the rollup\'s sites use.' : 'Days start and end at midnight in this timezone.'}
+    footer=${html`<${SaveFooter} help="Changing it re-draws the whole history in the new timezone." dirty=${tz !== site.timezone} onSave=${() => patch({ timezone: tz })} />`}>
+    <select value=${tz} onChange=${(e) => setTz(e.target.value)} aria-label="Reporting timezone" style="max-width:360px">${zones().map((z) => html`<option value=${z} selected=${z === tz}>${z}</option>`)}</select><//>`;
+  if (site.rollup) return html`${tzCard}
+    ${site.is_owner && html`<${Section} danger title="Danger zone" help="Removing a rollup never touches the sites it adds up.">
+      <div class="dz-row"><div><b>Delete rollup</b><span class="muted">Removes this dashboard and its goals.</span></div><button class="btn danger" onClick=${() => setConfirm('delete')}>Delete rollup</button></div><//>`}
+    ${confirm === 'delete' && html`<${TypedConfirm} title=${`Delete ${site.domain}?`} phrase=${site.domain} message="The rollup and its goals will be deleted. The sites it adds up are not affected." confirmLabel="Delete rollup" onClose=${() => setConfirm(null)} onConfirm=${async () => { await api(`/sites/${site.domain}`, { method: 'DELETE' }); navigate('/sites'); }} />`}`;
+  return html`${tzCard}
     ${site.can_manage && html`<${MoveData} site=${site} reload=${reload} />`}
     ${site.can_manage && html`<${ImportPlausible} site=${site} reload=${reload} />`}
-    ${site.is_owner && html`<${Section} danger title="Danger zone"><div class="row spread wrap"><div><b>Reset statistics</b><div class="muted">Deletes all collected data but keeps the site.</div></div><button class="btn danger" onClick=${() => setConfirm('reset')}>Reset</button></div>
-      <hr /><div class="row spread wrap"><div><b>Delete site</b><div class="muted">Removes the site and all its data permanently.</div></div><button class="btn danger" onClick=${() => setConfirm('delete')}>Delete site</button></div><//>`}
-    ${confirm === 'reset' && html`<${Confirm} title="Reset statistics?" message=${`All collected data for ${site.domain} will be deleted. This can't be undone.`} confirmLabel="Reset" onClose=${() => setConfirm(null)} onConfirm=${async () => { await api(`/sites/${site.domain}/reset`, { method: 'POST' }); toast('Statistics reset'); reload(); }} />`}
-    ${confirm === 'delete' && html`<${Confirm} title=${`Delete ${site.domain}?`} message="The site and all of its data will be permanently deleted." onClose=${() => setConfirm(null)} onConfirm=${async () => { await api(`/sites/${site.domain}`, { method: 'DELETE' }); navigate('/sites'); }} />`}`;
+    ${site.is_owner && html`<${Section} danger title="Danger zone" help="These actions cannot be undone.">
+      <div class="dz-row"><div><b>Reset statistics</b><span class="muted">Deletes all collected data but keeps the site.</span></div><button class="btn danger" onClick=${() => setConfirm('reset')}>Reset statistics</button></div>
+      <div class="dz-row"><div><b>Delete site</b><span class="muted">Removes the site and all its data permanently.</span></div><button class="btn danger" onClick=${() => setConfirm('delete')}>Delete site</button></div><//>`}
+    ${confirm === 'reset' && html`<${TypedConfirm} title="Reset statistics?" phrase=${site.domain} message=${`All collected data for ${site.domain} will be deleted. This can't be undone.`} confirmLabel="Reset statistics" onClose=${() => setConfirm(null)} onConfirm=${async () => { await api(`/sites/${site.domain}/reset`, { method: 'POST' }); toast('Statistics reset'); reload(); }} />`}
+    ${confirm === 'delete' && html`<${TypedConfirm} title=${`Delete ${site.domain}?`} phrase=${site.domain} message="The site and all of its data will be permanently deleted." confirmLabel="Delete site" onClose=${() => setConfirm(null)} onConfirm=${async () => { await api(`/sites/${site.domain}`, { method: 'DELETE' }); navigate('/sites'); }} />`}`;
 }
 
 /** Leave small groups out of what public dashboards and shared links list. */
 function SmallGroups({ site, reload }) {
   const [n, setN] = useState(String(site.min_group_size || 0));
   const [err, setErr] = useState(null);
+  const dirty = (parseInt(n, 10) || 0) !== (site.min_group_size || 0);
   const save = async () => { setErr(null); try { await api(`/sites/${site.domain}`, { method: 'PATCH', body: { min_group_size: parseInt(n, 10) || 0 } }); reload(); toast('Saved'); } catch (x) { setErr(firstError(x)); } };
-  return html`<${Section} title="Small groups" help="With few visitors, one visit from a rare country or to an obscure page can point at one person. Set a minimum and public dashboards and shared links leave out rows with fewer visitors than that. You and the people on this site still see everything.">
-    <div class="row"><label class="sr-only" for="min-group">Smallest group to show</label><input id="min-group" type="number" min="0" max="1000" value=${n} onInput=${(e) => setN(e.target.value)} style="width:96px" /><span class="muted">visitors (0 turns it off, 5 is a common choice)</span><button class="btn" type="button" disabled=${(parseInt(n, 10) || 0) === (site.min_group_size || 0)} onClick=${save}>Save</button></div>
-    <p class="muted small">Totals and the graph still count everyone. A filter that would narrow a public view down to a smaller group shows no data.</p>
-    ${err && html`<div class="alert">${err}</div>`}<//>`;
+  return html`<${Section} title="Small groups" help="With few visitors, one visit from a rare country or to an obscure page can point at one person. Set a minimum and public dashboards and shared links leave out rows with fewer visitors than that. You and the people on this site still see everything."
+    footer=${html`<${SaveFooter} help="Totals and the graph still count everyone. A filter that would narrow a public view down to a smaller group shows no data." dirty=${dirty} onSave=${save} />`}>
+    ${err && html`<div class="alert">${err}</div>`}
+    <div class="row"><label class="sr-only" for="min-group">Smallest group to show</label><input id="min-group" type="number" min="0" max="1000" value=${n} onInput=${(e) => setN(e.target.value)} style="width:96px" /><span class="muted">visitors (0 turns it off, 5 is a common choice)</span></div><//>`;
 }
 
 function Visibility({ site, reload }) {
@@ -192,7 +202,7 @@ function Visibility({ site, reload }) {
   const [del, setDel] = useState(null);
   const setPublic = async (v) => { await api(`/sites/${site.domain}`, { method: 'PATCH', body: { public: v } }); reload(); };
   const url = (l) => `${window.SD.origin}/share/${site.domain}?auth=${l.slug}`;
-  return html`<${Section} title="Public dashboard" help="Anyone with the address can view this site's stats — no sign-in needed."><${Toggle} label="Make the dashboard public" checked=${site.public} onChange=${setPublic} />
+  return html`<${Section} title="Public dashboard" help="Anyone with the address can view this site's stats, no sign-in needed."><${Toggle} label="Make the dashboard public" checked=${site.public} onChange=${setPublic} />
       ${site.public && html`<${CodeBlock} text=${`${window.SD.origin}/${site.domain}`} />`}<//>
     <${SmallGroups} site=${site} reload=${reload} />
     <${Section} title="Shared links" help="Private, read-only links you can revoke at any time. Add a password if you like.">
@@ -229,10 +239,10 @@ function Branding({ site, reload }) {
     run(() => api(`/sites/${site.domain}/branding/logo`, { method: 'POST', body }), 'Logo updated');
   };
   const dark = document.documentElement.dataset.theme === 'dark' || (!document.documentElement.dataset.theme && window.matchMedia('(prefers-color-scheme: dark)').matches);
-  const accent = valid && color ? ((dark ? shown.dark : shown.light) || color) : '#0e7c86';
+  const accent = valid && color ? ((dark ? shown.dark : shown.light) || color) : dark ? '#4fc3be' : '#0e7c86';
   const logo = site.brand && site.brand.logo;
   const off = !b.allowed;
-  return html`<${Section} title="Branding" locked=${off} help="Show your own logo, name and color to people who open the public dashboard or a shared link. A small “Analytics by Tidemark” link always stays in the footer.">
+  return html`<${Section} title="Branding" locked=${off} footer=${html`<${SaveFooter} help="Applies to the public dashboard and shared links." dirty=${changed && valid} busy=${busy} onSave=${save} label="Save changes" />`} help="Show your own logo, name and color to people who open the public dashboard or a shared link. A small “Analytics by Tidemark” link always stays in the footer.">
       <div class="brand-grid">
         <div class="brand-form">
           <div class="bf-field"><span class="lbl">Logo</span>
@@ -254,7 +264,6 @@ function Branding({ site, reload }) {
             <span class="help">Used for buttons, links and the chart.</span>
             ${!valid && html`<span class="help" style="color:var(--bad)">Use six hex digits, like #0e7c86.</span>`}
             ${valid && color && shown.changed && html`<span class="help">So text stays readable (WCAG AA contrast), visitors see this as <b class="mono">${shown.light}</b> on light pages and <b class="mono">${shown.dark}</b> on dark ones, the closest shades that pass.</span>`}</div>
-          <div class="row"><button class="btn primary" disabled=${off || busy || !changed || !valid} onClick=${save}>Save changes</button>${changed && html`<span class="muted small">Unsaved changes</span>`}</div>
         </div>
         <div class="brand-side"><span class="lbl">Preview</span>
           <div class="bp" style=${`--bc:${accent}`} aria-hidden="true">
@@ -381,7 +390,7 @@ function RollupSites({ site, reload }) {
   const count = all ? list.length || site.rollup.count : chosen.length;
   const toggle = (d, on) => setChosen(on ? [...chosen, d] : chosen.filter((x) => x !== d));
   const OPTIONS = [[true, 'All the sites I own', 'layers', 'Includes the sites you add later.'], [false, 'Only the sites I choose', 'funnel', 'Pick exactly which sites to add up.']];
-  return html`<${Section} title="Sites in this rollup" help="A rollup adds up the visits of several of your sites on one dashboard. Your sites themselves are never changed.">
+  return html`<${Section} title="Sites in this rollup" footer=${html`<${SaveFooter} help=${`${count} ${count === 1 ? 'site' : 'sites'} in this rollup.`} dirty=${dirty && (all || chosen.length > 0)} onSave=${save} label="Save changes" />`} help="A rollup adds up the visits of several of your sites on one dashboard. Your sites themselves are never changed.">
     ${err && html`<div class="alert">${err}</div>`}
     <div class="opt-cards" role="radiogroup" aria-label="Which sites">${OPTIONS.map(([v, t, i, d]) => html`<button type="button" role="radio" aria-checked=${all === v} class=${'opt-card' + (all === v ? ' on' : '')} onClick=${() => { setAll(v); if (!v && !chosen.length) setChosen(list.map((x) => x.domain)); }}>
       <span class="ri-ico" aria-hidden="true"><${Icon} name=${i} size=${16} /></span><span class="oc-t"><b>${t}</b><span class="muted">${d}</span></span><span class="oc-dot" aria-hidden="true"></span></button>`)}</div>
@@ -390,7 +399,6 @@ function RollupSites({ site, reload }) {
       <ul class="rows" role="group" aria-label="Sites in this rollup">${list.map((x) => html`<li class="rowitem pick"><label class="grow"><input type="checkbox" checked=${chosen.includes(x.domain)} onChange=${(e) => toggle(x.domain, e.target.checked)} /><span class="ri-ico" aria-hidden="true"><${Icon} name="globe" size=${16} /></span><b class="trunc">${x.domain}</b></label></li>`)}</ul>
       ${!list.length && cands.data && html`<div class="empty-inline"><${Icon} name="globe" size=${18} /><div><b>No sites to choose from</b><span>Add a site first, then come back to include it here.</span></div></div>`}`}
     ${dirty && html`<div class="notice"><${Icon} name="info" size=${16} /><div>Changing the list changes the whole history: a site you take out disappears from this dashboard's past as well as its future, and the other way round.</div></div>`}
-    <div class="row"><button class="btn primary" disabled=${!dirty || (!all && !chosen.length)} onClick=${save}>Save changes</button>${dirty && html`<span class="muted small">${count} ${count === 1 ? 'site' : 'sites'} after saving</span>`}</div>
   <//>`;
 }
 
@@ -587,14 +595,14 @@ function Profile() {
   const save = async (e) => { e.preventDefault(); setErr(null); try { const r = await api('/me', { method: 'POST', body: f }); setUser({ ...user, ...r.user }); toast('Saved'); } catch (x) { setErr(firstError(x)); } };
   const pick = (t) => { setTheme(t); setThemeState(t); };
   const THEMES = [['light', 'Light'], ['dark', 'Dark'], ['system', 'System']];
-  return html`<${Section} title="Profile" help="Your name and email are used to sign in and are shown to people you share sites with.">
-      <form class="form wide" onSubmit=${save}>
+  return html`<form onSubmit=${save}><${Section} title="Profile" help="Your name and email are used to sign in and are shown to people you share sites with."
+      footer=${html`<span class="help">${changed ? 'You have unsaved changes.' : 'Your email is also where password resets are sent.'}</span><button class="btn primary sm" disabled=${!changed}>Save changes</button>`}>
         <div class="profile-head"><span class="avatar big" aria-hidden="true">${initial(f)}</span><div class="ri-main"><b>${f.name || 'Your name'}</b><span class="muted">${f.email}</span></div></div>
         ${err && html`<div class="alert">${err}</div>`}
         <div class="fields2"><${Field} label="Name"><input required value=${f.name} onInput=${(e) => setF({ ...f, name: e.target.value })} /><//>
           <${Field} label="Email"><input type="email" required value=${f.email} onInput=${(e) => setF({ ...f, email: e.target.value })} /><//></div>
         <${Field} label="Timezone" help="Used for dates in your own views. Each site's reports use that site's own timezone." class="tzfield"><select value=${f.timezone} onChange=${(e) => setF({ ...f, timezone: e.target.value })}>${zones().map((z) => html`<option value=${z} selected=${z === f.timezone}>${z}</option>`)}</select><//>
-        <div class="row"><button class="btn primary" disabled=${!changed}>Save changes</button>${changed && html`<span class="muted small">Unsaved changes</span>`}</div></form><//>
+      <//></form>
     <${Section} title="Appearance" help="System follows your device and switches with it.">
       <div class="theme-opts" role="radiogroup" aria-label="Theme">${THEMES.map(([k, l]) => html`<button type="button" role="radio" aria-checked=${theme === k} class=${'theme-opt ' + k + (theme === k ? ' on' : '')} onClick=${() => pick(k)}><span class="tp" aria-hidden="true"><i></i><i></i><i></i></span><span>${l}</span></button>`)}</div><//>`;
 }
@@ -630,12 +638,13 @@ function Security() {
   const changePw = async (e) => { e.preventDefault(); setErr(null); try { await api('/me/password', { method: 'POST', body: pw }); setPw(blank); toast('Password updated'); } catch (x) { setErr(firstError(x)); } };
   const refresh = async () => setUser((await api('/me')).user);
   const mismatch = pw.password_confirmation !== '' && pw.password !== pw.password_confirmation;
-  return html`<${Section} title="Password" help="Use at least 8 characters.">
-      <form class="form wide" onSubmit=${changePw}>${err && html`<div class="alert">${err}</div>`}
+  return html`<form onSubmit=${changePw}><${Section} title="Password" help="Use at least 8 characters."
+      footer=${html`<span class="help">${mismatch ? 'The passwords don\'t match yet.' : 'Other signed-in devices stay signed in.'}</span><button class="btn primary sm" disabled=${!pw.current_password || !pw.password || mismatch}>Update password</button>`}>
+        ${err && html`<div class="alert">${err}</div>`}
         <${Field} label="Current password" class="tzfield"><input type="password" required autocomplete="current-password" value=${pw.current_password} onInput=${(e) => setPw({ ...pw, current_password: e.target.value })} /><//>
         <div class="fields2"><${Field} label="New password"><input type="password" required minlength="8" autocomplete="new-password" value=${pw.password} onInput=${(e) => setPw({ ...pw, password: e.target.value })} /><//>
-          <${Field} label="Confirm new password" help=${mismatch ? 'The passwords don\'t match yet.' : ''}><input type="password" required autocomplete="new-password" value=${pw.password_confirmation} onInput=${(e) => setPw({ ...pw, password_confirmation: e.target.value })} /><//></div>
-        <div><button class="btn primary" disabled=${!pw.current_password || !pw.password || mismatch}>Update password</button></div></form><//>
+          <${Field} label="Confirm new password"><input type="password" required autocomplete="new-password" value=${pw.password_confirmation} onInput=${(e) => setPw({ ...pw, password_confirmation: e.target.value })} /><//></div>
+      <//></form>
     <${Section} title="Two-factor authentication" help="Require a code from an authenticator app when you sign in.">
       ${user.two_factor ? html`<div class="rowitem boxed"><span class="ri-ico good" aria-hidden="true"><${Icon} name="shield-check" size=${16} /></span><div class="grow ri-main"><b>Two-factor is on</b><span class="muted">You'll be asked for a code from your authenticator app at sign-in.</span></div>
           ${!disabling && html`<button class="btn sm danger" onClick=${() => setDisabling(true)}>Turn off</button>`}</div>
@@ -647,10 +656,10 @@ function Security() {
           <div class="row"><button class="btn primary" disabled=${!code.trim()} onClick=${async () => { try { await api('/me/two-factor/confirm', { method: 'POST', body: { code } }); setSetup(null); setCode(''); await refresh(); toast('Two-factor enabled'); } catch (x) { toast(firstError(x), 'err'); } }}>Confirm and turn on</button><button class="btn" onClick=${() => { setSetup(null); setCode(''); }}>Cancel</button></div></div>`
         : html`<div class="rowitem boxed"><span class="ri-ico" aria-hidden="true"><${Icon} name="shield" size=${16} /></span><div class="grow ri-main"><b>Two-factor is off</b><span class="muted">Add a second step to protect your account if your password leaks.</span></div>
           <button class="btn sm primary" onClick=${async () => setSetup(await api('/me/two-factor', { method: 'POST' }))}>Set up</button></div>`}<//>
-    <${ApiKeys} />`;
+`;
 }
 
-function ApiKeys() {
+export function ApiKeys() {
   const res = useApi('/me/keys', null, []);
   const [name, setName] = useState('');
   const [scope, setScope] = useState('read');
@@ -793,11 +802,11 @@ export function AccountSettings({ tab }) {
   useDocTitle('Settings');
   const { user } = useContext(UserCtx);
   const extra = registry.accountTabs.filter((x) => !x.visible || x.visible(user));
-  const tabs = [['profile', 'Profile'], ['reports', 'Email reports'], ['security', 'Security'], ...extra.map((x) => [x.key, x.label, !!(x.dot && x.dot(user))]), ...(user.is_admin && !registry.adminUi ? [['users', 'Users'], ...(user.updater_enabled === false ? [] : [['updates', 'Updates', !!user.update]])] : [])];
+  const tabs = accountTabs(user);
   // administration lives in its own interface when an extension provides one
   if (registry.adminUi && user.is_admin && ['users', 'updates', 'customers'].includes(tab)) { window.location.replace(registry.adminUi.href + (tab === 'customers' ? '' : '/' + tab)); return null; }
-  const moved = { preferences: 'profile', keys: 'security' }; // older links still land in the right place
+  const moved = { preferences: 'profile' }; // older links still land in the right place
   const t = [tab, moved[tab]].find((k) => tabs.some((x) => x[0] === k)) || 'profile';
-  const Body = { profile: Profile, reports: EmailReports, security: Security, users: Users, updates: Updates, ...Object.fromEntries(extra.map((x) => [x.key, x.component])) }[t];
-  return html`<${SettingsShell} title="Account settings" back=${['/sites', 'Your sites']} tabs=${tabs} tab=${t} base="/settings"><${Body} /><//>`;
+  const Body = { profile: Profile, reports: EmailReports, security: Security, keys: ApiKeys, users: Users, updates: Updates, ...Object.fromEntries(extra.map((x) => [x.key, x.component])) }[t];
+  return html`<${SettingsShell} title="Account settings" back=${['/sites', 'Your sites']} scope="Account" dup tabs=${tabs} tab=${t} base="/settings"><${Body} /><//>`;
 }

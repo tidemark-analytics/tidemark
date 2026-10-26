@@ -46,8 +46,9 @@ export async function api(path, { method = 'GET', body, params } = {}) {
 
 // -------------------------------------------------------------------------------------------- toasts
 const toastListeners = new Set();
-export function toast(message, kind = '') {
-  const t = { id: Math.random(), message, kind };
+/** toast('Saved'), toast('Failed', 'err'), or with extras: toast('Link created', '', { description: 'Anyone with it can view', action: { label: 'Undo', onClick } }). */
+export function toast(message, kind = '', opts = {}) {
+  const t = { id: Math.random(), message, kind, ...opts };
   toastListeners.forEach((fn) => fn(t));
 }
 export function useToasts() {
@@ -55,7 +56,7 @@ export function useToasts() {
   useEffect(() => {
     const fn = (t) => {
       setList((l) => [...l, t]);
-      setTimeout(() => setList((l) => l.filter((x) => x.id !== t.id)), 3800);
+      setTimeout(() => setList((l) => l.filter((x) => x.id !== t.id)), 4000);
     };
     toastListeners.add(fn);
     return () => toastListeners.delete(fn);
@@ -103,6 +104,16 @@ export function setQuery(patch, { replace = true } = {}) {
   }
   const s = q.toString();
   navigate(appPath() + (s ? '?' + s : ''), { replace });
+}
+
+/** The scope (period, comparison, filters, share credentials) as a query string, so links between reports keep what you are looking at. */
+const SCOPE_KEYS = ['period', 'date', 'from', 'to', 'interval', 'comparison', 'filters', 'zoom', 'auth'];
+export function scopeQuery(extra = {}) {
+  const cur = new URLSearchParams(location.search), q = new URLSearchParams();
+  for (const k of SCOPE_KEYS) if (cur.get(k)) q.set(k, cur.get(k));
+  for (const [k, v] of Object.entries(extra)) { if (v === null || v === undefined || v === '') q.delete(k); else q.set(k, v); }
+  const s = q.toString();
+  return s ? '?' + s : '';
 }
 
 export const Link = ({ to, children, class: cls, ...rest }) => html`<a data-link href=${BASE + to} class=${cls} ...${rest}>${children}</a>`;
@@ -172,7 +183,7 @@ export function bucketLabel(x, unit, long = false) {
 // them selects `day` or `month` with an earlier date. The older 30d and 6mo windows are no longer offered but still open from a link.
 export const PERIODS = [
   ['day', 'Today', 'D'], ['yesterday', 'Yesterday', 'E'], ['realtime', 'Realtime', 'R'], ['24h', 'Last 24 hours', 'H'], ['7d', 'Last 7 days', 'W'], ['28d', 'Last 28 days', 'F'],
-  ['91d', 'Last 91 days', 'N'], ['month', 'Month to date', 'M'], ['last_month', 'Last month', 'P'], ['year', 'Year to date', 'Y'], ['12mo', 'Last 12 months', 'L'], ['all', 'All time', 'A'], ['custom', 'Custom range', 'C'],
+  ['91d', 'Last 91 days', 'N'], ['month', 'Month to date', 'M'], ['last_month', 'Last month', 'P'], ['year', 'Year to date', 'Y'], ['12mo', 'Last 12 months', 'L'], ['all', 'All time', 'A'], ['custom', 'Custom range', 'U'],
 ];
 export const DEFAULT_PERIOD = '28d';
 export const FILTER_OPS = [['is', 'is'], ['is_not', 'is not'], ['contains', 'contains'], ['contains_not', 'does not contain']];
@@ -216,11 +227,14 @@ export function useScope(site, extra = {}) {
   const period = query.period || (PERIODS.some((p) => p[0] === remembered) || ['30d', '6mo'].includes(remembered) ? remembered : null) || DEFAULT_PERIOD;
   const params = { period };
   for (const k of ['date', 'from', 'to', 'interval']) if (query[k]) params[k] = query[k];
-  if (query.comparison && !['realtime', 'all'].includes(period)) params.comparison = query.comparison;
+  // Comparing with the previous period is the default (it feeds the deltas and the Insights); `comparison=off` in the URL turns it off.
+  const comparable = !['realtime', 'all'].includes(period);
+  const comparison = comparable && query.comparison !== 'off' ? (query.comparison === 'year_over_year' ? 'year_over_year' : 'previous_period') : '';
+  if (comparison) params.comparison = comparison;
   if (query.filters) params.filters = query.filters;
   Object.assign(params, extra);
   const filters = parseFilters(query);
-  return { params, query, period, filters, goal: goalFilter(filters), key: JSON.stringify(params) };
+  return { params, query, period, comparison, comparable, filters, goal: goalFilter(filters), key: JSON.stringify(params) };
 }
 
 /** Fetch-on-change hook. Returns {data, loading, error, reload}. */

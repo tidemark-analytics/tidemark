@@ -207,7 +207,7 @@ class Site extends Model
         ];
     }
 
-    /** Script file name for the snippet: Plausible-style extensions in the file name, e.g. script.outbound-links.js */
+    /** Script file name for the snippet: the site's code, then Plausible-style extensions, e.g. 3fa91c0b2e.outbound-links.js */
     public function scriptName(): string
     {
         $parts = array_filter([
@@ -216,7 +216,17 @@ class Site extends Model
             $this->track_forms ? 'form-submissions' : null,
         ]);
 
-        return 'script'.($parts ? '.'.implode('.', $parts) : '').'.js';
+        return $this->trackerCode().($parts ? '.'.implode('.', $parts) : '').'.js';
+    }
+
+    /**
+     * A short code that is stable for this site and not guessable from the domain: it replaces "script" in the snippet's file name
+     * and names the collection address (/e/<code>), so blocklists written against Plausible-style names don't match. It is a keyed
+     * hash of the site id, so nothing is stored and it never changes.
+     */
+    public function trackerCode(): string
+    {
+        return substr(hash_hmac('sha256', 'tracker:'.$this->id, (string) config('app.key')), 0, 10);
     }
 
     /** Goals that the default tracking extensions need. */

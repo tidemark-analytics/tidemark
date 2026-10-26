@@ -8,7 +8,9 @@
     <link rel="icon" href="{{ asset('assets/favicon.svg') }}" type="image/svg+xml">
     <link rel="icon" href="{{ asset('favicon.ico') }}" sizes="32x32">
     <link rel="apple-touch-icon" href="{{ asset('assets/apple-touch-icon.png') }}">
-    <meta name="theme-color" content="#0e3a47">
+    <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
     <script>
         (function () { try { var t = localStorage.getItem('tidemark.theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {} })();
         window.SD = {
@@ -24,11 +26,12 @@
         };
     </script>
     <script type="importmap">@json(['imports' => \App\Support\Assets::importMap()], JSON_UNESCAPED_SLASHES)</script>
+    <link rel="preload" href="{{ asset('assets/fonts/geist-variable.woff2') }}" as="font" type="font/woff2" crossorigin>
     <link rel="stylesheet" href="{{ asset('assets/app.css') }}?v={{ @filemtime(public_path('assets/app.css')) }}">
 </head>
 <body>
 <div id="root"></div>
-<noscript>{{ config('app.name') }} needs JavaScript to render the dashboard.</noscript>
+<noscript><p style="font-family:system-ui,sans-serif;padding:24px">{{ config('app.name') }} needs JavaScript to render the dashboard.</p></noscript>
 <script type="module" src="{{ asset('assets/js/main.js') }}?v={{ @filemtime(public_path('assets/js/main.js')) }}"></script>
 </body>
 </html>
