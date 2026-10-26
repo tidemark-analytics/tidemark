@@ -4,7 +4,10 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [0.32.0] - 2026-10-25
+
 ### Changed
+- The Tidemark logo now heads every email, including the report and alert emails.
 - Account emails (email verification, password reset) now use the same styling as the report and alert emails, instead of the default Laravel look. The theme lives in `resources/views/vendor/mail` and applies to every notification the app sends, including Tidemark Cloud's.
 
 ## [0.31.1] - 2026-10-25
