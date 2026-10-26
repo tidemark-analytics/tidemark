@@ -211,3 +211,13 @@ export function GoalsCard({ site, scope, poll, shared }) {
 
 /** Utm values beyond the four tabs of the Sources card live on the full report; this small card is the campaign view for the overview. */
 export const CampaignsCard = dimCard('campaigns', 'Campaigns', 'sources', [{ key: 'utm_campaign', label: 'Campaigns' }, { key: 'utm_source', label: 'UTM sources' }, { key: 'utm_content', label: 'Content' }, { key: 'utm_term', label: 'Terms' }]);
+
+// ---- compatibility: the panels extensions and older code import by name -------------------------------------------------------
+export const Sources = SourcesCard, Pages = PagesCard, Locations = LocationsCard, Devices = DevicesCard;
+/** The old "Behaviors" panel (goals, properties, funnels, journeys in tabs). The dashboard now has their own pages; kept for extensions. */
+export function Behaviors({ site, scope, poll }) {
+  const f = site.features || {};
+  const tabs = [{ key: 'goals', label: 'Goals' }, { key: 'props', label: 'Properties' }, ...(f.funnels || site.can_manage ? [{ key: 'funnels', label: 'Funnels' }] : []), ...(f.journeys || site.can_manage ? [{ key: 'explore', label: 'Explore' }] : [])];
+  return html`<${Panel} id="behaviors" title="Behaviors" tabs=${tabs}>
+    ${(t) => (t.key === 'goals' ? html`<${GoalsBody} site=${site} scope=${scope} poll=${poll} />` : t.key === 'funnels' ? html`<${FunnelsBody} site=${site} scope=${scope} poll=${poll} />` : t.key === 'explore' ? html`<${ExploreBody} site=${site} scope=${scope} />` : html`<${PropsBody} site=${site} scope=${scope} poll=${poll} />`)}<//>`;
+}

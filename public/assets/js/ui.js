@@ -5,9 +5,9 @@ export const Loading = ({ rows = 5 }) => html`<div class="stack sm" aria-busy="t
 export const Empty = ({ title = 'Nothing here yet', icon = 'chart-column', children }) => html`<div class="empty fade-in"><div class="ico"><${Icon} name=${icon} size=${20} /></div><b>${title}</b>${children && html`<div class="empty-body">${children}</div>`}</div>`;
 export const ErrorBox = ({ error }) => (error ? html`<div class="alert" role="alert"><${Icon} name="info" size=${16} /><div>${error.message}</div></div>` : null);
 export const Notice = ({ children, icon = 'info', tone = '' }) => html`<div class=${'notice ' + tone}><${Icon} name=${icon} size=${16} /><div>${children}</div></div>`;
-/** Alert / banner: tone is '', 'good', 'warn' or 'danger'; onClose makes it dismissible. */
-export const Alert = ({ children, icon = 'info', tone = '', title, onClose }) => html`<div class=${'notice ' + tone} role=${tone === 'danger' ? 'alert' : 'status'}><${Icon} name=${icon} size=${16} /><div class="grow">${title && html`<b>${title} </b>`}${children}</div>${onClose && html`<button class="btn ghost icon sm" aria-label="Dismiss" onClick=${onClose}><${Icon} name="x" size=${14} /></button>`}</div>`;
-export const Badge = ({ children, tone = '', dot, title }) => html`<span class=${'badge ' + tone} title=${title}>${dot && html`<span class=${'dot static ' + (tone === 'good' || tone === 'success' ? '' : 'off')} aria-hidden="true"></span>`}${children}</span>`;
+/** Alert / banner: tone is '', 'good', 'warn' or 'danger'; `action` (a button or link) sits at the right; onClose makes it dismissible. */
+export const Alert = ({ children, icon = 'info', tone = '', title, onClose, action }) => html`<div class=${'notice ' + tone} role=${tone === 'danger' ? 'alert' : 'status'}><${Icon} name=${icon} size=${16} /><div class="grow">${title && html`<b>${title} </b>`}${children}</div>${action && html`<div class="alert-action">${action}</div>`}${onClose && html`<button class="btn ghost icon sm" aria-label="Dismiss" onClick=${onClose}><${Icon} name="x" size=${14} /></button>`}</div>`;
+export const Badge = ({ children, tone = '', dot, title }) => html`<span class=${'badge ' + tone} title=${title}>${dot && html`<span class=${'dot static ' + (tone === 'good' || tone === 'success' ? '' : tone ? tone : 'off')} aria-hidden="true"></span>`}${children}</span>`;
 /** The change against the comparison period: a green/red pill with an arrow. Bounce rate is the one metric where lower is better. */
 export function Delta({ metric, change, isNew, compact }) {
   if (isNew) return html`<span class=${'delta flat' + (compact ? ' compact' : '')} title="Not in the comparison period">New</span>`;
@@ -16,6 +16,8 @@ export function Delta({ metric, change, isNew, compact }) {
   const good = metric === 'bounce_rate' ? change < 0 : change > 0;
   return html`<span class=${'delta ' + (flat ? 'flat' : good ? 'up' : 'down') + (compact ? ' compact' : '')}>${!flat && html`<${Icon} name=${change > 0 ? 'arrow-up' : 'arrow-down'} size=${11} />`}<span class="sr-only">${change > 0 ? 'Up ' : change < 0 ? 'Down ' : ''}</span>${Math.abs(change) >= 1000 ? '999%+' : Math.abs(change).toFixed(change % 1 === 0 || Math.abs(change) >= 100 ? 0 : 1) + '%'}</span>`;
 }
+/** The full-width banner under the top bar. tone: '' (amber), 'danger', 'info'. Optional `action` button/link and `onClose`. */
+export const Banner = ({ children, icon = 'info', tone = '', action, onClose }) => html`<div class=${'banner ' + tone} role=${tone === 'danger' ? 'alert' : 'status'}><span class="banner-in"><${Icon} name=${icon} size=${15} /><span>${children}</span></span>${action}${onClose && html`<button class="btn ghost icon sm" aria-label="Dismiss" onClick=${onClose}><${Icon} name="x" size=${14} /></button>`}</div>`;
 export const Kbd = ({ children }) => html`<kbd>${children}</kbd>`;
 export const Spinner = () => html`<span class="spinner" role="status" aria-label="Loading"></span>`;
 export const Progress = ({ value, label }) => html`<progress max="100" value=${value} aria-label=${label} style="width:100%"></progress>`;
@@ -165,12 +167,12 @@ export function Confirm({ title, message, confirmLabel = 'Delete', onConfirm, on
 }
 
 /** Confirm by typing a phrase (the site's domain, usually) before a destructive action. */
-export function TypedConfirm({ title, message, phrase, confirmLabel = 'Delete', onConfirm, onClose }) {
+export function TypedConfirm({ title, message, phrase, confirmLabel = 'Delete', onConfirm, onClose, caseInsensitive = true }) {
   const [busy, setBusy] = useState(false);
   const [text, setText] = useState('');
   return html`<${Modal} title=${title} onClose=${onClose} footer=${html`
     <button class="btn" onClick=${onClose}>Cancel</button>
-    <button class="btn destructive" disabled=${busy || text.trim() !== phrase} onClick=${async () => { setBusy(true); try { await onConfirm(); onClose(); } catch (e) { toast(e.message, 'err'); setBusy(false); } }}>${busy ? 'Working…' : confirmLabel}</button>`}>
+    <button class="btn destructive" disabled=${busy || (caseInsensitive ? text.trim().toLowerCase() !== phrase.toLowerCase() : text.trim() !== phrase)} onClick=${async () => { setBusy(true); try { await onConfirm(); onClose(); } catch (e) { toast(e.message, 'err'); setBusy(false); } }}>${busy ? 'Working…' : confirmLabel}</button>`}>
     <div class="stack sm"><p style="line-height:1.55;color:var(--muted-foreground)">${message}</p>
       <label><span>Type <b class="mono" style="color:var(--foreground)">${phrase}</b> to confirm</span><input value=${text} onInput=${(e) => setText(e.target.value)} autocomplete="off" autocapitalize="off" spellcheck="false" aria-label=${'Type ' + phrase + ' to confirm'} /></label></div>
   <//>`;
@@ -213,8 +215,9 @@ export function useSort(initial, dir = 'desc') {
 }
 /** A sortable column header (<th>): shows the arrow and sets aria-sort. */
 export const SortTh = ({ sort, k, children, right }) => html`<th class=${right ? 'right' : ''} aria-sort=${sort.key === k ? (sort.dir === 'desc' ? 'descending' : 'ascending') : undefined}><button type="button" class="sort" onClick=${() => sort.toggle(k)}>${children}${sort.key === k && html`<${Icon} name=${sort.dir === 'desc' ? 'arrow-down' : 'arrow-up'} size=${12} />`}</button></th>`;
-/** "1-25 of 312" with previous / next. */
+/** "1-25 of 312" with previous / next. `page` is ZERO-based (0 is the first page); renders nothing when everything fits on one page. */
 export const Pagination = ({ page, size, total, onPage }) => {
+  if (total <= size) return null;
   const from = total ? page * size + 1 : 0, to = Math.min(total, (page + 1) * size);
   return html`<div class="table-foot"><span class="num">${from}-${to} of ${fmt(total)}</span><div class="row"><button class="btn sm" disabled=${page === 0} onClick=${() => onPage(page - 1)}>Previous</button><button class="btn sm" disabled=${to >= total} onClick=${() => onPage(page + 1)}>Next</button></div></div>`;
 };
