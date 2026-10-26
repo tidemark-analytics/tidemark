@@ -3,7 +3,7 @@
 import { html, useState, useEffect, useMemo, useRef, useApi, api, navigate, Link, Icon, fmtShort, fmt, BASE, PERIODS, UserCtx, useContext, setTheme, currentTheme, countryName, flag, scopeQuery } from './lib.js';
 import { Pop, Sheet, FavTile } from './ui.js';
 import { Logo } from './logo.js';
-import { registry } from './extensions.js';
+import { registry, badgeOf, badgeText, useBadgeCounts, useBadgePolling } from './extensions.js';
 
 const NOT_A_SITE = new Set(['', 'sites', 'settings', 'login', 'register', 'forgot-password', 'reset-password', 'share']);
 // the first segment of an extension's page ('/support' for '/support/:number?') is not a site either
@@ -102,7 +102,7 @@ export function AccountMenu({ user, align = 'right', btnClass = 'btn ghost avata
       <${Link} to="/sites" class="item" onClick=${close}><span>Your sites</span><${Icon} name="globe" size=${14} /><//>
       <${Link} to="/settings" class="item" onClick=${close}><span>Account settings${user.update && html`<span class="notif inline" aria-hidden="true"></span><span class="sr-only"> (update available)</span>`}</span><${Icon} name="settings" size=${14} /><//>
       ${user.is_admin && registry.adminUi && html`<a class="item" href=${BASE + registry.adminUi.href} onClick=${close}><span>${registry.adminUi.label}</span><${Icon} name="shield-check" size=${14} /></a>`}
-      ${registry.menuItems.filter((m) => !m.visible || m.visible(user)).map((m) => (m.onClick
+      ${registry.menuItems.filter((m) => !m.help && (!m.visible || m.visible(user))).map((m) => (m.onClick
         ? html`<button class="item" onClick=${() => { close(); m.onClick(); }}><span>${m.label}</span><${Icon} name=${m.icon || 'external-link'} size=${14} /></button>`
         : html`<a class="item" href=${m.href} target=${m.external ? '_blank' : null} rel=${m.external ? 'noopener' : null} onClick=${close}><span>${m.label}</span><${Icon} name=${m.icon || 'external-link'} size=${14} /></a>`))}
       <hr /><div class="grp" id="theme-label">Theme</div>
@@ -111,10 +111,18 @@ export function AccountMenu({ user, align = 'right', btnClass = 'btn ghost avata
       <button class="item" onClick=${async () => { close(); await api('/auth/logout', { method: 'POST' }); window.location.assign(window.SD.base + '/login'); }}><span>Sign out</span><${Icon} name="log-out" size=${14} /></button></div>`}<//>`;
 }
 
-function HelpMenu() {
-  return html`<${Pop} align="right" ariaLabel="Help" btnClass="btn ghost icon" label=${html`<${Icon} name="circle-help" size=${17} />`}>
+/** The count beside a menu entry that has a `badge`, with its text for screen readers. */
+const BadgeCount = ({ m }) => { const n = badgeOf(m); return n > 0 && html`<em class="side-count warn" aria-hidden="true">${n}</em><span class="sr-only"> (${badgeText(m, n)})</span>`; };
+
+function HelpMenu({ user }) {
+  const dot = useBadgeCounts();
+  const items = registry.menuItems.filter((m) => m.help && (!m.visible || m.visible(user)));
+  return html`<${Pop} align="right" ariaLabel=${dot ? 'Help (something needs your attention)' : 'Help'} btnClass="btn ghost icon help-btn" label=${html`<${Icon} name="circle-help" size=${17} />${dot && html`<span class="notif on-avatar" aria-hidden="true"></span>`}`}>
     ${(close) => html`<div style="min-width:220px">
       <a class="item" href="https://www.tidemarkanalytics.com/docs/" target="_blank" rel="noopener" onClick=${close}><span>Documentation</span><${Icon} name="book-open" size=${14} /></a>
+      ${items.map((m) => (m.onClick
+        ? html`<button class="item" onClick=${() => { close(); m.onClick(); }}><span>${m.label}</span><${BadgeCount} m=${m} /><${Icon} name=${m.icon || 'external-link'} size=${14} /></button>`
+        : html`<a class="item" href=${m.href} target=${m.external ? '_blank' : null} rel=${m.external ? 'noopener' : null} onClick=${close}><span>${m.label}</span><${BadgeCount} m=${m} /><${Icon} name=${m.icon || 'external-link'} size=${14} /></a>`))}
       <button class="item" onClick=${() => { close(); openShortcuts(); }}><span>Keyboard shortcuts</span><kbd>?</kbd></button>
       <a class="item" href="https://discord.gg/sCkHD3PPZh" target="_blank" rel="noopener" onClick=${close}><span>Community (Discord)</span><${Icon} name="users" size=${14} /></a></div>`}<//>`;
 }
@@ -226,7 +234,7 @@ export function AppBar({ user, path, sites, side }) {
     <div class="tb-right">
       <button class="find" onClick=${openPalette} aria-label=${'Find, ' + modKey() + ' K'} aria-haspopup="dialog"><${Icon} name="search" size=${14} /><span>Find</span><kbd>${modKey()} K</kbd></button>
       ${domain && html`<${LivePill} domain=${domain} />`}
-      <${HelpMenu} />
+      <${HelpMenu} user=${user} />
       <${AccountMenu} user=${user} />
     </div>
   </div></header>`;
@@ -234,9 +242,13 @@ export function AppBar({ user, path, sites, side }) {
 
 // -------------------------------------------------------------------------------------------------- sidebar
 const SideLink = ({ to, icon, label, on, children, ...rest }) => html`<${Link} to=${to} class=${'side-link ' + (on ? 'on' : '')} title=${label} aria-current=${on ? 'page' : undefined} ...${rest}><${Icon} name=${icon} size=${16} /><span>${label}</span>${children}<//>`;
-const SideExt = ({ href, icon, label, external = true }) => html`<a class="side-link" title=${label} href=${href} target=${external ? '_blank' : null} rel=${external ? 'noopener' : null}><${Icon} name=${icon} size=${16} /><span>${label}</span>${external && html`<${Icon} name="external-link" size=${12} class="side-ext" />`}</a>`;
+/** A menu entry's count in the sidebar: a pill, and a dot when the sidebar is collapsed. */
+const SideBadge = ({ m }) => { const n = badgeOf(m); return n > 0 && html`<${BadgeCount} m=${m} /><span class="notif side-dot" aria-hidden="true"></span>`; };
+const SideExt = ({ href, icon, label, external = true, children }) => html`<a class="side-link" title=${label} href=${href} target=${external ? '_blank' : null} rel=${external ? 'noopener' : null}><${Icon} name=${icon} size=${16} /><span>${label}</span>${children}${external && html`<${Icon} name="external-link" size=${12} class="side-ext" />`}</a>`;
 
 export function Sidebar({ user, path, sites, side }) {
+  useBadgePolling(path);
+  useBadgeCounts();
   const domain = siteFromPath(path);
   const list = sites ? sites.list : [];
   const current = domain && list.find((s) => s.domain === domain);
@@ -261,8 +273,8 @@ export function Sidebar({ user, path, sites, side }) {
       <div class="side-grp">Resources</div>
       <${SideExt} href="https://www.tidemarkanalytics.com/docs/" icon="book-open" label="Documentation" />
       ${registry.menuItems.filter((m) => !m.visible || m.visible(user)).map((m) => (m.onClick
-        ? html`<button class="side-link" title=${m.label} onClick=${m.onClick}><${Icon} name=${m.icon || 'life-buoy'} size=${16} /><span>${m.label}</span></button>`
-        : html`<${SideExt} href=${m.href} icon=${m.icon || 'external-link'} label=${m.label} external=${!!m.external} />`))}
+        ? html`<button class="side-link" title=${m.label} onClick=${m.onClick}><${Icon} name=${m.icon || 'life-buoy'} size=${16} /><span>${m.label}</span><${SideBadge} m=${m} /></button>`
+        : html`<${SideExt} href=${m.href} icon=${m.icon || 'external-link'} label=${m.label} external=${!!m.external}><${SideBadge} m=${m} /><//>`))}
       <${SideExt} href="https://discord.gg/sCkHD3PPZh" icon="users" label="Community" />`;
   return html`<aside class="side" id="app-side" aria-label="Main">
     <nav class="side-scroll" aria-label=${domain ? 'Site' : 'Workspace'}>${body}</nav>
