@@ -1,10 +1,40 @@
 // Reusable UI building blocks.
-import { html, useState, useEffect, useLayoutEffect, useRef, copy, toast, Icon, fmt } from './lib.js';
+import { html, useState, useEffect, useLayoutEffect, useRef, copy, toast, useToasts, Icon, fmt } from './lib.js';
 
 export const Loading = ({ rows = 5 }) => html`<div class="stack sm" aria-busy="true" aria-label="Loading">${Array.from({ length: rows }, (_, i) => html`<div class="skeleton" style=${`height:26px;width:${96 - i * 8}%`}></div>`)}</div>`;
 export const Empty = ({ title = 'Nothing here yet', icon = 'chart-column', children }) => html`<div class="empty fade-in"><div class="ico"><${Icon} name=${icon} size=${20} /></div><b>${title}</b>${children && html`<div class="empty-body">${children}</div>`}</div>`;
-export const ErrorBox = ({ error }) => (error ? html`<div class="alert" role="alert">${error.message}</div>` : null);
-export const Notice = ({ children, icon = 'info' }) => html`<div class="notice"><${Icon} name=${icon} size=${16} /><div>${children}</div></div>`;
+export const ErrorBox = ({ error }) => (error ? html`<div class="alert" role="alert"><${Icon} name="info" size=${16} /><div>${error.message}</div></div>` : null);
+export const Notice = ({ children, icon = 'info', tone = '' }) => html`<div class=${'notice ' + tone}><${Icon} name=${icon} size=${16} /><div>${children}</div></div>`;
+/** Alert / banner: tone is '', 'good', 'warn' or 'danger'; onClose makes it dismissible. */
+export const Alert = ({ children, icon = 'info', tone = '', title, onClose }) => html`<div class=${'notice ' + tone} role=${tone === 'danger' ? 'alert' : 'status'}><${Icon} name=${icon} size=${16} /><div class="grow">${title && html`<b>${title} </b>`}${children}</div>${onClose && html`<button class="btn ghost icon sm" aria-label="Dismiss" onClick=${onClose}><${Icon} name="x" size=${14} /></button>`}</div>`;
+export const Badge = ({ children, tone = '', dot, title }) => html`<span class=${'badge ' + tone} title=${title}>${dot && html`<span class=${'dot static ' + (tone === 'good' || tone === 'success' ? '' : 'off')} aria-hidden="true"></span>`}${children}</span>`;
+export const Kbd = ({ children }) => html`<kbd>${children}</kbd>`;
+export const Spinner = () => html`<span class="spinner" role="status" aria-label="Loading"></span>`;
+export const Progress = ({ value, label }) => html`<progress max="100" value=${value} aria-label=${label} style="width:100%"></progress>`;
+/** A square letter tile standing in for a favicon (no third-party requests); the color is derived from the name. */
+export const FavTile = ({ name = '?', rollup, size = '' }) => {
+  const hue = [...name].reduce((n, c) => (n * 31 + c.charCodeAt(0)) % 360, 7);
+  return rollup ? html`<span class=${'favtile rollup ' + size} aria-hidden="true"><${Icon} name="layers" size=${size === 'sm' ? 11 : 13} /></span>` : html`<span class=${'favtile ' + size} style=${`--tile:hsl(${hue} 42% 38%)`} aria-hidden="true">${name.slice(0, 1)}</span>`;
+};
+export const Avatar = ({ name = '?', size = '' }) => html`<span class=${'avatar ' + size} aria-hidden="true">${name.slice(0, 1).toUpperCase()}</span>`;
+/** Tooltip around one control: appears on hover and keyboard focus. */
+export const Tooltip = ({ text, kbd, side = '', children }) => html`<span class="tip-wrap">${children}<span class=${'tip ' + side} role="tooltip">${text}${kbd && html`<kbd>${kbd}</kbd>`}</span></span>`;
+export const Breadcrumb = ({ items }) => html`<nav class="breadcrumb" aria-label="Breadcrumb">${items.map((it, i) => html`${i > 0 && html`<${Icon} name="chevron-right" size=${14} class="bc-sep" />`}${it.to && i < items.length - 1 ? html`<a data-link href=${window.SD.base + it.to}>${it.label}</a>` : html`<span aria-current=${i === items.length - 1 ? 'page' : undefined}>${it.label}</span>`}`)}</nav>`;
+/** Underline tabs. items: [[key, label, count?]]; `panel` ids are optional. */
+export function Tabs({ items, value, onChange, label = 'Sections' }) {
+  const onKey = (e) => {
+    const i = items.findIndex((x) => x[0] === value);
+    const next = e.key === 'ArrowRight' ? i + 1 : e.key === 'ArrowLeft' ? i - 1 : null;
+    if (next === null) return;
+    e.preventDefault();
+    const t = items[(next + items.length) % items.length];
+    onChange(t[0]);
+    setTimeout(() => { const b = e.currentTarget.querySelector('[aria-selected="true"]'); b && b.focus(); }, 0);
+  };
+  return html`<div class="tabs" role="tablist" aria-label=${label} onKeyDown=${onKey}>${items.map(([k, l, n]) => html`<button role="tab" type="button" aria-selected=${k === value} tabindex=${k === value ? 0 : -1} class=${k === value ? 'on' : ''} onClick=${() => onChange(k)}>${l}${n !== undefined && html`<span class="muted">${n}</span>`}</button>`)}</div>`;
+}
+/** Segmented control for view toggles: items [[key, label, icon?]]. */
+export const Segmented = ({ items, value, onChange, label }) => html`<div class="seg" role="radiogroup" aria-label=${label}>${items.map(([k, l, i]) => html`<button type="button" role="radio" aria-checked=${k === value} aria-label=${i ? l : undefined} title=${i ? l : undefined} class=${k === value ? 'on' : ''} onClick=${() => onChange(k)}>${i && html`<${Icon} name=${i} size=${14} />`}${!i && l}</button>`)}</div>`;
 
 export function PageHead({ title, sub, crumb, children }) {
   return html`<header class="page-head"><div class="grow">${crumb && html`<div class="crumb">${crumb}</div>`}<h1>${title}</h1>${sub && html`<div class="sub">${sub}</div>`}</div>${children && html`<div class="row wrap">${children}</div>`}</header>`;
@@ -35,14 +65,33 @@ export function Pop({ label, children, align = 'right', btnClass = 'btn', open: 
     const dx = r.left < 8 ? 8 - r.left : r.right > vw - 8 ? vw - 8 - r.right : 0;
     if (dx) el.style.translate = dx + 'px';
   }, [open]);
+  const trigger = useRef();
+  useEffect(() => {
+    if (!open) return;
+    const pop = ref.current && ref.current.querySelector('.pop');
+    const items = () => [...(pop ? pop.querySelectorAll('.item, [role="menuitem"]') : [])].filter((el) => !el.disabled);
+    const key = (e) => {
+      if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key) || !pop || !pop.contains(document.activeElement) && document.activeElement !== trigger.current) return;
+      if (/input|textarea|select/i.test(document.activeElement.tagName) && !e.altKey) return;
+      const list = items();
+      if (!list.length) return;
+      e.preventDefault();
+      const i = list.indexOf(document.activeElement);
+      const n = e.key === 'Home' ? 0 : e.key === 'End' ? list.length - 1 : e.key === 'ArrowDown' ? (i + 1) % list.length : (i - 1 + list.length) % list.length;
+      list[n].focus();
+    };
+    document.addEventListener('keydown', key);
+    return () => { document.removeEventListener('keydown', key); };
+  }, [open]);
+  const toggle = () => setOpen(!open);
   return html`<div class="pop-wrap" ref=${ref}>
-    <button class=${btnClass} aria-haspopup="true" aria-expanded=${open} aria-label=${ariaLabel} onClick=${() => setOpen(!open)}>${label}</button>
-    ${open && html`<div class=${'pop ' + (align === 'left' ? 'left' : '')}>${typeof children === 'function' ? children(() => setOpen(false)) : children}</div>`}
+    <button ref=${trigger} class=${btnClass} aria-haspopup="true" aria-expanded=${open} aria-label=${ariaLabel} onClick=${toggle}>${label}</button>
+    ${open && html`<div class=${'pop ' + (align === 'left' ? 'left' : '')}>${typeof children === 'function' ? children(() => { setOpen(false); trigger.current && trigger.current.focus(); }) : children}</div>`}
   </div>`;
 }
 
 /** Traps focus, closes on Escape, restores focus to the trigger on close. */
-function useDialog(onClose) {
+export function useDialog(onClose) {
   const ref = useRef();
   useEffect(() => {
     const prev = document.activeElement;
@@ -68,32 +117,58 @@ function useDialog(onClose) {
   return ref;
 }
 
-export function Modal({ title, onClose, children, footer, wide }) {
+/** Dialog. `size` is 'md' (640) or 'wide' (860); the default is 480. `wide` still works. */
+export function Modal({ title, onClose, children, footer, wide, size, description }) {
   const ref = useDialog(onClose);
   return html`<div class="overlay" onMouseDown=${(e) => e.target === e.currentTarget && onClose()}>
-    <div class=${'modal ' + (wide ? 'wide' : '')} role="dialog" aria-modal="true" aria-label=${title} ref=${ref}>
-      <div class="modal-h"><h2>${title}</h2><button class="btn ghost icon" onClick=${onClose} aria-label="Close"><${Icon} name="x" /></button></div>
+    <div class=${'modal ' + (wide ? 'wide' : size || '')} role="dialog" aria-modal="true" aria-label=${title} ref=${ref}>
+      <div class="modal-h"><div><h2>${title}</h2>${description && html`<p class="muted small" style="margin-top:2px">${description}</p>`}</div><button class="btn ghost icon" onClick=${onClose} aria-label="Close"><${Icon} name="x" /></button></div>
       <div class="modal-b">${children}</div>
       ${footer && html`<div class="modal-f">${footer}</div>`}
     </div>
   </div>`;
 }
 
+/** Right-hand drawer without a frame; kept for existing callers. Prefer Sheet. */
 export function Drawer({ onClose, children }) {
   const ref = useDialog(onClose);
   return html`<div><div class="overlay" style="padding:0;z-index:54" onMouseDown=${onClose}></div><aside class="drawer" role="dialog" aria-modal="true" ref=${ref}>${children}</aside></div>`;
 }
 
-export function Confirm({ title, message, confirmLabel = 'Delete', onConfirm, onClose }) {
+/** Right-side sheet for detail and edit flows. size: '' (420), 'md' (560) or 'lg' (720). */
+export function Sheet({ title, description, onClose, children, footer, size = '' }) {
+  const ref = useDialog(onClose);
+  return html`<div><div class="overlay" style="padding:0;z-index:54" onMouseDown=${onClose}></div>
+    <aside class=${'sheet ' + size} role="dialog" aria-modal="true" aria-label=${title} ref=${ref}>
+      <div class="sheet-h"><div><h2>${title}</h2>${description && html`<p>${description}</p>`}</div><button class="btn ghost icon" onClick=${onClose} aria-label="Close"><${Icon} name="x" /></button></div>
+      <div class="sheet-b">${children}</div>
+      ${footer && html`<div class="sheet-f">${footer}</div>`}
+    </aside></div>`;
+}
+
+/** Alert dialog. Destructive by default (the confirm button is red); pass destructive=${false} for a plain confirmation. */
+export function Confirm({ title, message, confirmLabel = 'Delete', onConfirm, onClose, destructive = true }) {
   const [busy, setBusy] = useState(false);
   return html`<${Modal} title=${title} onClose=${onClose} footer=${html`
     <button class="btn" onClick=${onClose}>Cancel</button>
-    <button class="btn primary" disabled=${busy} onClick=${async () => { setBusy(true); try { await onConfirm(); onClose(); } catch (e) { toast(e.message, 'err'); setBusy(false); } }}>${busy ? 'Working…' : confirmLabel}</button>`}>
-    <p style="line-height:1.55;color:var(--ink-2)">${message}</p>
+    <button class=${'btn ' + (destructive ? 'destructive' : 'primary')} disabled=${busy} onClick=${async () => { setBusy(true); try { await onConfirm(); onClose(); } catch (e) { toast(e.message, 'err'); setBusy(false); } }}>${busy ? 'Working…' : confirmLabel}</button>`}>
+    <p style="line-height:1.55;color:var(--muted-foreground)">${message}</p>
   <//>`;
 }
 
-export const Field = ({ label, help, children, class: c }) => html`<label class=${c}>${label}${children}${help && html`<span class="help">${help}</span>`}</label>`;
+/** Confirm by typing a phrase (the site's domain, usually) before a destructive action. */
+export function TypedConfirm({ title, message, phrase, confirmLabel = 'Delete', onConfirm, onClose }) {
+  const [busy, setBusy] = useState(false);
+  const [text, setText] = useState('');
+  return html`<${Modal} title=${title} onClose=${onClose} footer=${html`
+    <button class="btn" onClick=${onClose}>Cancel</button>
+    <button class="btn destructive" disabled=${busy || text.trim() !== phrase} onClick=${async () => { setBusy(true); try { await onConfirm(); onClose(); } catch (e) { toast(e.message, 'err'); setBusy(false); } }}>${busy ? 'Working…' : confirmLabel}</button>`}>
+    <div class="stack sm"><p style="line-height:1.55;color:var(--muted-foreground)">${message}</p>
+      <label><span>Type <b class="mono" style="color:var(--foreground)">${phrase}</b> to confirm</span><input value=${text} onInput=${(e) => setText(e.target.value)} autocomplete="off" autocapitalize="off" spellcheck="false" aria-label=${'Type ' + phrase + ' to confirm'} /></label></div>
+  <//>`;
+}
+
+export const Field = ({ label, help, error, children, class: c }) => html`<label class=${c}>${label}${children}${help && html`<span class="help">${help}</span>`}${error && html`<span class="field-error" role="alert">${error}</span>`}</label>`;
 
 export function CodeBlock({ text }) {
   return html`<div class="code"><span class="code-t">${text}</span><button class="btn sm" onClick=${() => copy(text)}><${Icon} name="copy" size=${13} /> Copy</button></div>`;
@@ -109,7 +184,32 @@ export function Sparkline({ data, height = 36 }) {
     <path d=${line + ` L${w} ${height} L0 ${height} Z`} fill="var(--series-1-wash)" /><path d=${line} fill="none" stroke="var(--series-1)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke" /></svg>`;
 }
 
-export const Card = ({ title, actions, children, pad = true, class: c = '' }) => html`<section class=${'card ' + c}>${(title || actions) && html`<div class="card-h"><h3>${title}</h3><div class="row">${actions}</div></div>`}<div class=${pad ? 'card-b' : 'card-flush'}>${children}</div></section>`;
+export const Card = ({ title, actions, children, pad = true, class: c = '', footer }) => html`<section class=${'card ' + c}>${(title || actions) && html`<div class="card-h"><h3>${title}</h3><div class="row">${actions}</div></div>`}<div class=${pad ? 'card-b' : 'card-flush'}>${children}</div>${footer && html`<div class="card-f">${footer}</div>`}</section>`;
+
+/** The settings pattern: title + description, body, and a footer with helper text on the left and the action on the right. */
+export const SettingCard = ({ title, help, children, footer, danger, class: c = '' }) => html`<section class=${'card setting ' + (danger ? 'danger-zone ' : '') + c}>
+  <div class="setting-h"><h2>${title}</h2>${help && html`<p>${help}</p>`}</div>
+  ${children && html`<div class="setting-b">${children}</div>`}
+  ${footer && html`<div class="setting-f">${footer}</div>`}</section>`;
+
+// ----------------------------------------------------------------------------------------- data table helpers
+/** Sort state for a table: `sorted(rows, getters)` returns the rows ordered by the active column. */
+export function useSort(initial, dir = 'desc') {
+  const [state, setState] = useState({ key: initial, dir });
+  const toggle = (key) => setState((s) => (s.key === key ? { key, dir: s.dir === 'desc' ? 'asc' : 'desc' } : { key, dir: 'desc' }));
+  const sorted = (rows, get = {}) => {
+    const g = get[state.key] || ((r) => r[state.key]);
+    return [...rows].sort((a, b) => { const x = g(a), y = g(b); const c = typeof x === 'string' ? x.localeCompare(y) : (x ?? 0) - (y ?? 0); return state.dir === 'desc' ? -c : c; });
+  };
+  return { ...state, toggle, sorted };
+}
+/** A sortable column header (<th>): shows the arrow and sets aria-sort. */
+export const SortTh = ({ sort, k, children, right }) => html`<th class=${right ? 'right' : ''} aria-sort=${sort.key === k ? (sort.dir === 'desc' ? 'descending' : 'ascending') : undefined}><button type="button" class="sort" onClick=${() => sort.toggle(k)}>${children}${sort.key === k && html`<${Icon} name=${sort.dir === 'desc' ? 'arrow-down' : 'arrow-up'} size=${12} />`}</button></th>`;
+/** "1-25 of 312" with previous / next. */
+export const Pagination = ({ page, size, total, onPage }) => {
+  const from = total ? page * size + 1 : 0, to = Math.min(total, (page + 1) * size);
+  return html`<div class="table-foot"><span class="num">${from}-${to} of ${fmt(total)}</span><div class="row"><button class="btn sm" disabled=${page === 0} onClick=${() => onPage(page - 1)}>Previous</button><button class="btn sm" disabled=${to >= total} onClick=${() => onPage(page + 1)}>Next</button></div></div>`;
+};
 
 export function useDebounced(value, ms = 300) {
   const [v, setV] = useState(value);
@@ -119,3 +219,9 @@ export function useDebounced(value, ms = 300) {
 
 /** Switch row: a labeled toggle with help text. */
 export const Toggle = ({ label, help, checked, onChange, disabled }) => html`<label class="toggle"><input type="checkbox" role="switch" checked=${checked} disabled=${disabled} onChange=${(e) => onChange(e.target.checked)} /><span class="track" aria-hidden="true"></span><span class="grow"><b>${label}</b>${help && html`<span class="help">${help}</span>`}</span></label>`;
+
+/** The toast stack (bottom right): icon, title, optional description and action. Mounted once by the app. */
+export function Toaster() {
+  const toasts = useToasts();
+  return html`<div class="toasts" aria-live="polite">${toasts.map((t) => html`<div class=${'toast ' + t.kind} role="status"><${Icon} name=${t.kind === 'err' ? 'circle-alert' : 'circle-check'} size=${16} /><div class="toast-t">${t.message}${t.description && html`<span class="toast-d">${t.description}</span>`}</div>${t.action && html`<button class="btn sm toast-a" onClick=${t.action.onClick}>${t.action.label}</button>`}</div>`)}</div>`;
+}

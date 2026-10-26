@@ -46,8 +46,9 @@ export async function api(path, { method = 'GET', body, params } = {}) {
 
 // -------------------------------------------------------------------------------------------- toasts
 const toastListeners = new Set();
-export function toast(message, kind = '') {
-  const t = { id: Math.random(), message, kind };
+/** toast('Saved'), toast('Failed', 'err'), or with extras: toast('Link created', '', { description: 'Anyone with it can view', action: { label: 'Undo', onClick } }). */
+export function toast(message, kind = '', opts = {}) {
+  const t = { id: Math.random(), message, kind, ...opts };
   toastListeners.forEach((fn) => fn(t));
 }
 export function useToasts() {
@@ -55,7 +56,7 @@ export function useToasts() {
   useEffect(() => {
     const fn = (t) => {
       setList((l) => [...l, t]);
-      setTimeout(() => setList((l) => l.filter((x) => x.id !== t.id)), 3800);
+      setTimeout(() => setList((l) => l.filter((x) => x.id !== t.id)), 4000);
     };
     toastListeners.add(fn);
     return () => toastListeners.delete(fn);
