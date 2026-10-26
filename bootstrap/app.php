@@ -12,6 +12,7 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Session\Middleware\StartSession;
+use Illuminate\Support\Facades\Route;
 
 // First run on shared hosting (no SSH): create .env from the template and a fresh APP_KEY.
 $root = dirname(__DIR__);
@@ -27,6 +28,9 @@ return Application::configure(basePath: $root)
         api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
+        then: function () {
+            Route::middleware('api')->group(base_path('routes/collect.php'));
+        },
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([

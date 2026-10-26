@@ -5,7 +5,21 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 ## [Unreleased]
 
 ### Added
+- Each site's snippet now uses its own randomized script name and collection address (for example `/js/3fa91c0b2e.outbound-links.js` posting to `/e/3fa91c0b2e`) instead of Plausible-style `script.js` and `/api/event`, so blocklists written for those names miss it. The code is a keyed hash of the site, so nothing is stored and it never changes. Existing snippets keep working: `script.js` and `/api/event` are unchanged.
+- A test now fails if a file in the dashboard's assets carries a name that content blockers match on sight (such as plausible or analytics).
 - Site lists, the site switcher and the sidebar show each site's own icon, with the letter tile as the fallback. The server fetches and remembers the icon (public https addresses only, small raster images only), so your browser never contacts the site. Set `TIDEMARK_FAVICONS=false` to turn it off.
+
+### Changed
+- A new look for the whole app, in the style of Vercel's dashboard and shadcn/ui: Geist fonts (self-hosted), a neutral monochrome interface with teal reserved for data and focus, hairline borders, and light and dark themes that follow your system.
+- New navigation: a top bar with a site switcher, a Find box (⌘K) and a live-visitors pill; a sidebar that changes when you enter a site and collapses to icons; and keyboard shortcuts (press `?`).
+- One sticky scope bar for the period, comparison, segment and filters, all kept in the URL, with drag-to-zoom on the chart. Comparison with the previous period is now on by default.
+- The overview now leads with what changed: headline cards, the chart, a "What changed" card that lists the biggest risers and fallers, and report cards that link to full report pages (Pages, Sources, Locations, Devices, Events and goals, Funnels, Journeys) with search, sorting and CSV export. New sites get a setup checklist.
+- The Sites page is a grid or list with status dots and sparklines. Settings pages use cards with footers.
+- The key to set a custom range is now `U` (it was `C`, which now toggles comparison), and "All sites" is `g a`.
+- The Plausible importer file is renamed so a content blocker that matches its name no longer leaves the dashboard blank.
+
+### Fixed
+- The `favicon.ico` shipped with the app was fully transparent; it is now the real app icon.
 
 ## [0.32.0] - 2026-10-25
 

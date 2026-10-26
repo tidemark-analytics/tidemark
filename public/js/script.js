@@ -8,7 +8,11 @@
   var file = src.split('/').pop().split('?')[0];
   var mods = file.replace(/\.js$/, '').split('.').slice(1);
   var has = function (m) { return mods.indexOf(m) !== -1; };
-  var endpoint = el.getAttribute('data-api') || (src.replace(/\/js\/[^/]*$/, '') + '/api/event');
+  // A per-site file name (a 10-character code in place of "script") posts to the matching /e/<code> address; the classic
+  // script.js keeps posting to /api/event, so sites that already have the snippet are unaffected.
+  var origin = src.replace(/\/js\/[^/]*$/, '');
+  var alias = file.split('.')[0];
+  var endpoint = el.getAttribute('data-api') || (/^[a-f0-9]{10}$/.test(alias) ? origin + '/e/' + alias : origin + '/api/event');
   var domain = el.getAttribute('data-domain');
   var hashMode = has('hash');
   var local = has('local');
