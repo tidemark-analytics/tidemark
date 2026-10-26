@@ -314,7 +314,7 @@ td > .pill, td > .badge { vertical-align: middle; }
 .card-h .tabs button.on::after { display: none; }
 .card-h .tabs button:focus-visible { outline-offset: -2px; }
 .seg { display: inline-flex; padding: 3px; gap: 2px; background: var(--muted); border-radius: var(--radius-md); align-self: flex-start; max-width: 100%; }
-.seg button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 28px; padding: 0 12px; border: 0; border-radius: 4px; background: none; color: var(--muted-foreground); font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; transition: background .12s, color .12s; }
+.seg button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 30px; padding: 0 12px; border: 0; border-radius: 4px; background: none; color: var(--muted-foreground); font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; transition: background .12s, color .12s; }
 .seg button:hover { color: var(--foreground); }
 .seg button.on { background: var(--background); color: var(--foreground); box-shadow: 0 0 0 1px var(--border), 0 1px 2px rgba(0, 0, 0, 0.05); }
 :root[data-theme="dark"] .seg button.on { background: var(--accent); box-shadow: 0 0 0 1px var(--border); }
