@@ -18,6 +18,10 @@ return [
     // Self-hosters who deliver to a service on their own network (a local Slack bridge, Home Assistant…) can allow that here.
     'webhooks' => ['allow_private' => (bool) env('TIDEMARK_WEBHOOKS_ALLOW_PRIVATE', false)],
 
+    // The dashboard shows each site's own icon in site lists. The server fetches it (the viewer's browser never contacts the site), only from
+    // public https addresses. Turn this off on a server without internet access; the dashboard then shows letter tiles.
+    'favicons' => (bool) env('TIDEMARK_FAVICONS', true),
+
     'update_check' => (bool) env('TIDEMARK_UPDATE_CHECK', true),
 
     'update_repo' => env('TIDEMARK_UPDATE_REPO', 'tidemark-analytics/tidemark'),

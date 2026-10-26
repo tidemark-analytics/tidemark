@@ -4,6 +4,9 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Added
+- Site lists, the site switcher and the sidebar show each site's own icon, with the letter tile as the fallback. The server fetches and remembers the icon (public https addresses only, small raster images only), so your browser never contacts the site. Set `TIDEMARK_FAVICONS=false` to turn it off.
+
 ## [0.32.0] - 2026-10-25
 
 ### Changed

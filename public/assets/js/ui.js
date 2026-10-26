@@ -23,8 +23,11 @@ export const Spinner = () => html`<span class="spinner" role="status" aria-label
 export const Progress = ({ value, label }) => html`<progress max="100" value=${value} aria-label=${label} style="width:100%"></progress>`;
 /** A square letter tile standing in for a favicon (no third-party requests); the color is derived from the name. */
 export const FavTile = ({ name = '?', rollup, size = '' }) => {
+  const [missing, setMissing] = useState(false);
   const hue = [...name].reduce((n, c) => (n * 31 + c.charCodeAt(0)) % 360, 7);
-  return rollup ? html`<span class=${'favtile rollup ' + size} aria-hidden="true"><${Icon} name="layers" size=${size === 'sm' ? 11 : 13} /></span>` : html`<span class=${'favtile ' + size} style=${`--tile:hsl(${hue} 42% 38%)`} aria-hidden="true">${name.slice(0, 1)}</span>`;
+  if (rollup) return html`<span class=${'favtile rollup ' + size} aria-hidden="true"><${Icon} name="layers" size=${size === 'sm' ? 11 : 13} /></span>`;
+  // the site's own icon, fetched and kept by the server, covers the letter tile once it has loaded; with no icon the tile stays
+  return html`<span class=${'favtile ' + size} style=${`--tile:hsl(${hue} 42% 38%)`} aria-hidden="true">${name.slice(0, 1)}${!missing && html`<img class="fav-img" alt="" loading="lazy" decoding="async" src=${`${window.SD.base}/api/sites/${encodeURIComponent(name)}/favicon`} onLoad=${(e) => e.target.classList.add('loaded')} onError=${() => setMissing(true)} />`}</span>`;
 };
 export const Avatar = ({ name = '?', size = '' }) => html`<span class=${'avatar ' + size} aria-hidden="true">${name.slice(0, 1).toUpperCase()}</span>`;
 /** Tooltip around one control: appears on hover and keyboard focus. */
