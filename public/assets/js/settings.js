@@ -5,7 +5,7 @@ import { Snippet } from './dashboard.js';
 import { registry } from './extensions.js';
 import { accountTabs } from './shell.js';
 import { brandTheme } from './brand.js';
-import { importPlausible, removeImported } from './plausible.js';
+import { importPlausible, removeImported } from './data-import.js';
 
 const zones = () => { try { return ['UTC', ...Intl.supportedValuesOf('timeZone')]; } catch (e) { return ['UTC']; } };
 const firstError = (x) => (x.errors && Object.values(x.errors)[0][0]) || x.message;
