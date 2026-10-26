@@ -1257,7 +1257,7 @@ a.stat-card:hover { border-color: var(--muted-foreground); }
 @media (max-width: 860px) { .cards-grid { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 720px) {
   .dash { padding-top: 16px; }
-  .scopebar { position: static; margin: 0; padding: 0; background: none; }
+  .scopebar { position: relative; top: auto; margin: 0; padding: 0; background: none; z-index: 12; }
   .sb-row { gap: 8px; }
   .sb-row .pop-wrap { position: static; }
   .scopebar .pop, .scopebar .filter-pop { left: 0; right: 0; width: auto; min-width: 0; max-width: none; }

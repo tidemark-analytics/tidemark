@@ -76,6 +76,13 @@ export function Pop({ label, children, align = 'right', btnClass = 'btn', open: 
     if (dx) el.style.translate = dx + 'px';
   }, [open]);
   const trigger = useRef();
+  // Esc closes the menu and puts focus back on the button that opened it
+  useEffect(() => {
+    if (!open) return;
+    const esc = (e) => { if (e.key === 'Escape' && ref.current && ref.current.contains(document.activeElement)) { e.stopPropagation(); trigger.current && trigger.current.focus(); } };
+    document.addEventListener('keydown', esc, true);
+    return () => document.removeEventListener('keydown', esc, true);
+  }, [open]);
   useEffect(() => {
     if (!open) return;
     const pop = ref.current && ref.current.querySelector('.pop');
