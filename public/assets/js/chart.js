@@ -57,9 +57,10 @@ export function useWidth() {
  * values/labels: current period. prev/prevLabels: optional comparison series (aligned by index).
  * format(v) renders numbers; interval controls label text.
  */
-export function LineChart({ labels, values, prev, prevLabels, format = fmtShort, name = 'Visitors', interval = 'day', height = 300, live = false, annotations = [], onNote }) {
+export function LineChart({ labels, values, prev, prevLabels, format = fmtShort, name = 'Visitors', interval = 'day', height = 300, live = false, annotations = [], onNote, onBrush }) {
   const [ref, width] = useWidth();
   const [hover, setHover] = useState(null);
+  const [drag, setDrag] = useState(null); // brush-to-zoom: the buckets the pointer went down and is now on
   const m = { t: 12, r: 12, b: 28, l: 44 };
   const W = Math.max(width, 120), H = height;
   const iw = W - m.l - m.r, ih = H - m.t - m.b;
@@ -75,11 +76,19 @@ export function LineChart({ labels, values, prev, prevLabels, format = fmtShort,
   const tipRef = useRef();
   const [tipH, setTipH] = useState(0); // the tooltip sits above the point, so a tall one (with notes) needs room above it
 
-  const move = (e) => {
+  const idxAt = (e) => {
     const r = e.currentTarget.getBoundingClientRect();
     const px = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
-    setHover(Math.max(0, Math.min(n - 1, Math.round(((px - m.l) / iw) * (n - 1)))));
+    return Math.max(0, Math.min(n - 1, Math.round(((px - m.l) / iw) * (n - 1))));
   };
+  const move = (e) => { const i = idxAt(e); setHover(i); if (drag) setDrag((d) => d && { ...d, b: i }); };
+  const down = (e) => { if (onBrush && e.button === 0 && n > 2) { const i = idxAt(e); setDrag({ a: i, b: i }); } };
+  useEffect(() => {
+    if (!drag) return;
+    const up = () => { setDrag(null); if (drag.a !== drag.b) onBrush(Math.min(drag.a, drag.b), Math.max(drag.a, drag.b)); };
+    window.addEventListener('mouseup', up);
+    return () => window.removeEventListener('mouseup', up);
+  }, [drag]);
   const key = (e) => {
     if (e.key === 'ArrowLeft') { e.preventDefault(); setHover((h) => Math.max(0, (h ?? n) - 1)); }
     else if (e.key === 'ArrowRight') { e.preventDefault(); setHover((h) => Math.min(n - 1, (h ?? -1) + 1)); }
@@ -89,23 +98,24 @@ export function LineChart({ labels, values, prev, prevLabels, format = fmtShort,
   useEffect(() => { if (tipRef.current) setTipH(tipRef.current.offsetHeight); }, [hover, hoverNotes.length]);
 
   return html`<div class="chart" ref=${ref} style=${`height:${H}px`} tabindex="0" role="img" aria-label=${`${name} over time. Use the arrow keys to read each point.`} onKeyDown=${key} onBlur=${() => setHover(null)}>
-    ${width > 0 && html`<svg width=${W} height=${H} onMouseMove=${move} onMouseLeave=${() => setHover(null)} onTouchMove=${move} onTouchEnd=${() => setHover(null)}>
+    ${width > 0 && html`<svg width=${W} height=${H} class=${onBrush ? 'brushable' : ''} onMouseDown=${down} onMouseMove=${move} onMouseLeave=${() => setHover(null)} onTouchMove=${move} onTouchEnd=${() => setHover(null)}>
       <defs><linearGradient id="area" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--series-1)" stop-opacity="0.22" /><stop offset="1" stop-color="var(--series-1)" stop-opacity="0.02" /></linearGradient></defs>
       <g class="grid">${ticks.map((t) => html`<line x1=${m.l} x2=${W - m.r} y1=${y(t)} y2=${y(t)} />`)}</g>
       ${ticks.map((t) => html`<text x=${m.l - 8} y=${y(t) + 4} text-anchor="end">${format(Math.round(t * 100) / 100)}</text>`)}
       ${labels.map((l, i) => i % every === 0 && html`<text x=${x(i)} y=${H - 8} text-anchor=${i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle'}>${bucketText(l, interval)}</text>`)}
+      ${drag && drag.a !== drag.b && html`<rect class="brush" x=${x(Math.min(drag.a, drag.b))} y=${m.t} width=${Math.abs(x(drag.b) - x(drag.a))} height=${ih} />`}
       ${prev && html`<path d=${line(prev.slice(0, n))} fill="none" stroke="var(--series-2)" stroke-width="2" stroke-dasharray="4 4" stroke-linejoin="round" opacity="0.9" />`}
       ${n > 1 && html`<path d=${line(values) + ` L${x(n - 1)} ${y(0)} L${x(0)} ${y(0)} Z`} fill="url(#area)" />`}
       <path d=${line(values)} fill="none" stroke="var(--series-1)" stroke-width="2.25" stroke-linejoin="round" stroke-linecap="round" />
       ${n === 1 && html`<circle cx=${x(0)} cy=${y(values[0])} r="4" fill="var(--series-1)" />`}
       ${notes.map((p) => html`<g class="annot" tabindex="0" role="button" aria-label=${`${p.list.length} ${p.list.length === 1 ? 'note' : 'notes'} on ${bucketText(labels[p.idx], interval, true)}: ${p.list.map((a) => a.note).join('; ')}`}
-        onClick=${(e) => { e.stopPropagation(); onNote && onNote(p); }} onKeyDown=${(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onNote && onNote(p); } }}>
+        onMouseDown=${(e) => e.stopPropagation()} onClick=${(e) => { e.stopPropagation(); onNote && onNote(p); }} onKeyDown=${(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onNote && onNote(p); } }}>
         <line class="annot-line" x1=${x(p.idx)} x2=${x(p.idx)} y1=${m.t + 6} y2=${y(0)} /><circle class="annot-hit" cx=${x(p.idx)} cy=${m.t + 6} r="11" /><circle class="annot-dot" cx=${x(p.idx)} cy=${m.t + 6} r="5" /></g>`)}
       ${hover !== null && html`<g><line class="cross" x1=${x(hover)} x2=${x(hover)} y1=${m.t} y2=${y(0)} />
         ${prev && prev[hover] !== undefined && html`<circle cx=${x(hover)} cy=${y(prev[hover])} r="4" fill="var(--surface)" stroke="var(--series-2)" stroke-width="2" />`}
         <circle cx=${x(hover)} cy=${y(values[hover])} r="4.5" fill="var(--surface)" stroke="var(--series-1)" stroke-width="2.25" /></g>`}
     </svg>`}
-    ${hover !== null && html`<div class="tooltip" ref=${tipRef} style=${`left:${tipLeft}px;top:${Math.max(tipH + 4, Math.min(y(values[hover]), y(prev && prev[hover] !== undefined ? prev[hover] : values[hover])) - 12)}px`}>
+    ${hover !== null && !(drag && drag.a !== drag.b) && html`<div class="tooltip" ref=${tipRef} style=${`left:${tipLeft}px;top:${Math.max(tipH + 4, Math.min(y(values[hover]), y(prev && prev[hover] !== undefined ? prev[hover] : values[hover])) - 12)}px`}>
       <div class="tt-h" style="margin:0 0 3px">${name}</div>
       <div class="tt-r"><i style="background:var(--series-1)"></i><span>${bucketText(labels[hover], interval, true)}</span><b>${format(values[hover])}</b></div>
       ${prev && prev[hover] !== undefined && html`<div class="tt-r"><i style="background:var(--series-2)"></i><span>${prevLabels ? bucketText(prevLabels[hover], interval, true) : 'Previous'}</span><b>${format(prev[hover])}</b></div>`}

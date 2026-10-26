@@ -33,7 +33,7 @@ class SiteSettingsTest extends TestCase
     public function test_tracking_toggles_change_the_script_and_create_goals(): void
     {
         $res = $this->patchJson('/api/sites/example.com', ['track_outbound' => true, 'track_downloads' => true])->assertOk();
-        $this->assertSame('script.outbound-links.file-downloads.js', $res->json('data.script'));
+        $this->assertMatchesRegularExpression('/^[a-f0-9]{10}\.outbound-links\.file-downloads\.js$/', $res->json('data.script'));
         $names = $this->getJson('/api/sites/example.com/goals')->json('data.*.name');
         $this->assertContains('Outbound Link: Click', $names);
         $this->assertContains('File Download', $names);

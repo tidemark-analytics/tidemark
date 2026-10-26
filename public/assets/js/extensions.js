@@ -11,6 +11,12 @@
 //     api.registerMenuItem({ label: 'Chat', onClick: () => openChat(), icon: 'life-buoy' });
 //     api.registerAdminUi({ href: '/admin' }); // operators get this separate interface; Users and Updates move out of Account settings
 //   }
+//
+// Styling: pages use shadcn-style tokens in app.css (--background, --card, --foreground, --muted, --muted-foreground, --border, --input,
+// --ring, --primary, --destructive, --success and the brand teal --brand / --brand-ink / --brand-soft). The older names (--bg, --surface,
+// --surface-2, --line, --ink, --ink-2, --ink-3, --accent-ink, --accent-soft, --good, --bad ...) still resolve to the same colors.
+// The one exception is --accent: it now means the neutral hover surface, so use --brand where you meant Tide teal.
+// ui.js also exports Tabs, Badge, Breadcrumb, Sheet, SettingCard, TypedConfirm, Tooltip, FavTile and table helpers (useSort, SortTh, Pagination).
 import * as lib from './lib.js';
 import * as ui from './ui.js';
 import * as chart from './chart.js';

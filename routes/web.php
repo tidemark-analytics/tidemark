@@ -13,14 +13,15 @@ Route::post('/install', [InstallController::class, 'store']);
 Route::get('/reports/unsubscribe/{token}', [ReportUnsubscribeController::class, 'show'])->where('token', '[A-Za-z0-9]{40}');
 Route::post('/reports/unsubscribe/{token}', [ReportUnsubscribeController::class, 'destroy'])->where('token', '[A-Za-z0-9]{40}');
 
-// Tracking script. Plausible-style variants are selected by file name: script.outbound-links.file-downloads.js
+// Tracking script. Plausible-style variants are selected by file name: script.outbound-links.file-downloads.js. Each site's snippet
+// uses its own code instead of "script" (see Site::trackerCode), so no one file name can be blocklisted for every site; script.js keeps working.
 Route::get('/js/{file}', function (string $file) {
     return response()->file(public_path('js/script.js'), [
         'Content-Type' => 'application/javascript; charset=utf-8',
         'Cache-Control' => 'public, max-age=3600',
         'Access-Control-Allow-Origin' => '*',
     ]);
-})->where('file', 'script(\.[a-z-]+)*\.js')->name('tracker');
+})->where('file', '(script|[a-f0-9]{10})(\.[a-z-]+)*\.js')->name('tracker');
 
 // Single-page dashboard shell. A site's dashboard lives at /{domain}, like Plausible.
 Route::middleware('installed')->group(function () {
