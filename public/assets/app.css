@@ -651,6 +651,10 @@ main:focus { outline: none; }
 .side-link.on .icon { color: var(--brand-ink); opacity: 1; }
 .side-link > span:not(.notif), .side-site > span { overflow: hidden; text-overflow: ellipsis; }
 .side-count, .side-site em { margin-left: auto; font-style: normal; font-size: 12px; color: var(--muted-foreground); font-variant-numeric: tabular-nums; }
+.side-count.warn { color: #1f1300; background: var(--signal); border-radius: 999px; padding: 0 6px; min-width: 18px; text-align: center; line-height: 18px; font-weight: 500; }
+.menu .item .side-count.warn, .pop .item .side-count.warn { margin: 0 8px 0 auto; }
+.side-link .side-dot { display: none; }
+.btn.help-btn { position: relative; }
 .side-ext { margin-left: auto; color: var(--muted-foreground); flex: none; }
 .side-link .notif.inline { margin-left: auto; }
 .side-back { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px; margin: 0 0 6px; border-radius: var(--radius-md); color: var(--muted-foreground); font-size: 13px; cursor: pointer; background: none; border: 0; width: 100%; text-align: left; }
@@ -666,6 +670,8 @@ main:focus { outline: none; }
 .app.side-collapsed .side-link, .app.side-collapsed .side-back, .app.side-collapsed .side-collapse { justify-content: center; padding: 0; }
 .app.side-collapsed .side-site-head { justify-content: center; padding-left: 0; padding-right: 0; }
 .app.side-collapsed .side-link.on::before { left: -8px; }
+.app.side-collapsed .side-link { position: relative; }
+.app.side-collapsed .side-link > .side-dot { display: block; position: absolute; top: 5px; right: 7px; width: 8px; height: 8px; clip: auto; overflow: visible; }
 .side-toggle { display: none; }
 
 /* switcher + palette (Command) */
