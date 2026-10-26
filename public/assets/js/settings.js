@@ -120,7 +120,7 @@ function PrivacyControls({ site, reload }) {
   const masked = ((masks.data && masks.data.results) || []).map((r) => { const k = kinds[r.pattern] || [r.pattern, r.pattern]; return `${r.count.toLocaleString()} ${r.count === 1 ? k[0] : k[1]}`; }).join(', ');
   return html`<${Section} title="Privacy controls" help="Tidemark already sets no cookies, stores no IP addresses and drops query strings. These switches let you collect even less.">
     ${scrubChoice && html`<${Toggle} label="Mask personal data sent by accident" help="Email addresses, tokens, UUIDs and long numbers in page addresses, referrers, campaign values, event names and properties are replaced with a placeholder such as [email] before anything is stored. Ordinary page names and short ids are left alone." checked=${site.pii_scrub} onChange=${(v) => patch({ pii_scrub: v })} />`}
-    ${scrubChoice && masked && html`<p class="muted small" style="margin:-4px 0 4px 46px">Masked in the last 30 days: ${masked}. Only these counts are kept, never the values.</p>`}
+    ${scrubChoice && masked && html`<p class="muted small" style="margin:-4px 0 4px 48px">Masked in the last 30 days: ${masked}. Only these counts are kept, never the values.</p>`}
     <${Toggle} label="Respect Global Privacy Control" help="Visitors whose browser sends the Global Privacy Control signal are not counted." checked=${site.honor_gpc} onChange=${(v) => patch({ honor_gpc: v })} />
     <${Toggle} label="Respect Do Not Track" help="Visitors whose browser sends Do Not Track are not counted." checked=${site.honor_dnt} onChange=${(v) => patch({ honor_dnt: v })} />
     <${Toggle} label="Keep only the referrer's domain" help="Record news.example.org instead of news.example.org/story/42." checked=${site.referrer_domain_only} onChange=${(v) => patch({ referrer_domain_only: v })} />
@@ -140,7 +140,7 @@ function BotFiltering({ site, reload }) {
   return html`<${Section} title="Bot and spam filtering" help="Hits that don't come from a person's browser are left out of your numbers, using only what the request already carries (never stored): known crawlers, headless browsers, addresses of cloud and hosting providers, referrer spam and sudden floods from a single visitor. Lists of providers and spam domains are updated with each release.">
     <${Toggle} label="Filter bots and spam" help="Turn it off to count everything, for example while testing from a script or a server." checked=${site.bot_filter !== false} onChange=${(v) => patch({ bot_filter: v })} />
     ${err && html`<div class="alert">${err}</div>`}
-    ${filtered.data && html`<p class="muted small" style="margin:-4px 0 4px 46px">${total === 0 ? 'Nothing was filtered in the last 30 days.' : `Filtered in the last 30 days: ${total.toLocaleString()} (${rows.map((r) => `${r.count.toLocaleString()} ${names[r.reason] || r.reason}`).join(', ')}). Only these counts are kept.`}</p>`}
+    ${filtered.data && html`<p class="muted small" style="margin:-4px 0 4px 48px">${total === 0 ? 'Nothing was filtered in the last 30 days.' : `Filtered in the last 30 days: ${total.toLocaleString()} (${rows.map((r) => `${r.count.toLocaleString()} ${names[r.reason] || r.reason}`).join(', ')}). Only these counts are kept.`}</p>`}
   <//>`;
 }
 
@@ -239,7 +239,7 @@ function Branding({ site, reload }) {
     run(() => api(`/sites/${site.domain}/branding/logo`, { method: 'POST', body }), 'Logo updated');
   };
   const dark = document.documentElement.dataset.theme === 'dark' || (!document.documentElement.dataset.theme && window.matchMedia('(prefers-color-scheme: dark)').matches);
-  const accent = valid && color ? ((dark ? shown.dark : shown.light) || color) : '#0e7c86';
+  const accent = valid && color ? ((dark ? shown.dark : shown.light) || color) : dark ? '#4fc3be' : '#0e7c86';
   const logo = site.brand && site.brand.logo;
   const off = !b.allowed;
   return html`<${Section} title="Branding" locked=${off} footer=${html`<${SaveFooter} help="Applies to the public dashboard and shared links." dirty=${changed && valid} busy=${busy} onSave=${save} label="Save changes" />`} help="Show your own logo, name and color to people who open the public dashboard or a shared link. A small “Analytics by Tidemark” link always stays in the footer.">
@@ -596,7 +596,7 @@ function Profile() {
   const pick = (t) => { setTheme(t); setThemeState(t); };
   const THEMES = [['light', 'Light'], ['dark', 'Dark'], ['system', 'System']];
   return html`<form onSubmit=${save}><${Section} title="Profile" help="Your name and email are used to sign in and are shown to people you share sites with."
-      footer=${html`<span class="help">${changed ? 'You have unsaved changes.' : 'Saved.'}</span><button class="btn primary sm" disabled=${!changed}>Save changes</button>`}>
+      footer=${html`<span class="help">${changed ? 'You have unsaved changes.' : 'Your email is also where password resets are sent.'}</span><button class="btn primary sm" disabled=${!changed}>Save changes</button>`}>
         <div class="profile-head"><span class="avatar big" aria-hidden="true">${initial(f)}</span><div class="ri-main"><b>${f.name || 'Your name'}</b><span class="muted">${f.email}</span></div></div>
         ${err && html`<div class="alert">${err}</div>`}
         <div class="fields2"><${Field} label="Name"><input required value=${f.name} onInput=${(e) => setF({ ...f, name: e.target.value })} /><//>

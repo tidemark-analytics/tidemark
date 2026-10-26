@@ -255,8 +255,8 @@ function useScrollSpy(ids) {
   return active;
 }
 
-const SideLink = ({ to, icon, label, on, children, ...rest }) => html`<${Link} to=${to} class=${'side-link ' + (on ? 'on' : '')} data-tip=${label} aria-current=${on ? 'page' : undefined} ...${rest}><${Icon} name=${icon} size=${16} /><span>${label}</span>${children}<//>`;
-const SideExt = ({ href, icon, label, external = true }) => html`<a class="side-link" data-tip=${label} href=${href} target=${external ? '_blank' : null} rel=${external ? 'noopener' : null}><${Icon} name=${icon} size=${16} /><span>${label}</span>${external && html`<${Icon} name="external-link" size=${12} class="side-ext" />`}</a>`;
+const SideLink = ({ to, icon, label, on, children, ...rest }) => html`<${Link} to=${to} class=${'side-link ' + (on ? 'on' : '')} title=${label} aria-current=${on ? 'page' : undefined} ...${rest}><${Icon} name=${icon} size=${16} /><span>${label}</span>${children}<//>`;
+const SideExt = ({ href, icon, label, external = true }) => html`<a class="side-link" title=${label} href=${href} target=${external ? '_blank' : null} rel=${external ? 'noopener' : null}><${Icon} name=${icon} size=${16} /><span>${label}</span>${external && html`<${Icon} name="external-link" size=${12} class="side-ext" />`}</a>`;
 
 export function Sidebar({ user, path, sites, side }) {
   const domain = siteFromPath(path);
@@ -273,21 +273,21 @@ export function Sidebar({ user, path, sites, side }) {
   const accountOn = (k) => onAccount && (accountTab === k || (k === 'security' && accountTab === 'preferences') || (k === 'profile' && accountTab === 'preferences'));
   const itemOn = (i) => (i.route ? path.startsWith('/' + domain + i.route) : onDash && active === i.id);
   const body = domain
-    ? html`<${Link} to="/sites" class="side-back" data-tip="All sites"><${Icon} name="chevron-left" size=${15} /><span>All sites</span><//>
+    ? html`<${Link} to="/sites" class="side-back" title="All sites"><${Icon} name="chevron-left" size=${15} /><span>All sites</span><//>
       <div class="side-site-head"><${FavTile} name=${domain} rollup=${current && current.rollup} /><b>${domain}</b></div>
       ${SITE_NAV.filter((i) => !i.manage || canManage).map((i) => (i.route
         ? html`<${SideLink} to=${'/' + domain + i.route} icon=${i.icon} label=${i.label} on=${itemOn(i)} />`
-        : html`<button class=${'side-link ' + (itemOn(i) ? 'on' : '')} data-tip=${i.label} aria-current=${itemOn(i) ? 'location' : undefined} onClick=${() => jumpToSection(domain, i.section)}><${Icon} name=${i.icon} size=${16} /><span>${i.label}</span></button>`))}`
+        : html`<button class=${'side-link ' + (itemOn(i) ? 'on' : '')} title=${i.label} aria-current=${itemOn(i) ? 'location' : undefined} onClick=${() => jumpToSection(domain, i.section)}><${Icon} name=${i.icon} size=${16} /><span>${i.label}</span></button>`))}`
     : html`<div class="side-grp">Workspace</div>
       <${SideLink} to="/sites" icon="layout-dashboard" label="Sites" on=${path === '/sites' || path === '/sites/new' || path === '/sites/rollup'}>${list.length > 0 && html`<em class="side-count">${list.length}</em>`}<//>
       ${hasRollups && html`<${SideLink} to="/sites?kind=rollups" icon="layers" label="Rollups" on=${false}><em class="side-count">${list.filter((s) => s.rollup).length}</em><//>`}
       <div class="side-grp">Account</div>
       ${tabs.map(([k, l, dot]) => html`<${SideLink} to=${tabPath(k)} icon=${ACCOUNT_ICONS[k] || 'settings'} label=${l} on=${accountOn(k)}>${dot && html`<span class="notif inline" aria-hidden="true"></span><span class="sr-only"> (update available)</span>`}<//>`)}
-      ${user.is_admin && registry.adminUi && html`<a class="side-link" data-tip=${registry.adminUi.label} href=${BASE + registry.adminUi.href}><${Icon} name="shield-check" size=${16} /><span>${registry.adminUi.label}</span><${Icon} name="chevron-right" size=${13} class="side-ext" /></a>`}
+      ${user.is_admin && registry.adminUi && html`<a class="side-link" title=${registry.adminUi.label} href=${BASE + registry.adminUi.href}><${Icon} name="shield-check" size=${16} /><span>${registry.adminUi.label}</span><${Icon} name="chevron-right" size=${13} class="side-ext" /></a>`}
       <div class="side-grp">Resources</div>
       <${SideExt} href="https://support.tidemarkanalytics.com/en/docs" icon="book-open" label="Documentation" />
       ${registry.menuItems.filter((m) => !m.visible || m.visible(user)).map((m) => (m.onClick
-        ? html`<button class="side-link" data-tip=${m.label} onClick=${m.onClick}><${Icon} name=${m.icon || 'life-buoy'} size=${16} /><span>${m.label}</span></button>`
+        ? html`<button class="side-link" title=${m.label} onClick=${m.onClick}><${Icon} name=${m.icon || 'life-buoy'} size=${16} /><span>${m.label}</span></button>`
         : html`<${SideExt} href=${m.href} icon=${m.icon || 'external-link'} label=${m.label} external=${!!m.external} />`))}
       <${SideExt} href="https://discord.gg/sCkHD3PPZh" icon="users" label="Community" />`;
   return html`<aside class="side" id="app-side" aria-label="Main">
