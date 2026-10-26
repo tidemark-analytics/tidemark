@@ -109,9 +109,15 @@ export function brandTheme(hex, isDark) {
     accent,
     changed: accent.toLowerCase() !== hex.toLowerCase(),
     vars: {
+      // shadcn-style tokens (app.css). --primary follows the brand color here, so buttons and switches on a branded page take it.
+      '--canvas': n.bg, '--control': isDark ? 'transparent' : n.surface, '--background': n.surface, '--card': n.surface, '--popover': n.surface, '--muted': n.s2, '--accent': n.s3,
+      '--border': n.line, '--input': n.line2, '--foreground': n.ink, '--muted-foreground': ink3,
+      '--primary': accent, '--primary-foreground': onAccent, '--ring': accent,
+      '--brand': accent, '--brand-foreground': onAccent, '--brand-hover': hover, '--brand-ink': ink, '--brand-soft': soft, '--chart-1': accent,
+      // legacy names, still read by older extensions (--accent is not among them: it changed meaning)
       '--bg': n.bg, '--surface': n.surface, '--surface-2': n.s2, '--surface-3': n.s3, '--line': n.line, '--line-2': n.line2,
       '--ink': n.ink, '--ink-2': ink2, '--ink-3': ink3,
-      '--accent': accent, '--accent-hover': hover, '--on-accent': onAccent, '--accent-ink': ink, '--accent-soft': soft,
+      '--accent-hover': hover, '--on-accent': onAccent, '--accent-ink': ink, '--accent-soft': soft,
       '--accent-ring': `rgba(${r}, ${g}, ${b}, ${isDark ? 0.4 : 0.3})`,
       '--series-1': accent, '--series-1-wash': `rgba(${r}, ${g}, ${b}, ${isDark ? 0.16 : 0.11})`,
     },
