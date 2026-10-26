@@ -161,17 +161,18 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 14px 0; }
 .btn:hover { background: var(--accent); }
 .btn .icon { flex: none; }
 .btn.primary { background: var(--primary); color: var(--primary-foreground); border-color: var(--primary); }
-.btn.primary:hover { background: color-mix(in srgb, var(--primary) 88%, var(--background)); border-color: transparent; }
-.btn.secondary { background: var(--secondary); color: var(--secondary-foreground); border-color: transparent; }
-.btn.secondary:hover { background: color-mix(in srgb, var(--secondary) 80%, var(--foreground) 6%); }
+.btn.primary:hover, .btn.primary:active, .btn.primary[aria-expanded="true"] { background: color-mix(in srgb, var(--primary) 86%, var(--background)); color: var(--primary-foreground); border-color: color-mix(in srgb, var(--primary) 86%, var(--background)); }
+.btn.primary .icon, .btn.primary .spin { color: var(--primary-foreground); }
+.btn.secondary { background: var(--secondary); color: var(--secondary-foreground); border-color: var(--border); }
+.btn.secondary:hover, .btn.secondary[aria-expanded="true"] { background: color-mix(in srgb, var(--secondary) 80%, var(--foreground) 8%); color: var(--secondary-foreground); }
 .btn.brand { background: var(--brand); color: var(--brand-foreground); border-color: var(--brand); }
-.btn.brand:hover { background: var(--brand-hover); border-color: var(--brand-hover); }
+.btn.brand:hover { background: var(--brand-hover); border-color: var(--brand-hover); color: var(--brand-foreground); }
 .btn.ghost { border-color: transparent; background: transparent; }
 .btn.ghost:hover { background: var(--accent); }
 .btn.danger { color: var(--destructive); border-color: color-mix(in srgb, var(--destructive) 40%, var(--input)); }
 .btn.danger:hover { background: var(--destructive-soft); border-color: var(--destructive); }
 .btn.destructive { background: var(--destructive); color: var(--destructive-foreground); border-color: var(--destructive); }
-.btn.destructive:hover { background: color-mix(in srgb, var(--destructive) 88%, var(--foreground)); }
+.btn.destructive:hover { background: color-mix(in srgb, var(--destructive) 88%, var(--foreground)); color: var(--destructive-foreground); border-color: transparent; }
 .btn.ghost.danger { border-color: transparent; }
 .btn.ghost.danger:hover { background: var(--destructive-soft); color: var(--destructive); }
 .btn.link { border-color: transparent; background: none; padding: 0 2px; height: auto; text-decoration: underline; text-underline-offset: 3px; color: var(--foreground); }
@@ -180,6 +181,7 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 14px 0; }
 .btn.lg { height: 40px; padding: 0 20px; font-size: 14px; }
 .btn.icon { width: 36px; padding: 0; }
 .btn.sm.icon { width: 32px; padding: 0; }
+.btn.primary:disabled, .btn.primary.disabled { background: color-mix(in srgb, var(--primary) 55%, var(--background)); border-color: transparent; color: var(--primary-foreground); opacity: 1; }
 .btn.disabled, .btn:disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
 .btn.loading { pointer-events: none; }
 .btn.loading > .spin { display: inline-block; }
