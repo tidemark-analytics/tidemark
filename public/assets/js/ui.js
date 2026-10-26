@@ -8,6 +8,14 @@ export const Notice = ({ children, icon = 'info', tone = '' }) => html`<div clas
 /** Alert / banner: tone is '', 'good', 'warn' or 'danger'; onClose makes it dismissible. */
 export const Alert = ({ children, icon = 'info', tone = '', title, onClose }) => html`<div class=${'notice ' + tone} role=${tone === 'danger' ? 'alert' : 'status'}><${Icon} name=${icon} size=${16} /><div class="grow">${title && html`<b>${title} </b>`}${children}</div>${onClose && html`<button class="btn ghost icon sm" aria-label="Dismiss" onClick=${onClose}><${Icon} name="x" size=${14} /></button>`}</div>`;
 export const Badge = ({ children, tone = '', dot, title }) => html`<span class=${'badge ' + tone} title=${title}>${dot && html`<span class=${'dot static ' + (tone === 'good' || tone === 'success' ? '' : 'off')} aria-hidden="true"></span>`}${children}</span>`;
+/** The change against the comparison period: a green/red pill with an arrow. Bounce rate is the one metric where lower is better. */
+export function Delta({ metric, change, isNew, compact }) {
+  if (isNew) return html`<span class=${'delta flat' + (compact ? ' compact' : '')} title="Not in the comparison period">New</span>`;
+  if (change === null || change === undefined) return null;
+  const flat = Math.abs(change) < 0.05;
+  const good = metric === 'bounce_rate' ? change < 0 : change > 0;
+  return html`<span class=${'delta ' + (flat ? 'flat' : good ? 'up' : 'down') + (compact ? ' compact' : '')}>${!flat && html`<${Icon} name=${change > 0 ? 'arrow-up' : 'arrow-down'} size=${11} />`}<span class="sr-only">${change > 0 ? 'Up ' : change < 0 ? 'Down ' : ''}</span>${Math.abs(change) >= 1000 ? '999%+' : Math.abs(change).toFixed(change % 1 === 0 || Math.abs(change) >= 100 ? 0 : 1) + '%'}</span>`;
+}
 export const Kbd = ({ children }) => html`<kbd>${children}</kbd>`;
 export const Spinner = () => html`<span class="spinner" role="status" aria-label="Loading"></span>`;
 export const Progress = ({ value, label }) => html`<progress max="100" value=${value} aria-label=${label} style="width:100%"></progress>`;

@@ -1,6 +1,6 @@
 // The signed-in app shell: top bar with breadcrumb switchers, the context-aware sidebar, the live-visitors sheet,
 // the ⌘K command palette and the keyboard shortcuts.
-import { html, useState, useEffect, useMemo, useRef, useApi, api, navigate, Link, Icon, fmtShort, fmt, BASE, PERIODS, UserCtx, useContext, setTheme, currentTheme, countryName, flag } from './lib.js';
+import { html, useState, useEffect, useMemo, useRef, useApi, api, navigate, Link, Icon, fmtShort, fmt, BASE, PERIODS, UserCtx, useContext, setTheme, currentTheme, countryName, flag, scopeQuery } from './lib.js';
 import { Pop, Sheet, FavTile } from './ui.js';
 import { Logo } from './logo.js';
 import { registry } from './extensions.js';
@@ -11,19 +11,21 @@ const isExtensionPage = (seg) => registry.routes.some(([pattern]) => pattern.spl
 export const siteFromPath = (path) => { const seg = path.split('/')[1] || ''; return NOT_A_SITE.has(seg) || isExtensionPage(seg) ? null : decodeURIComponent(seg); };
 
 // ------------------------------------------------------------------------------------------------ route config
-/** Items of the sidebar while a site is open. ONE place to change when the dashboard splits into real report routes:
- *  - `section`: today every item scrolls to a part of the dashboard (`#sec-<section>`, see Dashboard in dashboard.js).
- *  - `route`: set it to a path suffix ('/pages', '/sources' ...) and the item becomes a real link to `/<domain><route>`,
- *    highlighted by the path instead of the scroll position. `route: '/settings'` is already like that.
- *  - `key`: the second key of the `g` chord ('g' then 'o' goes to Overview).
+/** Items of the sidebar while a site is open, and the targets of the `g` chords. ONE place to change when a report is added:
+ *  - `route`: a path suffix; the item links to `/<domain><route>` ('' is the overview) and is highlighted by the path.
+ *  - `scoped`: the link carries the period, comparison and filters in the URL, so moving between reports keeps what you look at.
+ *  - `key`: the second key of the `g` chord ('g' then 'p' goes to Pages).
  *  - `manage`: only for owners and admins of the site.
- *  Planned (SPEC section 5): overview '/', pages '/pages', sources '/sources', locations '/locations', devices '/devices',
- *  goals '/goals', funnels '/funnels', journeys '/journeys', settings '/settings'. */
+ *  The routes themselves are registered in main.js (see REPORT_ROUTES). */
 export const SITE_NAV = [
-  { id: 'overview', label: 'Overview', icon: 'chart-column', section: 'overview', route: null, key: 'o' },
-  { id: 'traffic', label: 'Traffic', icon: 'compass', section: 'traffic', route: null, key: 't' },
-  { id: 'audience', label: 'Audience', icon: 'users', section: 'audience', route: null, key: 'a' },
-  { id: 'conversions', label: 'Conversions', icon: 'target', section: 'conversions', route: null, key: 'c' },
+  { id: 'overview', label: 'Overview', icon: 'chart-column', route: '', key: 'o', scoped: true },
+  { id: 'pages', label: 'Pages', icon: 'file-text', route: '/pages', key: 'p', scoped: true },
+  { id: 'sources', label: 'Sources', icon: 'compass', route: '/sources', key: 's', scoped: true },
+  { id: 'locations', label: 'Locations', icon: 'globe', route: '/locations', key: 'l', scoped: true },
+  { id: 'devices', label: 'Devices', icon: 'monitor', route: '/devices', key: 'd', scoped: true },
+  { id: 'events', label: 'Events and goals', icon: 'target', route: '/events', key: 'e', scoped: true },
+  { id: 'funnels', label: 'Funnels', icon: 'funnel', route: '/funnels', key: 'f', scoped: true },
+  { id: 'journeys', label: 'Journeys', icon: 'route', route: '/journeys', key: 'j', scoped: true },
   { id: 'settings', label: 'Settings', icon: 'settings', route: '/settings', key: ',', manage: true },
 ];
 /** Sidebar and chord targets outside a site. */
@@ -196,9 +198,9 @@ function LivePill({ domain }) {
 function sectionLabel(path, domain) {
   if (domain) {
     const rest = path.slice(domain.length + 1);
-    if (rest.startsWith('/settings')) return 'Settings';
     if (rest.startsWith('/installation')) return 'Installation';
-    return 'Overview';
+    const item = SITE_NAV.find((i) => i.route && rest.startsWith(i.route));
+    return item ? item.label : 'Overview';
   }
   if (path === '/sites') return 'Sites';
   if (path === '/sites/new') return 'New site';
@@ -231,30 +233,6 @@ export function AppBar({ user, path, sites, side }) {
 }
 
 // -------------------------------------------------------------------------------------------------- sidebar
-/** Which section is in view: the last one whose top has passed the sticky toolbar. */
-function useScrollSpy(ids) {
-  const [active, setActive] = useState(ids[0]);
-  useEffect(() => {
-    if (!ids.length) return;
-    const on = () => {
-      const els = ids.map((id) => [id, document.getElementById('sec-' + id)]).filter(([, el]) => el);
-      if (!els.length) { setActive(ids[0]); return; } // the page hasn't rendered its sections yet
-      let cur = els[0][0];
-      for (const [id, el] of els) if (el.getBoundingClientRect().top <= 140) cur = id;
-      const scrollable = document.documentElement.scrollHeight > window.innerHeight + 80;
-      if (scrollable && window.scrollY > 0 && window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4) cur = els[els.length - 1][0];
-      setActive(cur);
-    };
-    on();
-    window.addEventListener('scroll', on, { passive: true });
-    // the sections appear and grow as their data loads; follow that too
-    const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(on) : null;
-    if (ro) ro.observe(document.body);
-    return () => { window.removeEventListener('scroll', on); if (ro) ro.disconnect(); };
-  }, [ids.join()]);
-  return active;
-}
-
 const SideLink = ({ to, icon, label, on, children, ...rest }) => html`<${Link} to=${to} class=${'side-link ' + (on ? 'on' : '')} title=${label} aria-current=${on ? 'page' : undefined} ...${rest}><${Icon} name=${icon} size=${16} /><span>${label}</span>${children}<//>`;
 const SideExt = ({ href, icon, label, external = true }) => html`<a class="side-link" title=${label} href=${href} target=${external ? '_blank' : null} rel=${external ? 'noopener' : null}><${Icon} name=${icon} size=${16} /><span>${label}</span>${external && html`<${Icon} name="external-link" size=${12} class="side-ext" />`}</a>`;
 
@@ -262,8 +240,6 @@ export function Sidebar({ user, path, sites, side }) {
   const domain = siteFromPath(path);
   const list = sites ? sites.list : [];
   const current = domain && list.find((s) => s.domain === domain);
-  const onDash = !!domain && path === '/' + domain;
-  const active = useScrollSpy(onDash ? SITE_NAV.filter((i) => i.section).map((i) => i.id) : []);
   const canManage = !current || current.role === 'owner' || current.role === 'admin';
   const hasRollups = list.some((s) => s.rollup);
   const tabs = accountTabs(user);
@@ -271,13 +247,11 @@ export function Sidebar({ user, path, sites, side }) {
   const accountTab = path === '/settings' ? 'profile' : path.split('/')[2];
   const tabPath = (k) => (k === 'profile' ? '/settings' : '/settings/' + k);
   const accountOn = (k) => onAccount && (accountTab === k || (k === 'security' && accountTab === 'preferences') || (k === 'profile' && accountTab === 'preferences'));
-  const itemOn = (i) => (i.route ? path.startsWith('/' + domain + i.route) : onDash && active === i.id);
+  const itemOn = (i) => (i.route === '' ? path === '/' + domain : path.startsWith('/' + domain + i.route));
   const body = domain
     ? html`<${Link} to="/sites" class="side-back" title="All sites"><${Icon} name="chevron-left" size=${15} /><span>All sites</span><//>
       <div class="side-site-head"><${FavTile} name=${domain} rollup=${current && current.rollup} /><b>${domain}</b></div>
-      ${SITE_NAV.filter((i) => !i.manage || canManage).map((i) => (i.route
-        ? html`<${SideLink} to=${'/' + domain + i.route} icon=${i.icon} label=${i.label} on=${itemOn(i)} />`
-        : html`<button class=${'side-link ' + (itemOn(i) ? 'on' : '')} title=${i.label} aria-current=${itemOn(i) ? 'location' : undefined} onClick=${() => jumpToSection(domain, i.section)}><${Icon} name=${i.icon} size=${16} /><span>${i.label}</span></button>`))}`
+      ${SITE_NAV.filter((i) => !i.manage || canManage).map((i) => html`<${SideLink} to=${'/' + domain + i.route + (i.scoped ? scopeQuery() : '')} icon=${i.icon} label=${i.label} on=${itemOn(i)} />`)}`
     : html`<div class="side-grp">Workspace</div>
       <${SideLink} to="/sites" icon="layout-dashboard" label="Sites" on=${path === '/sites' || path === '/sites/new' || path === '/sites/rollup'}>${list.length > 0 && html`<em class="side-count">${list.length}</em>`}<//>
       ${hasRollups && html`<${SideLink} to="/sites?kind=rollups" icon="layers" label="Rollups" on=${false}><em class="side-count">${list.filter((s) => s.rollup).length}</em><//>`}
@@ -325,15 +299,19 @@ export function CommandPalette({ path, sites }) {
     const go = (to) => () => navigate(to);
     const out = [];
     if (domain) {
-      PERIODS.filter((p) => p[0] !== 'custom').forEach(([k, l]) => out.push({ group: 'Date range', icon: 'calendar', label: l, run: () => command({ type: 'period', key: k }) }));
-      out.push({ group: 'View', icon: 'trending-up', label: 'Toggle comparison with the previous period', run: () => command({ type: 'compare' }) });
-      out.push({ group: 'View', icon: 'funnel', label: 'Add a filter…', run: () => command({ type: 'filter' }) });
+      PERIODS.filter((p) => p[0] !== 'custom').forEach(([k, l, key]) => out.push({ group: 'Date range', icon: 'calendar', label: l, hint: key, run: () => command({ type: 'period', key: k }) }));
+      out.push({ group: 'Date range', icon: 'calendar', label: 'Custom range…', hint: 'U', run: () => command({ type: 'period', key: 'custom' }) });
+      out.push({ group: 'Date range', icon: 'chevron-left', label: 'Previous period', hint: '[', run: () => command({ type: 'step', dir: -1 }) });
+      out.push({ group: 'Date range', icon: 'chevron-right', label: 'Next period', hint: ']', run: () => command({ type: 'step', dir: 1 }) });
+      out.push({ group: 'View', icon: 'git-compare', label: 'Toggle comparison with the previous period', hint: 'C', run: () => command({ type: 'compare' }) });
+      out.push({ group: 'View', icon: 'plus', label: 'Add a filter…', hint: '', run: () => command({ type: 'filter' }) });
+      out.push({ group: 'View', icon: 'rotate-ccw', label: 'Reset filters and zoom', run: () => command({ type: 'reset' }) });
       out.push({ group: 'View', icon: 'download', label: 'Export this view as CSV', run: () => command({ type: 'export' }) });
-      SITE_NAV.filter((i) => i.section).forEach((i) => out.push({ group: 'This site', icon: i.icon, label: i.label, hint: 'g ' + i.key, run: () => jumpToSection(domain, i.section) }));
+      SITE_NAV.filter((i) => !i.manage).forEach((i) => out.push({ group: 'This site', icon: i.icon, label: i.label, hint: 'g ' + i.key, run: go('/' + domain + i.route + scopeQuery()) }));
       out.push({ group: 'This site', icon: 'settings', label: 'Site settings', hint: 'g ,', run: go(`/${domain}/settings`) });
     }
     list.forEach((s) => out.push({ group: 'Sites', icon: s.rollup ? 'layers' : 'globe', label: s.domain, hint: s.rollup ? 'Rollup' : '', run: go('/' + s.domain) }));
-    out.push({ group: 'Go to', icon: 'layout-dashboard', label: 'All sites', hint: 'g s', run: go('/sites') }, { group: 'Go to', icon: 'plus', label: 'Add a site', run: go('/sites/new') });
+    out.push({ group: 'Go to', icon: 'layout-dashboard', label: 'All sites', hint: 'g a', run: go('/sites') }, { group: 'Go to', icon: 'plus', label: 'Add a site', run: go('/sites/new') });
     if (user) accountTabs(user).forEach(([k, l]) => out.push({ group: 'Account', icon: ACCOUNT_ICONS[k] || 'settings', label: l, run: go(k === 'profile' ? '/settings' : '/settings/' + k) }));
     out.push({ group: 'Preferences', icon: 'sun', label: 'Theme: light', run: () => setTheme('light') }, { group: 'Preferences', icon: 'moon', label: 'Theme: dark', run: () => setTheme('dark') }, { group: 'Preferences', icon: 'monitor', label: 'Theme: match system', run: () => setTheme('system') },
       { group: 'Preferences', icon: 'keyboard', label: 'Keyboard shortcuts', hint: '?', run: openShortcuts }, { group: 'Preferences', icon: 'book-open', label: 'Documentation', run: () => window.open('https://support.tidemarkanalytics.com/en/docs', '_blank', 'noopener') });
@@ -391,8 +369,8 @@ export function ShellKeys({ path }) {
         const k = e.key.toLowerCase();
         const { domain: d } = state.current;
         const site = d && SITE_NAV.find((i) => i.key === k);
-        if (site) { e.preventDefault(); e.stopImmediatePropagation(); if (site.route) navigate('/' + d + site.route); else jumpToSection(d, site.section); }
-        else if (k === 's') { e.preventDefault(); e.stopImmediatePropagation(); navigate('/sites'); }
+        if (site) { e.preventDefault(); e.stopImmediatePropagation(); navigate('/' + d + site.route + (site.scoped ? scopeQuery() : '')); }
+        else if (k === 'a') { e.preventDefault(); e.stopImmediatePropagation(); navigate('/sites'); }
         return;
       }
       armed = e.key === 'g' ? now : 0;
@@ -407,12 +385,16 @@ export function ShellKeys({ path }) {
       <h3>General</h3>
       <${Row} label="Command palette" keys=${[modKey(), 'K']} /><${Row} label="This list" keys=${['?']} /><${Row} label="Close a menu or dialog" keys=${['Esc']} />
       <h3>Go to (press G, then)</h3>
-      <${Row} label="All sites" keys=${['g', 's']} />
+      <${Row} label="All sites" keys=${['g', 'a']} />
       ${SITE_NAV.map((i) => html`<${Row} label=${i.label} keys=${['g', i.key]} />`)}
-      <h3>On a dashboard</h3>
-      ${PERIODS.filter((p) => p[2]).map(([, l, k]) => html`<${Row} label=${l} keys=${[k]} />`)}
-      <${Row} label="Compare with the previous period" keys=${['X']} />
+      <h3>Period and comparison</h3>
+      <${Row} label="Previous period" keys=${['[']} /><${Row} label="Next period" keys=${[']']} />
+      <${Row} label="Today" keys=${['T']} /><${Row} label="Turn comparison on or off" keys=${['C']} />
+      ${PERIODS.filter((p) => p[2] && p[0] !== 'day').map(([, l, k]) => html`<${Row} label=${l} keys=${[k]} />`)}
       <${Row} label="Previous / next day, month or year" keys=${['←', '→']} />
+      <h3>In reports</h3>
+      <${Row} label="Search the table" keys=${['/']} />
+
     </div>
   <//>`;
 }

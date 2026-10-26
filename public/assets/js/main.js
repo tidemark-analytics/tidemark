@@ -1,6 +1,7 @@
 import { html, render, useState, useEffect, useRef, useBrand, api, navigate, useLocation, matchRoute, Link, Icon, toggleTheme, UserCtx } from './lib.js';
 import { Login, Register, ForgotPassword, ResetPassword } from './pages/auth.js';
 import { Dashboard } from './dashboard.js';
+import { reportRoute, REPORTS } from './report-page.js';
 import { SitesPage, NewSite, NewRollup, Installation } from './sites.js';
 import { SiteSettings, AccountSettings } from './settings.js';
 import { Logo, Lockup } from './logo.js';
@@ -18,10 +19,14 @@ const head = [
   ['/sites/rollup', NewRollup],
   ['/settings/:tab?', AccountSettings],
   ['/share/:domain', (p) => html`<${Dashboard} ...${p} shared />`],
+  ...Object.keys(REPORTS).map((r) => [`/share/:domain/${r}`, reportRoute(r, true)]),
 ];
+// the full report pages: /:domain/pages ... They sit before the "/:domain" catch-all; a site's domain always has a dot or is never one of these words after it
+const REPORT_ROUTES = Object.keys(REPORTS).map((r) => [`/:domain/${r}`, reportRoute(r)]);
 const tail = [
   ['/:domain/installation', Installation],
   ['/:domain/settings/:tab?', SiteSettings],
+  ...REPORT_ROUTES,
   ['/:domain', Dashboard],
 ];
 // extension pages sit between the fixed pages and the "/{domain}" catch-all
@@ -73,7 +78,7 @@ function App() {
 
   const seg = path.split('/')[1] || '';
   const m = RESERVED.has(seg) ? null : matchRoute(allRoutes(), path);
-  const publicRoute = isShare || (m && m.component === Dashboard);
+  const publicRoute = isShare || (m && m.component.public);
   useEffect(() => { if (user === null && !isAuth && !publicRoute) navigate('/login', { replace: true }); }, [user, path]);
   useEffect(() => { if (user && isAuth) navigate('/sites', { replace: true }); }, [user, path]);
   useEffect(() => { if (path === '/' ) navigate(user ? '/sites' : '/login', { replace: true }); }, [path, user]);
