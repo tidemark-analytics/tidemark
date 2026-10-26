@@ -1034,7 +1034,7 @@ button.fact:hover { border-color: var(--muted-foreground); background: var(--mut
 .jlist .mrow.sel { box-shadow: inset 0 0 0 1px var(--foreground); }
 .jlist .mrow:disabled { cursor: default; }
 .jcol.idle .panel-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; }
-.prolock { position: relative; min-height: 0; border-radius: var(--radius-md); overflow: hidden; }
+.prolock { position: relative; min-height: 0; border-radius: var(--radius-md); }
 .prolock-body { filter: blur(5px); opacity: .5; pointer-events: none; user-select: none; }
 .prolock-over { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 16px; text-align: center; }
 .prolock-over p { margin: 0; max-width: 360px; color: var(--muted-foreground); }
