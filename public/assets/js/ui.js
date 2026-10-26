@@ -204,7 +204,7 @@ export function Sparkline({ data, height = 36 }) {
 export const Card = ({ title, actions, children, pad = true, class: c = '', footer }) => html`<section class=${'card ' + c}>${(title || actions) && html`<div class="card-h"><h3>${title}</h3><div class="row">${actions}</div></div>`}<div class=${pad ? 'card-b' : 'card-flush'}>${children}</div>${footer && html`<div class="card-f">${footer}</div>`}</section>`;
 
 /** The settings pattern: title + description, body, and a footer with helper text on the left and the action on the right. */
-export const SettingCard = ({ title, help, children, footer, danger, class: c = '' }) => html`<section class=${'card setting ' + (danger ? 'danger-zone ' : '') + c}>
+export const SettingCard = ({ title, help, children, footer, danger, class: c = '' }) => html`<section class=${'card setting ' + (danger ? 'danger-zone ' : '') + (children ? '' : 'no-body ') + c}>
   <div class="setting-h"><h2>${title}</h2>${help && html`<p>${help}</p>`}</div>
   ${children && html`<div class="setting-b">${children}</div>`}
   ${footer && html`<div class="setting-f">${footer}</div>`}</section>`;
