@@ -1,6 +1,7 @@
 // Site settings (General, Visibility, Branding, Goals, People, Shields) and account settings (Preferences, Security, API keys, Users).
 import { html, useState, useEffect, useRef, useApi, api, navigate, Link, Icon, toast, copy, toggleTheme, setTheme, currentTheme, UserCtx, useContext, useDocTitle, useLocation, ago, countryName, flag, BASE } from './lib.js';
-import { Loading, Empty, ErrorBox, Field, Confirm, TypedConfirm, Modal, Toggle, CodeBlock, Breadcrumb, Badge } from './ui.js';
+import { Loading, Empty, ErrorBox, Field, Confirm, TypedConfirm, Modal, Toggle, CodeBlock, Breadcrumb, Badge, Avatar } from './ui.js';
+import { squareImage } from './image.js';
 import { Snippet } from './dashboard.js';
 import { useScope } from './org.js';
 import { CreateOrganization } from './shell.js';
@@ -495,7 +496,7 @@ function People({ site }) {
   const run = async (fn) => { setErr(null); try { await fn(); res.reload(); return true; } catch (x) { setErr(firstError(x)); return false; } };
   const left = (iso) => { const h = Math.max(0, Math.round((new Date(iso) - Date.now()) / 3600000)); return h >= 2 ? `expires in ${h} hours` : 'expires within the hour'; };
   const roleSelect = (value, label, onChange) => html`<select class="mini-select" value=${value} aria-label=${label} onChange=${(e) => onChange(e.target.value)}><option value="viewer" selected=${value === 'viewer'}>Viewer</option><option value="admin" selected=${value === 'admin'}>Admin</option></select>`;
-  const avatar = (u) => html`<span class="avatar" aria-hidden="true">${(u.name || u.email || '?').slice(0, 1).toUpperCase()}</span>`;
+  const avatar = (u) => html`<${Avatar} name=${u.name || u.email} url=${u.avatar_url} />`;
   const tag = (t) => html`<span class="pill">${t}</span>`;
   const gap = html`<span class="ri-spacer" aria-hidden="true"></span>`;
   return html`<${Section} title="People with access" help=${res.data ? `${total} ${total === 1 ? 'person or group' : 'people and groups'} can open this site. ${canInvite ? 'Someone without an account gets an e-mail invitation that is valid for 72 hours.' : 'People need an account on this Tidemark install.'}` : 'Who can open this site, and how they got access.'}>
@@ -681,6 +682,31 @@ function Alerts({ site }) {
 // -------------------------------------------------------------------------------------- account settings
 const initial = (u) => (u.name || u.email || '?').slice(0, 1).toUpperCase();
 
+/** A picture with Upload and Remove: a profile photo (round) or an organization logo (square). The page crops it to a square and shrinks it first. */
+function ImageField({ label, name, url, shape, path, type, onChange, hint }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const pick = async (e) => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    setBusy(true); setErr(null);
+    try {
+      const body = new FormData();
+      body.append('image', await squareImage(file, { type }), 'image');
+      const r = await api(path, { method: 'POST', body });
+      onChange(r.avatar_url !== undefined ? r.avatar_url : r.logo_url);
+      toast(label + ' updated');
+    } catch (x) { setErr(firstError(x)); }
+    setBusy(false);
+  };
+  const remove = async () => { setBusy(true); setErr(null); try { const r = await api(path, { method: 'DELETE' }); onChange(r.avatar_url !== undefined ? r.avatar_url : r.logo_url); toast(label + ' removed'); } catch (x) { setErr(firstError(x)); } setBusy(false); };
+  return html`<div class="image-field"><${Avatar} size="huge" name=${name} url=${url} shape=${shape} />
+    <div class="ri-main"><b>${label}</b>
+      <div class="row"><label class=${'btn sm' + (busy ? ' disabled' : '')}>${url ? 'Replace' : 'Upload'}<input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled=${busy} onChange=${pick} /></label>${url && html`<button type="button" class="btn sm ghost danger" disabled=${busy} onClick=${remove}>Remove</button>`}</div>
+      <span class="help">${hint}</span>${err && html`<span class="help" style="color:var(--destructive)">${err}</span>`}</div></div>`;
+}
+
 function Profile() {
   const { user, setUser } = useContext(UserCtx);
   const [f, setF] = useState({ name: user.name, email: user.email, timezone: user.timezone || 'UTC' });
@@ -692,7 +718,7 @@ function Profile() {
   const THEMES = [['light', 'Light'], ['dark', 'Dark'], ['system', 'System']];
   return html`<form onSubmit=${save}><${Section} title="Profile" help="Your name and email are used to sign in and are shown to people you share sites with."
       footer=${html`<span class="help">${changed ? 'You have unsaved changes.' : 'Your email is also where password resets are sent.'}</span><button class="btn primary sm" disabled=${!changed}>Save changes</button>`}>
-        <div class="profile-head"><span class="avatar big" aria-hidden="true">${initial(f)}</span><div class="ri-main"><b>${f.name || 'Your name'}</b><span class="muted">${f.email}</span></div></div>
+        <${ImageField} label="Profile photo" name=${f.name} url=${user.avatar_url} shape="user" path="/me/avatar" type="image/jpeg" onChange=${(u) => setUser({ ...user, avatar_url: u })} hint="A square picture works best; it is cropped to a circle. PNG, JPEG or WebP. People you share sites with, and your Personal organization, show it." />
         ${err && html`<div class="alert">${err}</div>`}
         <div class="fields2"><${Field} label="Name"><input required value=${f.name} onInput=${(e) => setF({ ...f, name: e.target.value })} /><//>
           <${Field} label="Email"><input type="email" required value=${f.email} onInput=${(e) => setF({ ...f, email: e.target.value })} /><//></div>
@@ -855,7 +881,7 @@ function TeamDetail({ team, owned, canInvite, reload }) {
       <form class="goal-add" onSubmit=${add}><div class="goal-add-row"><input class="grow" type="email" required placeholder=${canInvite ? 'Email address' : 'Email address of an existing user'} aria-label="Email" value=${email} onInput=${(e) => setEmail(e.target.value)} /><button class="btn primary" disabled=${!email}>${canInvite ? 'Add or invite' : 'Add person'}</button></div></form>
       ${team.members.length + team.invites.length === 0 ? html`<div class="empty-inline"><${Icon} name="user-plus" size=${18} /><div><b>Nobody on this team yet</b><span>Add the people who should get access to the same sites.</span></div></div>`
         : html`<ul class="rows" aria-label=${'People in ' + team.name}>
-        ${team.members.map((u) => html`<li class="rowitem"><span class="avatar" aria-hidden="true">${(u.name || u.email || '?').slice(0, 1).toUpperCase()}</span><div class="grow ri-main"><b class="trunc">${u.name}</b><span class="muted trunc">${u.email}</span></div>
+        ${team.members.map((u) => html`<li class="rowitem"><${Avatar} name=${u.name || u.email} url=${u.avatar_url} /><div class="grow ri-main"><b class="trunc">${u.name}</b><span class="muted trunc">${u.email}</span></div>
           <button class="btn ghost icon sm danger" aria-label=${'Remove ' + u.name + ' from the team'} title="Remove from team" onClick=${() => run(() => api(`/teams/${team.id}/members/${u.id}`, { method: 'DELETE' }))}><${Icon} name="trash-2" size=${15} /></button></li>`)}
         ${team.invites.map((i) => html`<li class="rowitem"><span class="avatar" aria-hidden="true"><${Icon} name="mail" size=${14} /></span><div class="grow ri-main"><b class="trunc">${i.email}</b><span class="muted trunc">Waiting to accept · ${left(i.expires_at)}</span></div>
           <button class="btn ghost sm" disabled=${!canInvite} onClick=${() => run(() => api(`/teams/${team.id}/invites/${i.id}/resend`, { method: 'POST' }), 'Invitation sent again')}>Resend</button>
@@ -907,6 +933,7 @@ export function Organization() {
   const canInvite = !!org.invites_enabled;
   return html`${err && html`<div class="alert" role="alert">${err}</div>`}${offerBanners}
     ${owner ? html`<${Section} title="Organization name" help="Shown to the people you invite and to anyone you give access to. You are its owner.">
+      <${ImageField} label="Logo" name=${org.name} url=${org.logo_url} shape="org" path=${base + '/logo'} type="image/png" onChange=${async () => { await refreshMe(); res.reload(); }} hint="Helps you and your colleagues tell organizations apart in the switcher. Cropped to a square; PNG, JPEG or WebP." />
       <form class="goal-add-row" onSubmit=${(e) => { e.preventDefault(); run(async () => { await api(base, { method: 'PATCH', body: { name: name === null ? org.name : name } }); await refreshMe(); }, 'Name saved'); }}><input class="grow" required maxlength="100" aria-label="Organization name" value=${name === null ? org.name : name} onInput=${(e) => setName(e.target.value)} /><button class="btn" disabled=${name === null || !name.trim() || name.trim() === org.name}>Save</button></form>
     <//>` : html`<${Section} title=${org.name} help=${`You are an admin of this organization. You see and change every site in it, add sites and manage its teams. ${org.owner ? org.owner.name : 'The owner'} keeps billing, the admin list and the organization itself.`}>
       <div class="section-actions"><button class="btn danger" onClick=${() => setLeave(true)}>Leave organization</button></div>
@@ -915,7 +942,7 @@ export function Organization() {
       ${owner && html`<form class="goal-add" onSubmit=${add}><div class="goal-add-row"><input class="grow" type="email" required placeholder=${canInvite ? 'Email address' : 'Email address of an existing user'} aria-label="Email" value=${email} onInput=${(e) => setEmail(e.target.value)} /><button class="btn primary" disabled=${!email}>${canInvite ? 'Add or invite' : 'Add person'}</button></div></form>`}
       ${org.admins.length + org.invites.length === 0 && html`<div class="empty-inline"><${Icon} name="shield" size=${18} /><div><b>${owner ? 'Only you manage this organization' : 'No other admins'}</b>${owner && html`<span>Add a colleague to give them the same view of every site, without sharing each one.</span>`}</div></div>`}
       ${org.admins.length + org.invites.length > 0 && html`<ul class="rows" aria-label="Organization admins">
-        ${org.admins.map((u) => html`<li class="rowitem"><span class="avatar" aria-hidden="true">${(u.name || u.email || '?').slice(0, 1).toUpperCase()}</span><div class="grow ri-main"><b class="trunc">${u.name}</b>${(u.email || (org.transfer && org.transfer.to.id === u.id)) && html`<span class="muted trunc">${u.email || ''}${org.transfer && org.transfer.to.id === u.id ? ' · ownership offered' : ''}</span>`}</div>
+        ${org.admins.map((u) => html`<li class="rowitem"><${Avatar} name=${u.name || u.email} url=${u.avatar_url} /><div class="grow ri-main"><b class="trunc">${u.name}</b>${(u.email || (org.transfer && org.transfer.to.id === u.id)) && html`<span class="muted trunc">${u.email || ''}${org.transfer && org.transfer.to.id === u.id ? ' · ownership offered' : ''}</span>`}</div>
           ${owner && html`<button class="btn ghost icon sm danger" aria-label=${'Remove ' + u.name + ' as an admin'} title="Remove as admin" onClick=${() => run(() => api(`${base}/admins/${u.id}`, { method: 'DELETE' }))}><${Icon} name="trash-2" size=${15} /></button>`}</li>`)}
         ${org.invites.map((i) => html`<li class="rowitem"><span class="avatar" aria-hidden="true"><${Icon} name="mail" size=${14} /></span><div class="grow ri-main"><b class="trunc">${i.email}</b><span class="muted trunc">Waiting to accept · ${left(i.expires_at)}</span></div>
           <button class="btn ghost sm" disabled=${!canInvite} onClick=${() => run(() => api(`${base}/invites/${i.id}/resend`, { method: 'POST' }), 'Invitation sent again')}>Resend</button>

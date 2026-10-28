@@ -42,11 +42,11 @@ class OrganizationController extends Controller
         }
 
         return [
-            'id' => $org->id, 'name' => $org->name, 'personal' => $org->personal, 'role' => $owner ? 'owner' : 'admin',
+            'id' => $org->id, 'name' => $org->name, 'personal' => $org->personal, 'logo_url' => $org->logoUrl(), 'role' => $owner ? 'owner' : 'admin',
             'owner' => $org->owner?->only(['id', 'name']),
             'invites_enabled' => Invitation::enabled(),
             'sites' => $org->sites()->count(),
-            'admins' => $org->personal ? [] : $org->admins()->orderBy('name')->get()->map(fn ($u) => ['id' => $u->id, 'name' => $u->name, 'email' => $owner ? $u->email : null]),
+            'admins' => $org->personal ? [] : $org->admins()->orderBy('name')->get()->map(fn ($u) => ['id' => $u->id, 'name' => $u->name, 'avatar_url' => $u->avatarUrl(), 'email' => $owner ? $u->email : null]),
             'invites' => $owner ? Invitation::where('organization_id', $org->id)->orderBy('created_at')->get()->map(fn ($i) => ['id' => $i->id, 'email' => $i->email, 'expires_at' => $i->expires_at->toIso8601String()]) : [],
             'transfer' => $owner && $org->hasPendingTransfer() ? ['to' => ['id' => $org->transfer_to, 'name' => $org->transferTarget?->name, 'email' => $org->transferTarget?->email], 'expires_at' => $org->transfer_expires_at->toIso8601String()] : null,
         ];

@@ -617,6 +617,14 @@ main:focus { outline: none; }
 .live-pill .muted { font-weight: 400; }
 .avatar { width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(135deg, color-mix(in srgb, var(--brand) 85%, #fff), color-mix(in srgb, var(--brand) 60%, #000)); color: #fff; font-weight: 600; font-size: 12.5px; display: grid; place-items: center; flex: none; }
 .avatar.big { width: 48px; height: 48px; font-size: 19px; }
+.avatar.org { border-radius: 7px; }
+.avatar.big.org { border-radius: 10px; }
+.avatar.has-img { background: var(--muted); overflow: hidden; }
+.avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.avatar.huge { width: 64px; height: 64px; font-size: 24px; }
+.avatar.huge.org { border-radius: 12px; }
+.image-field { display: flex; align-items: center; gap: 16px; }
+.image-field .row { gap: 8px; margin: 6px 0 4px; }
 .avatar.sm { width: 24px; height: 24px; font-size: 11px; }
 .btn.avatar-btn { padding: 0 4px; height: 36px; border-radius: 999px; position: relative; border-color: transparent; background: transparent; }
 .btn.avatar-btn:hover { background: var(--accent); }

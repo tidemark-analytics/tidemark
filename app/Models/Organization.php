@@ -18,9 +18,11 @@ class Organization extends Model
 
     protected $fillable = ['name', 'owner_id', 'personal', 'transfer_to', 'transfer_expires_at'];
 
+    protected $hidden = ['logo'];
+
     protected function casts(): array
     {
-        return ['transfer_expires_at' => 'datetime', 'personal' => 'boolean'];
+        return ['transfer_expires_at' => 'datetime', 'logo_updated_at' => 'datetime', 'personal' => 'boolean'];
     }
 
     public function owner(): BelongsTo
@@ -41,6 +43,16 @@ class Organization extends Model
     public function sites(): HasMany
     {
         return $this->hasMany(Site::class);
+    }
+
+    /** The logo to show for it: its own, and for a Personal organization its owner's profile photo. */
+    public function logoUrl(): ?string
+    {
+        if ($this->personal) {
+            return $this->owner?->avatarUrl();
+        }
+
+        return $this->logo_mime ? url('/api/avatars/organizations/'.$this->id).'?v='.($this->logo_updated_at?->timestamp ?? 0) : null;
     }
 
     public function transferTarget(): BelongsTo

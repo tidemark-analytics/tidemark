@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BrandingController;
 use App\Http\Controllers\Api\DataController;
 use App\Http\Controllers\Api\FaviconController;
+use App\Http\Controllers\Api\ImageController;
 use App\Http\Controllers\Api\InviteController;
 use App\Http\Controllers\Api\McpController;
 use App\Http\Controllers\Api\OpenApiController;
@@ -83,6 +84,12 @@ Route::middleware('api.auth')->group(function () {
     Route::post('/me/keys', [AuthController::class, 'createKey']);
     Route::delete('/me/keys/{id}', [AuthController::class, 'deleteKey']);
 
+    Route::post('/me/avatar', [ImageController::class, 'uploadAvatar']);
+    Route::delete('/me/avatar', [ImageController::class, 'deleteAvatar']);
+    Route::get('/avatars/users/{user}', [ImageController::class, 'showUser']);
+    Route::get('/avatars/organizations/{organization}', [ImageController::class, 'showOrganization']);
+    Route::post('/organizations/{organization}/logo', [ImageController::class, 'uploadLogo']);
+    Route::delete('/organizations/{organization}/logo', [ImageController::class, 'deleteLogo']);
     Route::get('/organizations', [OrganizationController::class, 'index']);
     Route::post('/organizations', [OrganizationController::class, 'store']);
     Route::get('/organizations/{organization}', [OrganizationController::class, 'show']);

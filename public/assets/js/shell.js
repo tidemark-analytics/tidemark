@@ -1,7 +1,7 @@
 // The signed-in app shell: top bar with breadcrumb switchers, the context-aware sidebar, the live-visitors sheet,
 // the ⌘K command palette and the keyboard shortcuts.
 import { html, useState, useEffect, useMemo, useRef, useApi, api, navigate, Link, Icon, fmtShort, fmt, BASE, PERIODS, UserCtx, useContext, setTheme, currentTheme, countryName, flag, scopeQuery } from './lib.js';
-import { Pop, Sheet, FavTile, Modal, Field } from './ui.js';
+import { Pop, Sheet, FavTile, Modal, Field, Avatar } from './ui.js';
 import { useScope } from './org.js';
 import { Logo } from './logo.js';
 import { registry, badgeOf, badgeText, useBadgeCounts, useBadgePolling } from './extensions.js';
@@ -98,7 +98,7 @@ export function useSidebarState(path) {
 export function AccountMenu({ user, align = 'right', btnClass = 'btn ghost avatar-btn', named }) {
   const [theme, setT] = useState(currentTheme());
   const pick = (t) => { setTheme(t); setT(t); };
-  return html`<${Pop} align=${align} ariaLabel="Account menu" btnClass=${btnClass} label=${html`<span class="avatar" aria-hidden="true">${(user.name || '?').slice(0, 1).toUpperCase()}</span>${named && html`<span class="who-name"><b>${user.name}</b><span>${user.email}</span></span>`}${user.update && html`<span class="notif on-avatar" aria-hidden="true"></span><span class="sr-only">Update available</span>`}`}>
+  return html`<${Pop} align=${align} ariaLabel="Account menu" btnClass=${btnClass} label=${html`<${Avatar} name=${user.name} url=${user.avatar_url} />${named && html`<span class="who-name"><b>${user.name}</b><span>${user.email}</span></span>`}${user.update && html`<span class="notif on-avatar" aria-hidden="true"></span><span class="sr-only">Update available</span>`}`}>
     ${(close) => html`<div style="min-width:240px"><div class="who"><b>${user.name}</b><span class="muted">${user.email}</span></div><hr />
       <${Link} to="/sites" class="item" onClick=${close}><span>Your sites</span><${Icon} name="globe" size=${14} /><//>
       <${Link} to="/settings" class="item" onClick=${close}><span>Settings${user.update && html`<span class="notif inline" aria-hidden="true"></span><span class="sr-only"> (update available)</span>`}</span><${Icon} name="settings" size=${14} /><//>
@@ -146,16 +146,16 @@ function OrgSwitcher({ user }) {
   if (!scope.orgs.length) return null;
   const pick = (id) => { setOpen(false); scope.set(id); if (location.pathname !== '/sites' && !location.pathname.startsWith('/settings')) navigate('/sites'); };
   const label = scope.shared ? 'Shared with me' : scope.org.personal ? 'Personal' : scope.org.name;
-  const tile = (name) => html`<span class="avatar sm" aria-hidden="true">${(name || '?').slice(0, 1).toUpperCase()}</span>`;
+  const tile = (name, url) => html`<${Avatar} name=${name} url=${url} size="sm" shape="org" />`;
   return html`<div class="pop-wrap" ref=${wrap}>
     <button class=${'crumb-btn' + (open ? ' open' : '')} aria-haspopup="menu" aria-expanded=${open} aria-label=${'Switch organization, current: ' + label} onClick=${() => setOpen(!open)}>
-      ${tile(scope.shared ? 'S' : scope.org.name)}<span class="trunc">${label}</span><${Icon} name="chevrons-up-down" size=${14} class="chev" />
+      ${tile(scope.shared ? 'S' : scope.org.name, scope.shared ? null : scope.org.logo_url)}<span class="trunc">${label}</span><${Icon} name="chevrons-up-down" size=${14} class="chev" />
     </button>
     ${open && html`<div class="switch-pop" role="menu" aria-label="Organizations">
       <div class="cmd-list">
         <div class="grp">Organizations</div>
         ${scope.orgs.map((o) => html`<button class=${'cmd-item' + (!scope.shared && o.id === scope.id ? ' on' : '')} role="menuitemradio" aria-checked=${!scope.shared && o.id === scope.id} onClick=${() => pick(o.id)}>
-          ${tile(o.name)}<span class="trunc">${o.personal ? 'Personal' : o.name}</span>${o.personal && html`<span class="pill">You</span>`}${!scope.shared && o.id === scope.id && html`<${Icon} name="check" size=${14} class="tick" />`}</button>`)}
+          ${tile(o.name, o.logo_url)}<span class="trunc">${o.personal ? 'Personal' : o.name}</span>${o.personal && html`<span class="pill">You</span>`}${!scope.shared && o.id === scope.id && html`<${Icon} name="check" size=${14} class="tick" />`}</button>`)}
         ${user.shared_sites && html`<div class="grp">Others</div>
           <button class=${'cmd-item' + (scope.shared ? ' on' : '')} role="menuitemradio" aria-checked=${scope.shared} onClick=${() => pick('shared')}>${tile('S')}<span class="trunc">Shared with me</span>${scope.shared && html`<${Icon} name="check" size=${14} class="tick" />`}</button>`}
       </div>

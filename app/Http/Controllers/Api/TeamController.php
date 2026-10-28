@@ -34,7 +34,7 @@ class TeamController extends Controller
             'owned_sites' => Site::real()->whereIn('organization_id', $orgs)->orderBy('domain')->get(['domain', 'organization_id'])->map(fn ($s) => ['domain' => $s->domain, 'organization_id' => $s->organization_id])->values(),
             'data' => $teams->map(fn (Team $t) => [
                 'id' => $t->id, 'name' => $t->name, 'organization_id' => $t->organization_id, 'organization' => $t->organization?->name,
-                'members' => $t->members->map(fn ($u) => ['id' => $u->id, 'name' => $u->name, 'email' => $u->email])->values(),
+                'members' => $t->members->map(fn ($u) => ['id' => $u->id, 'name' => $u->name, 'email' => $u->email, 'avatar_url' => $u->avatarUrl()])->values(),
                 'invites' => ($invites[$t->id] ?? collect())->map(fn ($i) => ['id' => $i->id, 'email' => $i->email, 'expires_at' => $i->expires_at->toIso8601String()])->values(),
                 'sites' => $t->sites->sortBy('domain')->map(fn ($s) => ['domain' => $s->domain, 'role' => $s->pivot->role])->values(),
             ])->values(),
