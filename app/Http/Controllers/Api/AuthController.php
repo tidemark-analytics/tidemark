@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ApiKey;
+use App\Models\Invitation;
 use App\Models\Site;
 use App\Models\User;
 use App\Support\Totp;
@@ -149,7 +150,7 @@ class AuthController extends Controller
 
     public function config()
     {
-        return ['registration' => (bool) config('tidemark.registration'), 'mode' => config('tidemark.mode'), 'name' => config('app.name'), 'password_reset' => self::mailConfigured()];
+        return ['registration' => (bool) config('tidemark.registration'), 'mode' => config('tidemark.mode'), 'name' => config('app.name'), 'password_reset' => self::mailConfigured(), 'invites' => Invitation::enabled()];
     }
 
     public function update(Request $request)

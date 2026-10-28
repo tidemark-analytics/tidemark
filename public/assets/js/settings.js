@@ -409,17 +409,20 @@ function People({ site }) {
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
   const people = (res.data && res.data.data) || [];
+  const invites = (res.data && res.data.invites) || [];
+  const canInvite = !!(res.data && res.data.invites_enabled);
+  const left = (iso) => { const h = Math.max(0, Math.round((new Date(iso) - Date.now()) / 3600000)); return h >= 2 ? `expires in ${h} hours` : 'expires within the hour'; };
   const run = async (fn) => { setErr(null); try { await fn(); res.reload(); } catch (x) { setErr(firstError(x)); } };
   const invite = async (e) => {
     e.preventDefault(); setErr(null); setBusy(true);
-    try { await api(`/sites/${site.domain}/people`, { method: 'POST', body: f }); setF({ ...f, email: '' }); res.reload(); toast('Added'); } catch (x) { setErr(firstError(x)); }
+    try { const r = await api(`/sites/${site.domain}/people`, { method: 'POST', body: f }); setF({ ...f, email: '' }); res.reload(); toast(r.invited ? 'Invitation sent' : 'Added'); } catch (x) { setErr(firstError(x)); }
     setBusy(false);
   };
   const ROLES = [['viewer', 'Viewer', 'eye'], ['admin', 'Admin', 'settings']];
-  return html`<${Section} title="People" help="Add existing users of this Tidemark install to this site.">
+  return html`<${Section} title="People" help=${canInvite ? 'Give people access to this site. Someone without an account gets an e-mail invitation that is valid for 72 hours.' : 'Add existing users of this Tidemark install to this site.'}>
     <form class="goal-add" onSubmit=${invite}>
       <div class="seg" role="radiogroup" aria-label="Role">${ROLES.map(([k, l, i]) => html`<button type="button" role="radio" aria-checked=${f.role === k} class=${f.role === k ? 'on' : ''} onClick=${() => setF({ ...f, role: k })}><${Icon} name=${i} size=${14} />${l}</button>`)}</div>
-      <div class="goal-add-row"><input class="grow" type="email" required placeholder="Email address of an existing user" aria-label="Email" value=${f.email} onInput=${(e) => setF({ ...f, email: e.target.value })} /><button class="btn primary" disabled=${!f.email || busy}>Add person</button></div>
+      <div class="goal-add-row"><input class="grow" type="email" required placeholder=${canInvite ? 'Email address' : 'Email address of an existing user'} aria-label="Email" value=${f.email} onInput=${(e) => setF({ ...f, email: e.target.value })} /><button class="btn primary" disabled=${!f.email || busy}>${canInvite ? 'Add or invite' : 'Add person'}</button></div>
       <span class="muted small">${f.role === 'admin' ? 'Admins can see stats and change this site\'s settings.' : 'Viewers can see stats but not change anything.'}</span>
     </form>
     ${err && html`<div class="alert">${err}</div>`}
@@ -428,6 +431,11 @@ function People({ site }) {
       <div class="grow ri-main"><b class="trunc">${u.name}</b><span class="muted trunc">${u.email}</span></div>
       ${u.role === 'owner' ? html`<span class="pill brand">Owner</span>` : html`<select class="mini-select" value=${u.role} aria-label=${'Role of ' + u.name} onChange=${(e) => run(() => api(`/sites/${site.domain}/people/${u.id}`, { method: 'PATCH', body: { role: e.target.value } }))}><option value="viewer" selected=${u.role === 'viewer'}>Viewer</option><option value="admin" selected=${u.role === 'admin'}>Admin</option></select>`}
       ${u.role !== 'owner' ? html`<button class="btn ghost icon sm danger" aria-label=${'Remove ' + u.name} title="Remove from this site" onClick=${() => run(() => api(`/sites/${site.domain}/people/${u.id}`, { method: 'DELETE' }))}><${Icon} name="trash-2" size=${15} /></button>` : html`<span class="ri-spacer" aria-hidden="true"></span>`}</li>`)}</ul>`}
+    ${invites.length > 0 && html`<h4 class="muted small" style="margin:16px 0 6px">Waiting to accept</h4><ul class="rows" aria-label="Pending invitations">${invites.map((i) => html`<li class="rowitem">
+      <span class="avatar" aria-hidden="true"><${Icon} name="mail" size=${14} /></span>
+      <div class="grow ri-main"><b class="trunc">${i.email}</b><span class="muted trunc">${i.role === 'admin' ? 'Admin' : 'Viewer'} · ${left(i.expires_at)}</span></div>
+      <button class="btn ghost sm" disabled=${!canInvite} onClick=${() => run(async () => { await api(`/sites/${site.domain}/invites/${i.id}/resend`, { method: 'POST' }); toast('Invitation sent again'); })}>Resend</button>
+      <button class="btn ghost icon sm danger" aria-label=${'Cancel invitation for ' + i.email} title="Cancel invitation" onClick=${() => run(() => api(`/sites/${site.domain}/invites/${i.id}`, { method: 'DELETE' }))}><${Icon} name="trash-2" size=${15} /></button></li>`)}</ul>`}
   <//>`;
 }
 

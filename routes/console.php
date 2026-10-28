@@ -2,6 +2,7 @@
 
 use App\Console\Commands\CheckUpdates;
 use App\Console\Commands\PruneEvents;
+use App\Console\Commands\PruneInvitations;
 use App\Console\Commands\RefreshExchangeRates;
 use App\Console\Commands\RunAlerts;
 use App\Console\Commands\SendReports;
@@ -20,3 +21,5 @@ Schedule::command(RefreshExchangeRates::class)->dailyAt('16:30');
 Schedule::command(SendReports::class)->hourly()->withoutOverlapping();
 // Alert rules are checked every five minutes.
 Schedule::command(RunAlerts::class)->everyFiveMinutes()->withoutOverlapping();
+// Invitations expire after 72 hours (checked when the link is opened); this removes the leftovers.
+Schedule::command(PruneInvitations::class)->hourly();

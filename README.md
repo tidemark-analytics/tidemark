@@ -148,6 +148,7 @@ Logo (pictorial mark: pier pilings with a tide line across them), palette, typog
 | Variable | Default | Notes |
 |---|---|---|
 | `TIDEMARK_REGISTRATION` | `false` | Allow sign-ups |
+| `TIDEMARK_INVITES` | `false` | Let site owners invite people who have no account by e-mail (needs working `MAIL_*` settings). Invitations expire after `TIDEMARK_INVITE_HOURS` (default 72) |
 | `TIDEMARK_INGEST` | `sync` | `queue` buffers writes; drained by `schedule:run` or a worker |
 | `TIDEMARK_ANALYTICS_DB` | *(app DB)* | Separate connection for `visits`, `events` and `event_props` |
 | `TIDEMARK_IGNORE_IP`, `TIDEMARK_HOSTNAMES` | – | Comma-separated lists |

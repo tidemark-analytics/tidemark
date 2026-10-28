@@ -1,5 +1,5 @@
 import { html, render, useState, useEffect, useRef, useBrand, api, navigate, useLocation, matchRoute, Link, Icon, toggleTheme, UserCtx } from './lib.js';
-import { Login, Register, ForgotPassword, ResetPassword } from './pages/auth.js';
+import { Login, Register, ForgotPassword, ResetPassword, Invite } from './pages/auth.js';
 import { Dashboard } from './dashboard.js';
 import { reportRoute, REPORTS } from './report-page.js';
 import { SitesPage, NewSite, NewRollup, Installation } from './sites.js';
@@ -14,6 +14,7 @@ const head = [
   ['/register', Register],
   ['/forgot-password', ForgotPassword],
   ['/reset-password', ResetPassword],
+  ['/invite', Invite],
   ['/sites', SitesPage],
   ['/sites/new', NewSite],
   ['/sites/rollup', NewRollup],
@@ -64,7 +65,7 @@ function VerifyBanner({ user }) {
 function App() {
   const { path } = useLocation();
   const [user, setUser] = useState(undefined);
-  const isAuth = ['/login', '/register', '/forgot-password', '/reset-password'].includes(path);
+  const isAuth = ['/login', '/register', '/forgot-password', '/reset-password', '/invite'].includes(path);
   const isShare = path.startsWith('/share/');
   const side = useSidebarState(path);
   const sites = useSites(path, !!user && !isShare);
@@ -80,7 +81,7 @@ function App() {
   const m = RESERVED.has(seg) ? null : matchRoute(allRoutes(), path);
   const publicRoute = isShare || (m && m.component.public);
   useEffect(() => { if (user === null && !isAuth && !publicRoute) navigate('/login', { replace: true }); }, [user, path]);
-  useEffect(() => { if (user && isAuth) navigate('/sites', { replace: true }); }, [user, path]);
+  useEffect(() => { if (user && isAuth && path !== '/invite') navigate('/sites', { replace: true }); }, [user, path]);
   useEffect(() => { if (path === '/' ) navigate(user ? '/sites' : '/login', { replace: true }); }, [path, user]);
   // after a page change: move focus to the page and tell screen readers where they are
   useEffect(() => {

@@ -74,6 +74,13 @@ return [
     // Require new accounts to confirm their email address (needs working mail settings) before they can add sites.
     'verify_email' => (bool) env('TIDEMARK_VERIFY_EMAIL', false),
 
+    // E-mail invitations: sharing a site with an address that has no account sends an invitation instead of failing. Off by default
+    // on self-hosted installs (accounts are then created by an administrator); on for Cloud. Needs working mail settings.
+    'invites' => (bool) env('TIDEMARK_INVITES', env('TIDEMARK_MODE', 'self-hosted') === 'cloud'),
+    'invite_hours' => (int) env('TIDEMARK_INVITE_HOURS', 72),
+    'invite_daily_limit' => (int) env('TIDEMARK_INVITE_DAILY_LIMIT', 20),
+    'invite_pending_limit' => (int) env('TIDEMARK_INVITE_PENDING_LIMIT', 100),
+
     // Where the "Analytics by Tidemark" link in the footer of public dashboards points.
     'brand_url' => env('TIDEMARK_BRAND_URL', 'https://tidemarkanalytics.com'),
 

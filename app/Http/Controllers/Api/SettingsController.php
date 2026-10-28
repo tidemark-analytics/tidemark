@@ -6,9 +6,11 @@ use App\Analytics\Support\FilteredHits;
 use App\Analytics\Support\PiiMasks;
 use App\Analytics\Support\Sql;
 use App\Http\Controllers\Controller;
+use App\Mail\InviteMail;
 use App\Models\Funnel;
 use App\Models\FunnelStep;
 use App\Models\Goal;
+use App\Models\Invitation;
 use App\Models\SharedLink;
 use App\Models\ShieldRule;
 use App\Models\Site;
@@ -17,6 +19,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -244,25 +248,83 @@ class SettingsController extends Controller
     // ---- people ------------------------------------------------------------------------------------------
     public function people(Request $r)
     {
-        return ['data' => $r->attributes->get('site')->members()->get()->map(fn ($u) => ['id' => $u->id, 'name' => $u->name, 'email' => $u->email, 'role' => $u->pivot->role])];
+        $site = $r->attributes->get('site');
+        Invitation::where('expires_at', '<', now())->where('site_id', $site->id)->delete();
+
+        return [
+            'data' => $site->members()->get()->map(fn ($u) => ['id' => $u->id, 'name' => $u->name, 'email' => $u->email, 'role' => $u->pivot->role]),
+            'invites' => Invitation::where('site_id', $site->id)->orderBy('created_at')->get()->map(fn ($i) => ['id' => $i->id, 'email' => $i->email, 'role' => $i->role, 'expires_at' => $i->expires_at->toIso8601String()]),
+            'invites_enabled' => Invitation::enabled(),
+        ];
     }
 
-    /** Add an existing account to the site (accounts are created by an administrator; there is no e-mail invite flow). */
+    /**
+     * Give a person access. Someone who already has an account is added straight away; an address without one gets an e-mail
+     * invitation when invitations are enabled (otherwise an administrator has to create the account first).
+     */
     public function addPerson(Request $r)
     {
         $site = $r->attributes->get('site');
         abort_if($site->isRollup(), 422, 'A rollup is private to its owner. Share it with a shared link instead.');
         $data = $r->validate(['email' => 'required|email', 'role' => ['required', Rule::in(['admin', 'viewer'])]]);
-        $user = User::where('email', $data['email'])->first();
+        $email = strtolower(trim($data['email']));
+        $inviter = $r->user();
+        $user = User::whereRaw('lower(email) = ?', [$email])->first();
         if (! $user) {
-            throw ValidationException::withMessages(['email' => 'No account with that e-mail. Ask an administrator to create one first.']);
+            if (! Invitation::enabled()) {
+                throw ValidationException::withMessages(['email' => 'No account with that e-mail. Ask an administrator to create one first.']);
+            }
+            $this->guardInviteAbuse($inviter);
+            $invite = Invitation::issue($email, $inviter, $site, $data['role']);
+            Mail::to($email)->send(new InviteMail($site, $inviter, $data['role'], $invite));
+            RateLimiter::hit('invite:'.$inviter->id, 86400);
+
+            return response()->json(['ok' => true, 'invited' => true], 201);
         }
         if ($site->members()->where('users.id', $user->id)->exists()) {
             throw ValidationException::withMessages(['email' => 'This person already has access.']);
         }
         $site->members()->attach($user->id, ['role' => $data['role'], 'id' => (string) Str::uuid()]);
+        Invitation::where('email', $email)->where('site_id', $site->id)->delete();
+        if (AuthController::mailConfigured()) {
+            Mail::to($user->email)->send(new InviteMail($site, $inviter, $data['role']));
+        }
 
         return response()->json(['ok' => true], 201);
+    }
+
+    public function resendInvite(Request $r, string $site, string $invite)
+    {
+        $s = $r->attributes->get('site');
+        $old = Invitation::where('site_id', $s->id)->whereKey($invite)->firstOrFail();
+        abort_unless(Invitation::enabled(), 422, 'Invitations are turned off.');
+        $this->guardInviteAbuse($r->user());
+        $new = Invitation::issue($old->email, $r->user(), $s, $old->role);
+        Mail::to($new->email)->send(new InviteMail($s, $r->user(), $new->role, $new));
+        RateLimiter::hit('invite:'.$r->user()->id, 86400);
+
+        return ['ok' => true];
+    }
+
+    public function revokeInvite(Request $r, string $site, string $invite)
+    {
+        Invitation::where('site_id', $r->attributes->get('site')->id)->whereKey($invite)->delete();
+
+        return ['ok' => true];
+    }
+
+    /** Invitations send mail from this install, so they are capped per person per day and in total. */
+    private function guardInviteAbuse(User $inviter): void
+    {
+        if (config('tidemark.verify_email') && ! $inviter->hasVerifiedEmail()) {
+            throw ValidationException::withMessages(['email' => 'Confirm your own e-mail address before inviting people.']);
+        }
+        if (RateLimiter::tooManyAttempts('invite:'.$inviter->id, (int) config('tidemark.invite_daily_limit'))) {
+            throw ValidationException::withMessages(['email' => 'You have sent a lot of invitations today. Try again tomorrow.']);
+        }
+        if (Invitation::where('invited_by', $inviter->id)->where('expires_at', '>', now())->count() >= (int) config('tidemark.invite_pending_limit')) {
+            throw ValidationException::withMessages(['email' => 'Too many invitations are waiting to be accepted. Revoke some first.']);
+        }
     }
 
     public function updatePerson(Request $r, string $site, string $user)
