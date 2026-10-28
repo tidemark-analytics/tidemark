@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BrandingController;
 use App\Http\Controllers\Api\DataController;
 use App\Http\Controllers\Api\FaviconController;
+use App\Http\Controllers\Api\InviteController;
 use App\Http\Controllers\Api\McpController;
 use App\Http\Controllers\Api\OpenApiController;
 use App\Http\Controllers\Api\PlausibleImportController;
@@ -41,6 +42,8 @@ Route::middleware('api.auth:optional')->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:5,1');
     Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:10,1');
+    Route::get('/invites/{token}', [InviteController::class, 'show'])->middleware('throttle:30,1');
+    Route::post('/invites/{token}/accept', [InviteController::class, 'accept'])->middleware('throttle:10,1');
     Route::get('/auth/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])->middleware('signed')->name('verification.verify');
 
     // Readable by members, by anyone when the dashboard is public, or via a shared link.
@@ -135,6 +138,8 @@ Route::middleware('api.auth')->group(function () {
         Route::post('/people', [S::class, 'addPerson']);
         Route::patch('/people/{user}', [S::class, 'updatePerson']);
         Route::delete('/people/{user}', [S::class, 'removePerson']);
+        Route::post('/invites/{invite}/resend', [S::class, 'resendInvite'])->middleware('throttle:10,1');
+        Route::delete('/invites/{invite}', [S::class, 'revokeInvite']);
     });
     Route::middleware('site:owner')->delete('/sites/{site}', [SiteController::class, 'destroy']);
 

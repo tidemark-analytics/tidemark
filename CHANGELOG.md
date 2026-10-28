@@ -5,6 +5,7 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 ## [Unreleased]
 
 ### Added
+- E-mail invitations (opt-in with `TIDEMARK_INVITES=true`, needs working mail settings): adding someone without an account under a site's People now sends them an invitation instead of asking you to contact an administrator. They set a name and password from the link, which works once and expires after 72 hours (`TIDEMARK_INVITE_HOURS`). Nothing is created for them until they accept, pending invitations can be resent or cancelled, and people who already have an account are added straight away and told by e-mail.
 - Scroll depth and time on page: an opt-in `engagement` script variant (Site settings → Tracking) that sends one non-interactive `Engagement` event per page view with how far the visitor scrolled (`depth`: 0, 25, 50, 75, 100) and how long they were active (`time`, in five bands). It doesn't affect bounce rate or visit duration, repeats for the same page view replace the earlier one, and the properties work in goals, filters and funnels. Numbers only: no element, text or position is captured.
 - The Events API accepts `i: 0` (or Plausible's `interactive: false`) for an event that is not an interaction: it is stored, but doesn't count against a bounce and never starts a visit.
 
