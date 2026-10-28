@@ -22,6 +22,7 @@
 // ui.js also exports Tabs, Badge, Breadcrumb, Sheet, SettingCard, TypedConfirm, Tooltip, FavTile and table helpers (useSort, SortTh, Pagination).
 import * as lib from './lib.js';
 import * as ui from './ui.js';
+import * as org from './org.js';
 import * as chart from './chart.js';
 
 export const registry = { routes: [], accountTabs: [], banners: [], menuItems: [], adminUi: null };
@@ -60,6 +61,8 @@ const api = {
   version: 1,
   html: lib.html,
   lib, ui, chart,
+  /** The organization chosen in the top-bar switcher: `org.useScope(user)` gives { id, org, orgs, shared, personal, owner, set }, `org.getScope()` and `org.setScope(id)` read and change it. */
+  org,
   /** A full page: pattern like '/pricing' or '/billing/:id?'; component receives the matched params. */
   registerRoute: (pattern, component) => registry.routes.push([pattern, component]),
   /** A tab in Account settings: { key, label, component, visible?(user), dot?(user) }. */
