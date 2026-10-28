@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Organization;
 use App\Models\Site;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -10,26 +11,29 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Rollups: a read-only dashboard that adds up the data of several of a person's sites. A rollup is a site of its own (kind `rollup`) with
+ * Rollups: a read-only dashboard that adds up the data of several sites of one organization. A rollup is a site of its own (kind `rollup`) with
  * its own goals, funnels, segments and timezone, so the dashboard works as it does for any site; only the data comes from its members.
  */
 class RollupController extends Controller
 {
     private const RESERVED = ['sites', 'settings', 'login', 'register', 'share', 'install', 'api', 'js', 'assets', 'up', 'storage', 'build', 'rollups', 'admin'];
 
-    /** The sites a person could put in a rollup: the ones they belong to. */
+    /** The sites an organization's rollup could add up: the ones the organization holds, for someone who owns or administers it. */
     public function candidates(Request $r)
     {
-        return ['data' => $this->reachable($r->user())->orderBy('domain')->get(['id', 'domain', 'timezone'])->all()];
+        $org = $this->organizationFor($r->user(), $r->query('organization'));
+
+        return ['data' => Site::real()->where('organization_id', $org->id)->orderBy('domain')->get(['id', 'domain', 'timezone'])->all()];
     }
 
     public function store(Request $r)
     {
         $user = $r->user();
-        if (! Site::rollupsAllowedFor($user)) {
+        $data = $r->validate(['name' => 'required|string|max:63', 'organization' => 'nullable|string', 'timezone' => 'nullable|string|max:64', 'all' => 'sometimes|boolean', 'sites' => 'sometimes|array|max:500', 'sites.*' => 'string']);
+        $org = $this->organizationFor($user, $data['organization'] ?? null);
+        if (! Site::rollupsAllowedFor($user, $org)) {
             return response()->json(['error' => 'rollups_unavailable', 'message' => 'Rollups are included with Pro.'], 403);
         }
-        $data = $r->validate(['name' => 'required|string|max:63', 'timezone' => 'nullable|string|max:64', 'all' => 'sometimes|boolean', 'sites' => 'sometimes|array|max:500', 'sites.*' => 'string']);
         $name = strtolower(trim($data['name']));
         if (! preg_match('/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/', $name)) {
             throw ValidationException::withMessages(['name' => 'Use letters, numbers and hyphens only, for example all-sites.']);
@@ -38,18 +42,19 @@ class RollupController extends Controller
             throw ValidationException::withMessages(['name' => 'That name is already taken.']);
         }
         $all = (bool) ($data['all'] ?? false);
-        $members = $all ? collect() : $this->membersFor($user, (array) ($data['sites'] ?? []));
+        $members = $all ? collect() : $this->membersFor($org, (array) ($data['sites'] ?? []));
         if (! $all && $members->isEmpty()) {
-            throw ValidationException::withMessages(['sites' => 'Choose at least one site, or include all of your sites.']);
+            throw ValidationException::withMessages(['sites' => 'Choose at least one site, or include all of the organization\'s sites.']);
         }
         $timezone = $data['timezone'] ?? null;
         if (! $timezone || ! in_array($timezone, \DateTimeZone::listIdentifiers(), true)) {
-            $timezone = $this->commonTimezone($all ? Site::real()->whereHas('members', fn ($q) => $q->where('users.id', $user->id)->where('site_user.role', 'owner'))->get() : $members);
+            $timezone = $this->commonTimezone($all ? Site::real()->where('organization_id', $org->id)->get() : $members);
         }
 
-        $rollup = DB::transaction(function () use ($name, $timezone, $all, $members, $user) {
-            $rollup = Site::create(['kind' => 'rollup', 'domain' => $name, 'timezone' => $timezone, 'rollup_all' => $all]);
-            $rollup->members()->attach($user->id, ['role' => 'owner', 'id' => (string) Str::uuid()]);
+        $rollup = DB::transaction(function () use ($name, $timezone, $all, $members, $org) {
+            $rollup = Site::create(['kind' => 'rollup', 'domain' => $name, 'timezone' => $timezone, 'rollup_all' => $all, 'organization_id' => $org->id]);
+            // owned by the organization's owner, like its sites, so it stays with the organization
+            $rollup->members()->attach($org->owner_id, ['role' => 'owner', 'id' => (string) Str::uuid()]);
             $rollup->rollupMembers()->sync($members->pluck('id')->all());
 
             return $rollup;
@@ -65,9 +70,9 @@ class RollupController extends Controller
         $rollup = $r->attributes->get('site');
         abort_unless($rollup->isRollup(), 404, 'This site is not a rollup.');
         $data = $r->validate(['all' => 'sometimes|boolean', 'sites' => 'sometimes|array|max:500', 'sites.*' => 'string']);
-        $owner = $rollup->members()->wherePivot('role', 'owner')->first();
+        $org = $rollup->organization ?? abort(422, 'This rollup is not in an organization yet.');
         $all = (bool) ($data['all'] ?? $rollup->rollup_all);
-        $members = $all ? collect() : $this->membersFor($owner, array_key_exists('sites', $data) ? $data['sites'] : $rollup->rollupMembers()->pluck('domain')->all());
+        $members = $all ? collect() : $this->membersFor($org, array_key_exists('sites', $data) ? $data['sites'] : $rollup->rollupMembers()->pluck('domain')->all());
         if (! $all && $members->isEmpty()) {
             throw ValidationException::withMessages(['sites' => 'Choose at least one site, or include all of your sites.']);
         }
@@ -77,17 +82,23 @@ class RollupController extends Controller
         return ['data' => app(SiteController::class)->present($rollup->fresh(), $r->user(), $r->attributes->get('role'))];
     }
 
-    private function reachable($user)
+    /** The organization a rollup is made in: one the person owns or administers (their Personal one by default). */
+    private function organizationFor($user, ?string $id): Organization
     {
-        return Site::real()->whereHas('members', fn ($q) => $q->where('users.id', $user->id));
+        $org = $id ? Organization::whereKey($id)->whereIn('id', Organization::idsFor($user))->first() : Organization::personalFor($user);
+        if (! $org) {
+            throw ValidationException::withMessages(['organization' => 'You are not an owner or admin of that organization.']);
+        }
+
+        return $org;
     }
 
     /** @param array<int,string> $domains */
-    private function membersFor($user, array $domains)
+    private function membersFor(Organization $org, array $domains)
     {
         $domains = array_map(fn ($d) => strtolower(trim($d)), $domains);
 
-        return $this->reachable($user)->whereIn('domain', $domains)->get(['id', 'domain', 'timezone']);
+        return Site::real()->where('organization_id', $org->id)->whereIn('domain', $domains)->get(['id', 'domain', 'timezone']);
     }
 
     /** The timezone most of the sites use, like Plausible does for its consolidated view. */

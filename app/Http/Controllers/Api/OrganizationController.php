@@ -45,7 +45,7 @@ class OrganizationController extends Controller
             'id' => $org->id, 'name' => $org->name, 'personal' => $org->personal, 'logo_url' => $org->logoUrl(), 'role' => $owner ? 'owner' : 'admin',
             'owner' => $org->owner?->only(['id', 'name']),
             'invites_enabled' => Invitation::enabled(),
-            'sites' => $org->sites()->count(),
+            'sites' => $org->sites()->real()->count(),
             'admins' => $org->personal ? [] : $org->admins()->orderBy('name')->get()->map(fn ($u) => ['id' => $u->id, 'name' => $u->name, 'avatar_url' => $u->avatarUrl(), 'email' => $owner ? $u->email : null]),
             'invites' => $owner ? Invitation::where('organization_id', $org->id)->orderBy('created_at')->get()->map(fn ($i) => ['id' => $i->id, 'email' => $i->email, 'expires_at' => $i->expires_at->toIso8601String()]) : [],
             'transfer' => $owner && $org->hasPendingTransfer() ? ['to' => ['id' => $org->transfer_to, 'name' => $org->transferTarget?->name, 'email' => $org->transferTarget?->email], 'expires_at' => $org->transfer_expires_at->toIso8601String()] : null,
@@ -81,10 +81,19 @@ class OrganizationController extends Controller
         if (mb_strtolower(trim($data['confirm'])) !== mb_strtolower($org->name)) {
             throw ValidationException::withMessages(['confirm' => 'Type the organization\'s name exactly to confirm.']);
         }
-        if ($org->sites()->exists()) {
+        if ($org->sites()->real()->exists()) {
             throw ValidationException::withMessages(['confirm' => 'Delete this organization\'s sites first.']);
         }
         DB::transaction(function () use ($org) {
+            // its rollups hold no data of their own, so they go with it
+            foreach ($org->sites()->rollups()->get() as $rollup) {
+                $rollup->rollupMembers()->detach();
+                foreach (['funnels', 'segments', 'goals', 'sharedLinks'] as $rel) {
+                    $rollup->{$rel}()->delete();
+                }
+                $rollup->members()->detach();
+                $rollup->delete();
+            }
             $org->teams()->each(fn ($t) => $t->erase());
             DB::table('organization_user')->where('organization_id', $org->id)->delete();
             Invitation::where('organization_id', $org->id)->delete();
@@ -211,8 +220,8 @@ class OrganizationController extends Controller
             $org->admins()->detach($me->id);
             $org->admins()->attach($previous, ['id' => (string) Str::uuid()]);
             $org->update(['owner_id' => $me->id, 'transfer_to' => null, 'transfer_expires_at' => null]);
-            // each site's owner row follows the organization
-            foreach ($org->sites()->where('kind', '!=', 'rollup')->pluck('id') as $siteId) {
+            // each site's (and rollup's) owner row follows the organization
+            foreach ($org->sites()->pluck('id') as $siteId) {
                 DB::table('site_user')->where('site_id', $siteId)->where('user_id', $me->id)->delete();
                 DB::table('site_user')->where('site_id', $siteId)->where('role', 'owner')->update(['user_id' => $me->id, 'updated_at' => now()]);
             }

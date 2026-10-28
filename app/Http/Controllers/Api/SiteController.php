@@ -30,15 +30,15 @@ class SiteController extends Controller
         $entitlements = app(Entitlements::class);
         $otherPath = $entitlements instanceof LimitsSiteList ? $entitlements->otherSitesPath($user) : null;
         // an extension can keep an administrator's list to their own sites; the rest are browsed elsewhere
-        $query = $otherPath !== null ? Site::memberOf($user) : Site::visibleTo($user)->where(fn ($q) => $q->where('kind', '!=', 'rollup')->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id)));
-        // the organization chosen in the switcher: its sites (Personal also holds the person's rollups), or "shared" for sites of other people's organizations
+        $query = $otherPath !== null ? Site::memberOf($user) : Site::visibleTo($user)->where(fn ($q) => $q->where('kind', '!=', 'rollup')->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id))->orWhereIn('organization_id', Organization::idsFor($user)));
+        // the organization chosen in the switcher: its sites and rollups, or "shared" for sites of other people's organizations
         $scope = $request->query('organization');
         $mine = Organization::idsFor($user);
         if ($scope === 'shared') {
             $query->where('kind', '!=', 'rollup')->where(fn ($q) => $q->whereNull('organization_id')->orWhereNotIn('organization_id', $mine));
         } elseif ($scope) {
             $org = in_array($scope, $mine, true) ? Organization::find($scope) : null;
-            $query->where(fn ($q) => $q->where('organization_id', $org?->id ?? $scope)->when($org?->personal, fn ($w) => $w->orWhere('kind', 'rollup')));
+            $query->where('organization_id', $org?->id ?? $scope);
         }
         $sites = $query->orderBy('domain')->get()->map(function (Site $s) use ($user) {
             $r = $s->only(['id', 'domain', 'public', 'organization_id']) + ['role' => $s->roleOf($user), 'created_at' => $s->created_at, 'rollup' => $s->isRollup()] + ($s->isRollup() ? ['members' => count($s->memberSiteIds())] : []);

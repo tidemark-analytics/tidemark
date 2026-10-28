@@ -3,8 +3,10 @@
 namespace Tests\Feature;
 
 use App\Contracts\AllowsRollups;
+use App\Contracts\AllowsRollupsIn;
 use App\Contracts\Entitlements;
 use App\Models\Goal;
+use App\Models\Organization;
 use App\Models\Site;
 use App\Models\User;
 use App\Support\DefaultEntitlements;
@@ -29,8 +31,9 @@ class RollupTest extends TestCase
 
     private function site(string $domain, ?User $user = null, string $timezone = 'UTC'): Site
     {
-        $site = Site::create(['domain' => $domain, 'timezone' => $timezone]);
-        $site->members()->attach(($user ?? $this->owner)->id, ['role' => 'owner', 'id' => (string) Str::uuid()]);
+        $user ??= $this->owner;
+        $site = Site::create(['domain' => $domain, 'timezone' => $timezone, 'organization_id' => Organization::personalFor($user)->id]);
+        $site->members()->attach($user->id, ['role' => 'owner', 'id' => (string) Str::uuid()]);
 
         return $site;
     }
@@ -86,7 +89,7 @@ class RollupTest extends TestCase
         $this->assertSame(2, $this->visitors('a.example.com'));
     }
 
-    public function test_a_rollup_of_all_sites_follows_new_sites_and_skips_ones_the_owner_does_not_belong_to(): void
+    public function test_a_rollup_of_all_sites_follows_new_sites_and_skips_ones_in_other_organizations(): void
     {
         $other = User::create(['name' => 'Other', 'email' => 'other@example.com', 'password' => 'password']);
         $mine = $this->site('mine.example.com');
@@ -100,11 +103,11 @@ class RollupTest extends TestCase
         $this->visit($later, '3');
         $this->assertSame(2, $this->visitors('everything'));
 
-        $later->members()->detach($this->owner->id);
-        $this->assertSame(1, $this->visitors('everything'), 'a site the owner no longer belongs to leaves the rollup');
+        $later->update(['organization_id' => Organization::personalFor($other)->id]);
+        $this->assertSame(1, $this->visitors('everything'), 'a site that leaves the organization leaves the rollup');
     }
 
-    public function test_all_means_the_sites_the_owner_owns_not_ones_they_can_merely_open(): void
+    public function test_a_rollup_adds_up_only_the_sites_of_its_organization(): void
     {
         $customer = User::create(['name' => 'Customer', 'email' => 'customer@example.com', 'password' => 'password']);
         $mine = $this->site('mine.example.com');
@@ -117,7 +120,7 @@ class RollupTest extends TestCase
         $this->assertSame(1, $this->visitors('everything'));
 
         $this->postJson('/api/rollups', ['name' => 'picked', 'sites' => ['mine.example.com', 'theirs.example.com']])->assertCreated();
-        $this->assertSame(2, $this->visitors('picked'), 'a site picked on purpose is included');
+        $this->assertSame(1, $this->visitors('picked'), 'a rollup only adds up the sites of its own organization, whatever is picked');
     }
 
     public function test_goals_funnels_and_segments_work_across_the_member_sites(): void
@@ -223,5 +226,70 @@ class RollupTest extends TestCase
         $this->site('b.example.com', null, 'Europe/Berlin');
         $this->site('c.example.com', null, 'America/New_York');
         $this->postJson('/api/rollups', ['name' => 'network', 'all' => true])->assertCreated()->assertJsonPath('data.timezone', 'Europe/Berlin');
+    }
+
+    public function test_an_organization_admin_makes_a_rollup_that_belongs_to_the_organization_and_follows_its_owner(): void
+    {
+        $admin = User::create(['name' => 'Admin', 'email' => 'admin@example.com', 'password' => 'password']);
+        $org = Organization::create(['name' => 'Agency', 'owner_id' => $this->owner->id]);
+        $org->admins()->attach($admin->id, ['id' => (string) Str::uuid()]);
+        foreach (['a.example.com', 'b.example.com'] as $d) {
+            $s = Site::create(['domain' => $d, 'timezone' => 'UTC', 'organization_id' => $org->id]);
+            $s->members()->attach($this->owner->id, ['role' => 'owner', 'id' => (string) Str::uuid()]);
+            $this->visit($s, $d);
+        }
+        $personal = $this->site('mine.example.com');
+        $this->visit($personal, 'p');
+
+        $this->actingAs($admin);
+        $this->getJson('/api/rollups/candidates?organization='.$org->id)->assertOk()->assertJsonCount(2, 'data');
+        $this->postJson('/api/rollups', ['name' => 'agency', 'organization' => $org->id, 'all' => true])->assertCreated()->assertJsonPath('data.organization_id', $org->id);
+        $rollup = Site::where('domain', 'agency')->first();
+        $this->assertSame($this->owner->id, $rollup->ownerId(), 'owned by the organization\'s owner, like its sites');
+        $this->assertSame(2, $this->visitors('agency'), 'the Personal site is not in it');
+        $this->putJson('/api/sites/agency/rollup', ['all' => false, 'sites' => ['a.example.com']])->assertOk()->assertJsonPath('data.rollup.count', 1);
+
+        $list = collect($this->getJson('/api/sites?organization='.$org->id)->json('data'))->pluck('domain');
+        $this->assertTrue($list->contains('agency'));
+        $this->assertFalse(collect($this->getJson('/api/sites?organization='.Organization::personalFor($admin)->id)->json('data'))->pluck('domain')->contains('agency'));
+
+        $this->actingAs($this->owner);
+        $this->assertFalse(collect($this->getJson('/api/sites?organization='.Organization::personalFor($this->owner)->id)->json('data'))->pluck('domain')->contains('agency'), 'it no longer sits in Personal');
+        $this->postJson('/api/rollups', ['name' => 'nope', 'organization' => Organization::personalFor($admin)->id, 'all' => true])->assertUnprocessable();
+    }
+
+    public function test_deleting_an_organization_takes_its_rollups_and_ownership_transfer_moves_them(): void
+    {
+        $other = User::create(['name' => 'Other', 'email' => 'other@example.com', 'password' => 'password']);
+        $org = Organization::create(['name' => 'Agency', 'owner_id' => $this->owner->id]);
+        $org->admins()->attach($other->id, ['id' => (string) Str::uuid()]);
+        $this->postJson('/api/rollups', ['name' => 'agency', 'organization' => $org->id, 'all' => true])->assertCreated();
+        $this->assertSame(0, $this->getJson('/api/organizations')->json('data.0.sites') ?? 0);
+
+        $org->update(['transfer_to' => $other->id, 'transfer_expires_at' => now()->addHour()]);
+        $this->actingAs($other)->postJson("/api/organizations/{$org->id}/transfer/accept")->assertOk();
+        $this->assertSame($other->id, Site::where('domain', 'agency')->first()->ownerId());
+
+        $this->deleteJson("/api/organizations/{$org->id}", ['confirm' => 'Agency'])->assertOk();
+        $this->assertNull(Site::where('domain', 'agency')->first());
+    }
+
+    public function test_an_extension_can_decide_rollups_per_organization(): void
+    {
+        $org = Organization::create(['name' => 'Agency', 'owner_id' => $this->owner->id]);
+        $this->app->instance(Entitlements::class, new class extends DefaultEntitlements implements AllowsRollups, AllowsRollupsIn
+        {
+            public function allowsRollups(User $user): bool
+            {
+                return false;
+            }
+
+            public function allowsRollupsIn(Organization $organization): bool
+            {
+                return ! $organization->personal;
+            }
+        });
+        $this->postJson('/api/rollups', ['name' => 'mine', 'all' => true])->assertForbidden();
+        $this->postJson('/api/rollups', ['name' => 'agency', 'organization' => $org->id, 'all' => true])->assertCreated();
     }
 }

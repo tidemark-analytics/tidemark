@@ -72,7 +72,7 @@ class SiteMoveController extends Controller
 
     private function source(Site $site): Organization
     {
-        abort_if($site->isRollup(), 422, 'A rollup is private to its owner and has no organization.');
+        abort_if($site->isRollup(), 422, 'A rollup adds up the sites of its own organization, so it cannot move. Create a new one in the other organization.');
 
         return $site->organization ?? abort(422, 'This site is not in an organization yet.');
     }

@@ -415,7 +415,7 @@ function Funnels({ site }) {
 
 /** Which of the owner's sites a rollup adds up. */
 function RollupSites({ site, reload }) {
-  const cands = useApi('/rollups/candidates', null, []);
+  const cands = useApi('/rollups/candidates' + (site.organization_id ? '?organization=' + site.organization_id : ''), null, [site.organization_id]);
   const [all, setAll] = useState(site.rollup.all);
   const [chosen, setChosen] = useState(site.rollup.sites.map((s) => s.domain));
   const [err, setErr] = useState(null);
