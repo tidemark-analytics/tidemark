@@ -11,6 +11,7 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 - The Events API accepts `i: 0` (or Plausible's `interactive: false`) for an event that is not an interaction: it is stored, but doesn't count against a bounce and never starts a visit.
 
 ### Changed
+- Buttons, inputs and selects that sit side by side are now the same height everywhere: the header search box (32px beside 36px icon buttons), the chart's Note and Table buttons beside the Daily/Weekly toggle, and the team sharing row. Form rows (`.goal-add-row`) keep their controls at 36px whatever size class they carry.
 - The README shows the current dashboard, and has a section for people who would rather not host Tidemark themselves, pointing to Tidemark Cloud. The notes on how the hosted version is built are gone from it.
 
 ## [0.34.0] - 2026-10-26

@@ -438,7 +438,7 @@ function People({ site }) {
       ${u.role !== 'owner' ? html`<button class="btn ghost icon sm danger" aria-label=${'Remove ' + u.name} title="Remove from this site" onClick=${() => run(() => api(`/sites/${site.domain}/people/${u.id}`, { method: 'DELETE' }))}><${Icon} name="trash-2" size=${15} /></button>` : html`<span class="ri-spacer" aria-hidden="true"></span>`}</li>`)}</ul>`}
     ${(teams.length > 0 || available.length > 0) && html`<h4 class="muted small" style="margin:16px 0 6px">Teams</h4>
       ${available.length > 0 && html`<form class="goal-add-row" onSubmit=${addTeam}><select class="grow" aria-label="Team" value=${tf.team_id} onChange=${(e) => setTf({ ...tf, team_id: e.target.value })}><option value="">Share with a team…</option>${available.map((t) => html`<option value=${t.id} selected=${tf.team_id === t.id}>${t.name}</option>`)}</select>
-        <select class="mini-select" aria-label="Role for the team" value=${tf.role} onChange=${(e) => setTf({ ...tf, role: e.target.value })}><option value="viewer" selected=${tf.role === 'viewer'}>Viewer</option><option value="admin" selected=${tf.role === 'admin'}>Admin</option></select>
+        <select class="fit" aria-label="Role for the team" value=${tf.role} onChange=${(e) => setTf({ ...tf, role: e.target.value })}><option value="viewer" selected=${tf.role === 'viewer'}>Viewer</option><option value="admin" selected=${tf.role === 'admin'}>Admin</option></select>
         <button class="btn primary" disabled=${!tf.team_id}>Share</button></form>`}
       ${teams.length > 0 && html`<ul class="rows" aria-label="Teams with access">${teams.map((t) => html`<li class="rowitem">
         <span class="avatar" aria-hidden="true"><${Icon} name="users" size=${14} /></span>

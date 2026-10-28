@@ -156,3 +156,8 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 - Run `vendor/bin/phpunit` to call the test runner directly. It accepts the same file path and `--filter=testName` arguments.
 
 </laravel-boost-guidelines>
+
+# Tidemark UI rules
+
+- Controls that sit side by side (an input or select next to a button, a segmented control next to a button) must be the same height. The default for all of them is 36px, so don't mix in `.btn.sm` (32px), `.mini-select` (32px) or `.btn.lg` (40px) beside a default input; use `.goal-add-row` for form rows, which enforces it. Dense row actions (`.rowitem`) use `.sm` and `.mini-select` together, which also match each other.
+- Before shipping UI work, measure rather than eyeball: look for neighbouring controls whose rendered heights differ (the audit that found these compares `getBoundingClientRect().height` of adjacent inputs, selects and buttons on each page, including states opened by "New" and "Add" buttons).
