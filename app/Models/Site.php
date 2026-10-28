@@ -18,13 +18,13 @@ class Site extends Model
 {
     use HasUuids;
 
-    protected $fillable = ['kind', 'rollup_all', 'domain', 'timezone', 'public', 'track_outbound', 'track_downloads', 'track_forms', 'brand_name', 'brand_hide_name', 'brand_color', 'brand_logo', 'brand_logo_mime', 'honor_gpc', 'honor_dnt', 'location_precision', 'url_params', 'referrer_domain_only', 'min_group_size', 'pii_scrub', 'bot_filter'];
+    protected $fillable = ['kind', 'rollup_all', 'domain', 'timezone', 'public', 'track_outbound', 'track_downloads', 'track_forms', 'track_engagement', 'brand_name', 'brand_hide_name', 'brand_color', 'brand_logo', 'brand_logo_mime', 'honor_gpc', 'honor_dnt', 'location_precision', 'url_params', 'referrer_domain_only', 'min_group_size', 'pii_scrub', 'bot_filter'];
 
     protected $hidden = ['brand_logo'];
 
     protected function casts(): array
     {
-        return ['rollup_all' => 'boolean', 'public' => 'boolean', 'track_outbound' => 'boolean', 'track_downloads' => 'boolean', 'track_forms' => 'boolean', 'brand_hide_name' => 'boolean', 'honor_gpc' => 'boolean', 'honor_dnt' => 'boolean', 'referrer_domain_only' => 'boolean', 'pii_scrub' => 'boolean', 'bot_filter' => 'boolean', 'imported_start' => 'date', 'imported_end' => 'date'];
+        return ['rollup_all' => 'boolean', 'public' => 'boolean', 'track_outbound' => 'boolean', 'track_downloads' => 'boolean', 'track_forms' => 'boolean', 'track_engagement' => 'boolean', 'brand_hide_name' => 'boolean', 'honor_gpc' => 'boolean', 'honor_dnt' => 'boolean', 'referrer_domain_only' => 'boolean', 'pii_scrub' => 'boolean', 'bot_filter' => 'boolean', 'imported_start' => 'date', 'imported_end' => 'date'];
     }
 
     public function members(): BelongsToMany
@@ -214,6 +214,7 @@ class Site extends Model
             $this->track_outbound ? 'outbound-links' : null,
             $this->track_downloads ? 'file-downloads' : null,
             $this->track_forms ? 'form-submissions' : null,
+            $this->track_engagement ? 'engagement' : null,
         ]);
 
         return $this->trackerCode().($parts ? '.'.implode('.', $parts) : '').'.js';
@@ -232,6 +233,6 @@ class Site extends Model
     /** Goals that the default tracking extensions need. */
     public static function extensionGoals(): array
     {
-        return ['track_outbound' => 'Outbound Link: Click', 'track_downloads' => 'File Download', 'track_forms' => 'Form: Submission'];
+        return ['track_outbound' => 'Outbound Link: Click', 'track_downloads' => 'File Download', 'track_forms' => 'Form: Submission', 'track_engagement' => 'Engagement'];
     }
 }

@@ -112,6 +112,7 @@ export function Installation({ domain }) {
         <${Toggle} label="Outbound link clicks" help="Counts clicks on links that leave your site." checked=${s.track_outbound} onChange=${(v) => set('track_outbound', v)} />
         <${Toggle} label="File downloads" help="Counts clicks on links to PDFs, archives and similar." checked=${s.track_downloads} onChange=${(v) => set('track_downloads', v)} />
         <${Toggle} label="Form submissions" help="Counts submitted forms." checked=${s.track_forms} onChange=${(v) => set('track_forms', v)} />
+        <${Toggle} label="Scroll depth and time on page" help="Sends one extra event per page view as a visitor leaves it: how far they scrolled and how long they were active. It does not change bounce rate." checked=${s.track_engagement} onChange=${(v) => set('track_engagement', v)} />
       <//>
     </div></main>`;
 }

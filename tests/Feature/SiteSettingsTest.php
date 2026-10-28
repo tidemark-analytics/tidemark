@@ -39,6 +39,16 @@ class SiteSettingsTest extends TestCase
         $this->assertContains('File Download', $names);
     }
 
+    public function test_the_engagement_toggle_adds_its_script_extension_and_goal(): void
+    {
+        $this->assertFalse($this->getJson('/api/sites/example.com')->json('data.track_engagement'));
+
+        $res = $this->patchJson('/api/sites/example.com', ['track_engagement' => true, 'track_forms' => true])->assertOk();
+        $this->assertTrue($res->json('data.track_engagement'));
+        $this->assertMatchesRegularExpression('/^[a-f0-9]{10}\.form-submissions\.engagement\.js$/', $res->json('data.script'));
+        $this->assertContains('Engagement', $this->getJson('/api/sites/example.com/goals')->json('data.*.name'));
+    }
+
     public function test_goals_shields_and_people(): void
     {
         $this->postJson('/api/sites/example.com/goals', ['type' => 'event', 'value' => 'Signup'])->assertCreated();

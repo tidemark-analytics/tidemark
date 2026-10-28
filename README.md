@@ -90,6 +90,7 @@ the file name — combine as many as you like (`script.outbound-links.file-downl
 | `outbound-links` | `Outbound Link: Click` events (`url` property) |
 | `file-downloads` | `File Download` events (`url` property) |
 | `form-submissions` | `Form: Submission` events |
+| `engagement` | one `Engagement` event per page view with how far down the page the visitor scrolled and how long they were active ([details](#scroll-depth-and-time-on-page)) |
 | `tagged-events` | click events from `class="plausible-event-name=Signup"` |
 | `hash` | pageviews on `#hash` route changes |
 | `manual` | no automatic pageviews; call `plausible('pageview')` yourself |
@@ -103,6 +104,22 @@ plausible('Signup', { props: { plan: 'pro' }, callback: () => {} })
 
 Create a matching **goal** (custom event or page) in the site's settings to see it under *Behaviors*. Use `data-api="https://…/api/event"` to send through a proxy on your own domain.
 Anything that speaks Plausible's Events API works too: `POST /api/event` with `{"n": "pageview", "u": "https://example.com/", "d": "example.com", "r": null, "w": 1280, "p": {…}}`.
+
+### Scroll depth and time on page
+
+The `engagement` variant (**Site settings → Tracking → Scroll depth and time on page**, or add `.engagement` to the file name) answers "did they read it?" with numbers only: no element, text or position is ever captured. When a visitor leaves a page or switches tab, the script sends one **`Engagement`** event with two properties:
+
+| Property | Values |
+|---|---|
+| `depth` | the furthest milestone reached: `0`, `25`, `50`, `75` or `100` (percent of the page). A page that fits on one screen is `100`. |
+| `time` | active time on the page: `0-10s`, `10-30s`, `30-60s`, `1-3m` or `3m+` |
+
+Add an **`Engagement`** goal (turning the setting on creates it), then open it under *Behaviors* to see how many visitors reached each depth and time, or filter any report by those properties, in goals and funnels too. Good to know:
+
+- The event is **not an interaction**, so bounce rate and visit duration don't change, and it is stored as one row per page view however often the visitor comes and goes (the latest totals win). It does count as one extra event per page view.
+- Active time stops after a minute without scrolling, moving the mouse, typing or touching the screen, and only counts while the tab is visible.
+- Single-page apps are measured per route change. A measurement that arrives more than 30 minutes after the visit's last hit is dropped rather than starting a visit of its own.
+- Send your own with `plausible('Name', { interactive: false })` or `"i": 0` in the Events API.
 
 ## What's included
 

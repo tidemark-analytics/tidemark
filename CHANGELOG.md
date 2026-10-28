@@ -4,6 +4,10 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Added
+- Scroll depth and time on page: an opt-in `engagement` script variant (Site settings → Tracking) that sends one non-interactive `Engagement` event per page view with how far the visitor scrolled (`depth`: 0, 25, 50, 75, 100) and how long they were active (`time`, in five bands). It doesn't affect bounce rate or visit duration, repeats for the same page view replace the earlier one, and the properties work in goals, filters and funnels. Numbers only: no element, text or position is captured.
+- The Events API accepts `i: 0` (or Plausible's `interactive: false`) for an event that is not an interaction: it is stored, but doesn't count against a bounce and never starts a visit.
+
 ### Changed
 - The README shows the current dashboard, and has a section for people who would rather not host Tidemark themselves, pointing to Tidemark Cloud. The notes on how the hosted version is built are gone from it.
 
