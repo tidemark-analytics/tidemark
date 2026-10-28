@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Mail\TeamMail;
 use App\Models\Invitation;
+use App\Models\Organization;
 use App\Models\Site;
 use App\Models\Team;
 use App\Models\User;
@@ -17,6 +18,8 @@ class TeamsTest extends TestCase
 
     private User $owner;
 
+    private string $org;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -24,8 +27,9 @@ class TeamsTest extends TestCase
         $this->withHeader('X-Requested-With', 'XMLHttpRequest');
         $this->owner = $this->user('owner@example.com');
         $this->actingAs($this->owner);
-        $this->postJson('/api/sites', ['domain' => 'example.com'])->assertCreated();
-        $this->postJson('/api/sites', ['domain' => 'second.com'])->assertCreated();
+        $this->org = $this->postJson('/api/organizations', ['name' => 'Acme'])->assertCreated()->json('data.id');
+        $this->postJson('/api/sites', ['domain' => 'example.com', 'organization' => $this->org])->assertCreated();
+        $this->postJson('/api/sites', ['domain' => 'second.com', 'organization' => $this->org])->assertCreated();
     }
 
     private function user(string $email): User
@@ -35,7 +39,7 @@ class TeamsTest extends TestCase
 
     private function team(string $name = 'Marketing'): string
     {
-        return $this->postJson('/api/teams', ['name' => $name])->assertCreated()->json('data.id');
+        return $this->postJson('/api/teams', ['name' => $name, 'organization_id' => $this->org])->assertCreated()->json('data.id');
     }
 
     private function role(string $domain, User $u): ?string
@@ -46,14 +50,17 @@ class TeamsTest extends TestCase
     public function test_teams_belong_to_their_owner_and_names_are_unique_per_owner(): void
     {
         $this->team();
-        $this->postJson('/api/teams', ['name' => 'Marketing'])->assertUnprocessable();
+        $this->postJson('/api/teams', ['name' => 'Marketing', 'organization_id' => $this->org])->assertUnprocessable();
         $this->assertCount(1, $this->getJson('/api/teams')->json('data'));
-        $this->assertSame(['example.com', 'second.com'], $this->getJson('/api/teams')->json('owned_sites'));
+        $this->assertSame(['example.com', 'second.com'], collect($this->getJson('/api/teams')->json('owned_sites'))->pluck('domain')->all());
 
         $other = $this->user('other@example.com');
         $this->actingAs($other);
         $this->assertCount(0, $this->getJson('/api/teams')->json('data'));
-        $this->postJson('/api/teams', ['name' => 'Marketing'])->assertCreated();
+        $this->postJson('/api/teams', ['name' => 'Marketing', 'organization_id' => $this->org])->assertForbidden(); // not their organization
+        $their = $this->postJson('/api/organizations', ['name' => 'Other Co'])->json('data.id');
+        $this->postJson('/api/teams', ['name' => 'Marketing', 'organization_id' => $their])->assertCreated();
+        $this->postJson('/api/teams', ['name' => 'Nope', 'organization_id' => Organization::personalFor($other)->id])->assertUnprocessable(); // Personal has no teams
     }
 
     public function test_sharing_a_site_with_a_team_gives_each_member_the_teams_role(): void
@@ -104,7 +111,8 @@ class TeamsTest extends TestCase
         $this->postJson('/api/sites/example.com/people', ['email' => 'sam@example.com', 'role' => 'admin'])->assertCreated();
 
         $this->actingAs($sam);
-        $theirs = $this->postJson('/api/teams', ['name' => 'Sam team'])->json('data.id');
+        $samOrg = $this->postJson('/api/organizations', ['name' => 'Sam Co'])->json('data.id');
+        $theirs = $this->postJson('/api/teams', ['name' => 'Sam team', 'organization_id' => $samOrg])->json('data.id');
         $this->postJson('/api/sites/example.com/teams', ['team_id' => $mine, 'role' => 'viewer'])->assertForbidden(); // an admin is not the owner
         $this->actingAs($this->owner);
         $this->postJson('/api/sites/example.com/teams', ['team_id' => $theirs, 'role' => 'viewer'])->assertUnprocessable(); // not the owner's team

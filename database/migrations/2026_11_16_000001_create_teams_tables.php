@@ -10,10 +10,10 @@ return new class extends Migration
     {
         Schema::create('teams', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->uuid('owner_id')->index(); // the account that owns the team
+            $table->uuid('organization_id')->index(); // the organization that owns the team
             $table->string('name', 80);
             $table->timestamps();
-            $table->unique(['owner_id', 'name']);
+            $table->unique(['organization_id', 'name']);
         });
 
         Schema::create('team_user', function (Blueprint $table) {

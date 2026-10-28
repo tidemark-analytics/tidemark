@@ -77,6 +77,8 @@ return [
     // E-mail invitations: sharing a site with an address that has no account sends an invitation instead of failing. Off by default
     // on self-hosted installs (accounts are then created by an administrator); on for Cloud. Needs working mail settings.
     'invites' => (bool) env('TIDEMARK_INVITES', env('TIDEMARK_MODE', 'self-hosted') === 'cloud'),
+    // How many organizations (besides Personal) one person may own.
+    'organization_limit' => (int) env('TIDEMARK_ORGANIZATION_LIMIT', 10),
     'invite_hours' => (int) env('TIDEMARK_INVITE_HOURS', 72),
     'invite_daily_limit' => (int) env('TIDEMARK_INVITE_DAILY_LIMIT', 20),
     'invite_pending_limit' => (int) env('TIDEMARK_INVITE_PENDING_LIMIT', 100),

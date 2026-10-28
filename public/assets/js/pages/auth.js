@@ -113,7 +113,7 @@ export function Invite({ setUser }) {
   useEffect(() => { if (query.token) api('/invites/' + query.token).then(setInfo).catch(() => setGone(true)); }, [query.token]);
   if (gone) return html`<${AuthShell} title="Invitation not valid" sub="This invitation has expired or was already used. Invitations last 72 hours; ask the person who sent it to invite you again."><${Link} to="/login" class="btn">Go to sign in<//><//>`;
   if (!info) return html`<${AuthShell} title="Invitation" sub="Loading…"><//>`;
-  const what = info.team ? html`<b>${info.inviter || 'Someone'}</b> invited you to the <b>${info.team}</b> team. It gives you access to the sites the team is shared with.` : html`<b>${info.inviter || 'Someone'}</b> invited you to <b>${info.site}</b> as ${info.role === 'admin' ? 'an admin' : 'a viewer'}.`;
+  const what = info.organization ? html`<b>${info.inviter || 'Someone'}</b> invited you to help manage <b>${info.organization}</b>. You will be able to see and change every site in it.` : info.team ? html`<b>${info.inviter || 'Someone'}</b> invited you to the <b>${info.team}</b> team. It gives you access to the sites the team is shared with.` : html`<b>${info.inviter || 'Someone'}</b> invited you to <b>${info.site}</b> as ${info.role === 'admin' ? 'an admin' : 'a viewer'}.`;
   const accept = async (e) => {
     e.preventDefault(); setErr(''); setBusy(true);
     try { const r = await api('/invites/' + query.token + '/accept', { method: 'POST', body: f }); const me = await api('/me'); setUser(me.user); navigate(r.site ? '/' + r.site : '/sites'); toast('Welcome!'); }

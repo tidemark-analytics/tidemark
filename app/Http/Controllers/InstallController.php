@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Organization;
 use App\Models\User;
 use App\Support\Installer;
 use Illuminate\Http\Request;
@@ -96,6 +97,7 @@ class InstallController extends Controller
             'is_admin' => true,
         ]);
         $user->forceFill(['email_verified_at' => now()])->save();
+        Organization::personalFor($user);
         Installer::markInstalled();
         Auth::login($user);
 

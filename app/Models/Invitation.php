@@ -15,7 +15,7 @@ class Invitation extends Model
 {
     use HasUuids;
 
-    protected $fillable = ['email', 'token_hash', 'invited_by', 'site_id', 'team_id', 'role', 'expires_at'];
+    protected $fillable = ['email', 'token_hash', 'invited_by', 'site_id', 'team_id', 'organization_id', 'role', 'expires_at'];
 
     protected function casts(): array
     {
@@ -80,6 +80,20 @@ class Invitation extends Model
         return $invite;
     }
 
+    /** Same, for helping to manage an organization (as one of its admins). */
+    public static function issueForOrganization(string $email, User $inviter, Organization $org): self
+    {
+        static::where('email', $email)->where('organization_id', $org->id)->delete();
+        $token = Str::random(40);
+        $invite = static::create([
+            'email' => $email, 'token_hash' => static::hash($token), 'invited_by' => $inviter->id,
+            'organization_id' => $org->id, 'role' => 'admin', 'expires_at' => now()->addHours((int) config('tidemark.invite_hours')),
+        ]);
+        $invite->plainToken = $token;
+
+        return $invite;
+    }
+
     public ?string $plainToken = null;
 
     /** The live invitation for a link token, or null when it is unknown or past its 72 hours. */
@@ -108,5 +122,10 @@ class Invitation extends Model
     public function team(): BelongsTo
     {
         return $this->belongsTo(Team::class);
+    }
+
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class);
     }
 }

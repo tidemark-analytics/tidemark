@@ -11,7 +11,9 @@ use App\Events\SiteCreated;
 use App\Http\Controllers\Controller;
 use App\Models\FunnelStep;
 use App\Models\Goal;
+use App\Models\Organization;
 use App\Models\Site;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -28,14 +30,23 @@ class SiteController extends Controller
         $otherPath = $entitlements instanceof LimitsSiteList ? $entitlements->otherSitesPath($user) : null;
         // an extension can keep an administrator's list to their own sites; the rest are browsed elsewhere
         $query = $otherPath !== null ? Site::memberOf($user) : Site::visibleTo($user)->where(fn ($q) => $q->where('kind', '!=', 'rollup')->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id)));
+        // the organization chosen in the switcher: its sites (Personal also holds the person's rollups), or "shared" for sites of other people's organizations
+        $scope = $request->query('organization');
+        $mine = Organization::idsFor($user);
+        if ($scope === 'shared') {
+            $query->where('kind', '!=', 'rollup')->where(fn ($q) => $q->whereNull('organization_id')->orWhereNotIn('organization_id', $mine));
+        } elseif ($scope) {
+            $org = in_array($scope, $mine, true) ? Organization::find($scope) : null;
+            $query->where(fn ($q) => $q->where('organization_id', $org?->id ?? $scope)->when($org?->personal, fn ($w) => $w->orWhere('kind', 'rollup')));
+        }
         $sites = $query->orderBy('domain')->get()->map(function (Site $s) use ($user) {
-            $r = $s->only(['id', 'domain', 'public']) + ['role' => $s->roleOf($user), 'created_at' => $s->created_at, 'rollup' => $s->isRollup()] + ($s->isRollup() ? ['members' => count($s->memberSiteIds())] : []);
+            $r = $s->only(['id', 'domain', 'public', 'organization_id']) + ['role' => $s->roleOf($user), 'created_at' => $s->created_at, 'rollup' => $s->isRollup()] + ($s->isRollup() ? ['members' => count($s->memberSiteIds())] : []);
             $r += (new Stats($s))->last24h();
 
             return $r;
         });
 
-        return ['data' => $sites, 'other_sites' => $otherPath ? ['path' => $otherPath, 'count' => max(0, Site::count() - $sites->count())] : null];
+        return ['data' => $sites, 'other_sites' => $otherPath && ! $scope ? ['path' => $otherPath, 'count' => max(0, Site::count() - $sites->count())] : null];
     }
 
     public static function normalizeDomain(string $raw): string
@@ -49,7 +60,7 @@ class SiteController extends Controller
 
     public function store(Request $request)
     {
-        $data = $request->validate(['domain' => 'required|string|max:200', 'timezone' => 'nullable|string|max:64']);
+        $data = $request->validate(['domain' => 'required|string|max:200', 'timezone' => 'nullable|string|max:64', 'organization' => 'nullable|string']);
         $domain = self::normalizeDomain($data['domain']);
         if (! preg_match('/^(localhost|[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+)(:\d+)?$/', $domain)) {
             throw ValidationException::withMessages(['domain' => 'Enter just the domain, e.g. example.com (no “https://”, no path).']);
@@ -65,14 +76,24 @@ class SiteController extends Controller
         if (config('tidemark.verify_email') && ! $user->hasVerifiedEmail()) {
             return response()->json(['error' => 'email_unverified', 'message' => 'Verify your email address before adding a site. We sent you a link.'], 403);
         }
-        $allowed = app(Entitlements::class)->canCreateSite($user);
+        // the site belongs to an organization: the person's own by default, or one they are an admin of (its owner's plan and limits apply)
+        if (! empty($data['organization'])) {
+            $org = Organization::whereKey($data['organization'])->whereIn('id', Organization::idsFor($user))->first();
+            if (! $org) {
+                throw ValidationException::withMessages(['organization' => 'You are not part of that organization.']);
+            }
+        } else {
+            $org = Organization::personalFor($user);
+        }
+        $owner = $org->owner_id === $user->id ? $user : User::findOrFail($org->owner_id);
+        $allowed = app(Entitlements::class)->canCreateSite($owner);
         if ($allowed !== true) {
             throw ValidationException::withMessages(['domain' => $allowed]);
         }
 
-        $site = Site::create(['domain' => $domain, 'timezone' => $tz]);
-        $site->members()->attach($user->id, ['role' => 'owner', 'id' => (string) Str::uuid()]);
-        SiteCreated::dispatch($site, $user);
+        $site = Site::create(['domain' => $domain, 'timezone' => $tz, 'organization_id' => $org->id]);
+        $site->members()->attach($owner->id, ['role' => 'owner', 'id' => (string) Str::uuid()]);
+        SiteCreated::dispatch($site, $owner);
 
         return response()->json(['data' => $this->present($site->fresh(), $user)], 201); // fresh, so columns that take their default in the database are filled in
     }
@@ -160,10 +181,10 @@ class SiteController extends Controller
         $role ??= $site->roleOf($user);
         $first = (new Stats($site))->firstVisitAt();
 
-        return $site->only(['id', 'domain', 'timezone', 'public', 'track_outbound', 'track_downloads', 'track_forms', 'track_engagement', 'honor_gpc', 'honor_dnt', 'location_precision', 'url_params', 'referrer_domain_only', 'min_group_size', ...(Site::piiScrubEnforced() ? [] : ['pii_scrub']), 'bot_filter']) + ['rollup' => $site->isRollup() ? ['all' => $site->rollup_all, 'sites' => $site->rollupMembers()->orderBy('domain')->get(['sites.id', 'sites.domain'])->map->only(['id', 'domain'])->all(), 'count' => count($site->memberSiteIds())] : null] + [
+        return $site->only(['id', 'domain', 'organization_id', 'timezone', 'public', 'track_outbound', 'track_downloads', 'track_forms', 'track_engagement', 'honor_gpc', 'honor_dnt', 'location_precision', 'url_params', 'referrer_domain_only', 'min_group_size', ...(Site::piiScrubEnforced() ? [] : ['pii_scrub']), 'bot_filter']) + ['rollup' => $site->isRollup() ? ['all' => $site->rollup_all, 'sites' => $site->rollupMembers()->orderBy('domain')->get(['sites.id', 'sites.domain'])->map->only(['id', 'domain'])->all(), 'count' => count($site->memberSiteIds())] : null] + [
             'role' => $role,
             'can_manage' => in_array($role, ['owner', 'admin'], true),
-            'is_owner' => $role === 'owner',
+            'is_owner' => $role === 'owner' || $site->isOrganizationAdmin($user),
             'script' => $site->scriptName(),
             'has_data' => $first !== null,
             'first_visit_at' => $first?->toIso8601String(),

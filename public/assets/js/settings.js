@@ -1,7 +1,10 @@
 // Site settings (General, Visibility, Branding, Goals, People, Shields) and account settings (Preferences, Security, API keys, Users).
-import { html, useState, useEffect, useApi, api, navigate, Link, Icon, toast, copy, toggleTheme, setTheme, currentTheme, UserCtx, useContext, useDocTitle, useLocation, ago, countryName, flag, BASE } from './lib.js';
-import { Loading, Empty, ErrorBox, Field, Confirm, TypedConfirm, Modal, Toggle, CodeBlock, Breadcrumb, Badge } from './ui.js';
+import { html, useState, useEffect, useRef, useApi, api, navigate, Link, Icon, toast, copy, toggleTheme, setTheme, currentTheme, UserCtx, useContext, useDocTitle, useLocation, ago, countryName, flag, BASE } from './lib.js';
+import { Loading, Empty, ErrorBox, Field, Confirm, TypedConfirm, Modal, Toggle, CodeBlock, Breadcrumb, Badge, Avatar } from './ui.js';
+import { squareImage } from './image.js';
 import { Snippet } from './dashboard.js';
+import { useScope } from './org.js';
+import { CreateOrganization } from './shell.js';
 import { registry } from './extensions.js';
 import { accountTabs } from './shell.js';
 import { brandTheme } from './brand.js';
@@ -162,7 +165,7 @@ function Tracking({ site, reload }) {
 const Conversions = ({ site }) => html`<${Goals} site=${site} /><${Funnels} site=${site} /><${EventDocs} site=${site} />`;
 
 /** Who can see the site, and how it looks to them. */
-const Access = ({ site, reload }) => html`${!site.rollup && html`<${People} site=${site} />`}<${Visibility} site=${site} reload=${reload} /><${Branding} site=${site} reload=${reload} />`;
+const Access = ({ site, reload }) => html`${!site.rollup && html`<${People} site=${site} />`}<${Visibility} site=${site} reload=${reload} /><${Branding} site=${site} reload=${reload} />${!site.rollup && site.is_owner && html`<${MoveSite} site=${site} reload=${reload} />`}`;
 
 function DataTab({ site, reload }) {
   const [tz, setTz] = useState(site.timezone);
@@ -183,6 +186,37 @@ function DataTab({ site, reload }) {
       <div class="dz-row"><div><b>Delete site</b><span class="muted">Removes the site and all its data permanently.</span></div><button class="btn danger" onClick=${() => setConfirm('delete')}>Delete site</button></div><//>`}
     ${confirm === 'reset' && html`<${TypedConfirm} title="Reset statistics?" phrase=${site.domain} message=${`All collected data for ${site.domain} will be deleted. This can't be undone.`} confirmLabel="Reset statistics" onClose=${() => setConfirm(null)} onConfirm=${async () => { await api(`/sites/${site.domain}/reset`, { method: 'POST' }); toast('Statistics reset'); reload(); }} />`}
     ${confirm === 'delete' && html`<${TypedConfirm} title=${`Delete ${site.domain}?`} phrase=${site.domain} message="The site and all of its data will be permanently deleted." confirmLabel="Delete site" onClose=${() => setConfirm(null)} onConfirm=${async () => { await api(`/sites/${site.domain}`, { method: 'DELETE' }); navigate('/sites'); }} />`}`;
+}
+
+
+const names = (list) => (list.length > 3 ? list.slice(0, 3).join(', ') + ` and ${list.length - 3} more` : list.join(', '));
+
+/** Site settings → Sharing and access → Move to another organization. Shows who gains and loses access before anything happens. */
+function MoveSite({ site, reload }) {
+  const { user } = useContext(UserCtx);
+  const scope = useScope(user);
+  const res = useApi(`/sites/${site.domain}/move`, null, [site.domain, site.organization_id]);
+  const [to, setTo] = useState('');
+  const [confirm, setConfirm] = useState(false);
+  const d = res.data;
+  if (!d) return res.error ? null : html`<${Section} title="Move to another organization"><${Loading} /><//>`;
+  const dest = d.destinations.find((x) => x.id === to);
+  const i = dest && dest.impact;
+  const label = (o) => (o.personal ? 'Personal' : o.name);
+  const lines = i ? [
+    i.owner_changes && `${i.new_owner} becomes the owner, so the site counts against their plan from now on.`,
+    i.gains_access.length > 0 && `${names(i.gains_access)} gain${i.gains_access.length === 1 ? 's' : ''} access as organization admins.`,
+    i.loses_access.length > 0 && `${names(i.loses_access)} lose${i.loses_access.length === 1 ? 's' : ''} the access they had through ${label(d.organization)}.`,
+    i.teams.length > 0 && `Shared with ${names(i.teams.map((t) => `${t.name} (${t.members} ${t.members === 1 ? 'person' : 'people'})`))}: unshared, because teams belong to an organization.`,
+    i.direct_people_kept > 0 && `The ${i.direct_people_kept} ${i.direct_people_kept === 1 ? 'person' : 'people'} you added to this site directly keep their access.`,
+    'Statistics, goals, shared links and alerts move with it.',
+  ].filter(Boolean) : [];
+  return html`<${Section} title="Move to another organization" help=${`This site is in ${label(d.organization)}. Moving it keeps its data and the people you added to it directly; access that came from the organization (its admins and teams) changes.`}>
+    ${d.destinations.length === 0 ? html`<div class="empty-inline"><${Icon} name="shield" size=${18} /><div><b>Nowhere to move it</b><span>You can move a site between organizations you own or administer. Moving it out of an organization with a different owner takes that organization's owner.</span></div></div>`
+      : html`<form class="goal-add-row" onSubmit=${(e) => { e.preventDefault(); setConfirm(true); }}><select class="grow" aria-label="Destination organization" value=${to} onChange=${(e) => setTo(e.target.value)}><option value="">Move to…</option>${d.destinations.map((o) => html`<option value=${o.id} selected=${to === o.id}>${label(o)}</option>`)}</select><button class="btn" disabled=${!to}>Review move</button></form>
+        ${dest && html`<ul class="muted small" style="margin:0;padding-left:18px;display:grid;gap:4px">${lines.map((l) => html`<li>${l}</li>`)}</ul>`}`}
+  <//>
+  ${confirm && dest && html`<${Confirm} title=${`Move ${site.domain} to ${label(dest)}?`} confirmLabel="Move site" destructive=${false} message=${lines.join(' ')} onClose=${() => setConfirm(false)} onConfirm=${async () => { await api(`/sites/${site.domain}/move`, { method: 'POST', body: { organization: dest.id } }); scope.set(dest.id); setTo(''); reload(); res.reload(); toast(`Moved to ${label(dest)}`); }} />`}`;
 }
 
 /** Leave small groups out of what public dashboards and shared links list. */
@@ -403,55 +437,92 @@ function RollupSites({ site, reload }) {
   <//>`;
 }
 
+/** One field to give access: type a name to find one of the organization's teams, or an e-mail address to add or invite a person. */
+function AccessAdd({ teams, canInvite, onTeam, onEmail }) {
+  const [q, setQ] = useState('');
+  const [role, setRole] = useState('viewer');
+  const [open, setOpen] = useState(false);
+  const [sel, setSel] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const wrap = useRef();
+  const text = q.trim();
+  const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text);
+  const options = [
+    ...teams.filter((t) => !text || t.name.toLowerCase().includes(text.toLowerCase())).slice(0, 6).map((t) => ({ key: 't' + t.id, icon: 'users', title: t.name, sub: `Team · ${t.members} ${t.members === 1 ? 'person' : 'people'} · all of them get access`, run: () => onTeam(t.id, role) })),
+    ...(isEmail ? [{ key: 'e', icon: 'mail', title: (canInvite ? 'Add or invite ' : 'Add ') + text, sub: canInvite ? 'Access now, or an e-mail invitation if they have no account' : 'Must already have an account on this install', run: () => onEmail(text, role) }] : []),
+  ];
+  useEffect(() => {
+    if (!open) return;
+    const out = (e) => wrap.current && !wrap.current.contains(e.target) && setOpen(false);
+    document.addEventListener('mousedown', out);
+    return () => document.removeEventListener('mousedown', out);
+  }, [open]);
+  useEffect(() => setSel(0), [q]);
+  const go = async (o) => { if (!o || busy) return; setBusy(true); const ok = await o.run(); if (ok !== false) { setQ(''); setOpen(false); } setBusy(false); };
+  const onKey = (e) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); setOpen(true); setSel((n) => Math.min(options.length - 1, n + 1)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setSel((n) => Math.max(0, n - 1)); }
+    else if (e.key === 'Escape') setOpen(false);
+    else if (e.key === 'Enter') { e.preventDefault(); if (text) go(options[sel]); }
+  };
+  return html`<div class="access-add"><div class="goal-add-row">
+      <div class="pop-wrap grow" ref=${wrap}>
+        <input type="text" role="combobox" aria-expanded=${open && options.length > 0} aria-controls="access-opts" autocomplete="off" spellcheck="false" placeholder=${teams.length ? 'Add a person by e-mail, or a team by name' : 'Add a person by e-mail address'} aria-label="Add a person or a team" value=${q} onFocus=${() => setOpen(true)} onInput=${(e) => { setQ(e.target.value); setOpen(true); }} onKeyDown=${onKey} />
+        ${open && options.length > 0 && html`<div class="switch-pop" style="width:100%" role="listbox" id="access-opts"><div class="cmd-list">${options.map((o, i) => html`<button type="button" role="option" aria-selected=${i === sel} class=${'cmd-item' + (i === sel ? ' on' : '')} style="min-height:44px" onMouseMove=${() => setSel(i)} onClick=${() => go(o)}>
+          <${Icon} name=${o.icon} size=${15} /><span class="ri-main grow"><b class="trunc">${o.title}</b><span class="muted small trunc">${o.sub}</span></span></button>`)}</div></div>`}
+      </div>
+      <select class="fit" aria-label="Role to give" value=${role} onChange=${(e) => setRole(e.target.value)}><option value="viewer" selected=${role === 'viewer'}>Viewer</option><option value="admin" selected=${role === 'admin'}>Admin</option></select>
+      <button type="button" class="btn primary" disabled=${!text || !options.length || busy} onClick=${() => go(options[sel])}>${isEmail && !teams.some((t) => t.name.toLowerCase().includes(text.toLowerCase())) ? (canInvite ? 'Add or invite' : 'Add') : options.length && !isEmail ? 'Add team' : 'Add'}</button>
+    </div>
+    <span class="muted small">${role === 'admin' ? 'Admins can see stats and change this site\'s settings.' : 'Viewers can see stats but not change anything.'}</span></div>`;
+}
+
+/** Site settings → Sharing and access → People with access: one list of everyone who can open the site and how they got access. */
 function People({ site }) {
   const res = useApi(`/sites/${site.domain}/people`, null, []);
-  const [f, setF] = useState({ email: '', role: 'viewer' });
   const [err, setErr] = useState(null);
-  const [busy, setBusy] = useState(false);
-  const people = (res.data && res.data.data) || [];
-  const invites = (res.data && res.data.invites) || [];
-  const canInvite = !!(res.data && res.data.invites_enabled);
-  const teams = (res.data && res.data.teams) || [];
-  const available = (res.data && res.data.available_teams) || [];
+  const [open, setOpen] = useState({});
+  const d = res.data || {};
+  const people = d.data || [];
+  const invites = d.invites || [];
+  const teams = d.teams || [];
+  const orgAdmins = d.organization_admins || [];
+  const available = d.available_teams || [];
+  const canInvite = !!d.invites_enabled;
   const isOwner = !!site.is_owner;
-  const [tf, setTf] = useState({ team_id: '', role: 'viewer' });
-  const addTeam = async (e) => { e.preventDefault(); await run(async () => { await api(`/sites/${site.domain}/teams`, { method: 'POST', body: tf }); setTf({ ...tf, team_id: '' }); toast('Shared with the team'); }); };
+  const owner = people.find((u) => u.role === 'owner');
+  const direct = people.filter((u) => u.role !== 'owner');
+  const total = people.length + teams.length + orgAdmins.length + invites.length;
+  const run = async (fn) => { setErr(null); try { await fn(); res.reload(); return true; } catch (x) { setErr(firstError(x)); return false; } };
   const left = (iso) => { const h = Math.max(0, Math.round((new Date(iso) - Date.now()) / 3600000)); return h >= 2 ? `expires in ${h} hours` : 'expires within the hour'; };
-  const run = async (fn) => { setErr(null); try { await fn(); res.reload(); } catch (x) { setErr(firstError(x)); } };
-  const invite = async (e) => {
-    e.preventDefault(); setErr(null); setBusy(true);
-    try { const r = await api(`/sites/${site.domain}/people`, { method: 'POST', body: f }); setF({ ...f, email: '' }); res.reload(); toast(r.invited ? 'Invitation sent' : 'Added'); } catch (x) { setErr(firstError(x)); }
-    setBusy(false);
-  };
-  const ROLES = [['viewer', 'Viewer', 'eye'], ['admin', 'Admin', 'settings']];
-  return html`<${Section} title="People" help=${canInvite ? 'Give people access to this site. Someone without an account gets an e-mail invitation that is valid for 72 hours.' : 'Add existing users of this Tidemark install to this site.'}>
-    <form class="goal-add" onSubmit=${invite}>
-      <div class="seg" role="radiogroup" aria-label="Role">${ROLES.map(([k, l, i]) => html`<button type="button" role="radio" aria-checked=${f.role === k} class=${f.role === k ? 'on' : ''} onClick=${() => setF({ ...f, role: k })}><${Icon} name=${i} size=${14} />${l}</button>`)}</div>
-      <div class="goal-add-row"><input class="grow" type="email" required placeholder=${canInvite ? 'Email address' : 'Email address of an existing user'} aria-label="Email" value=${f.email} onInput=${(e) => setF({ ...f, email: e.target.value })} /><button class="btn primary" disabled=${!f.email || busy}>${canInvite ? 'Add or invite' : 'Add person'}</button></div>
-      <span class="muted small">${f.role === 'admin' ? 'Admins can see stats and change this site\'s settings.' : 'Viewers can see stats but not change anything.'}</span>
-    </form>
-    ${err && html`<div class="alert">${err}</div>`}
-    ${people.length > 0 && html`<ul class="rows" aria-label="People with access">${people.map((u) => html`<li class="rowitem">
-      <span class="avatar" aria-hidden="true">${(u.name || u.email || '?').slice(0, 1).toUpperCase()}</span>
-      <div class="grow ri-main"><b class="trunc">${u.name}</b><span class="muted trunc">${u.email}</span></div>
-      ${u.role === 'owner' ? html`<span class="pill brand">Owner</span>` : html`<select class="mini-select" value=${u.role} aria-label=${'Role of ' + u.name} onChange=${(e) => run(() => api(`/sites/${site.domain}/people/${u.id}`, { method: 'PATCH', body: { role: e.target.value } }))}><option value="viewer" selected=${u.role === 'viewer'}>Viewer</option><option value="admin" selected=${u.role === 'admin'}>Admin</option></select>`}
-      ${u.role !== 'owner' ? html`<button class="btn ghost icon sm danger" aria-label=${'Remove ' + u.name} title="Remove from this site" onClick=${() => run(() => api(`/sites/${site.domain}/people/${u.id}`, { method: 'DELETE' }))}><${Icon} name="trash-2" size=${15} /></button>` : html`<span class="ri-spacer" aria-hidden="true"></span>`}</li>`)}</ul>`}
-    ${(teams.length > 0 || available.length > 0) && html`<h4 class="muted small" style="margin:16px 0 6px">Teams</h4>
-      ${available.length > 0 && html`<form class="goal-add-row" onSubmit=${addTeam}><select class="grow" aria-label="Team" value=${tf.team_id} onChange=${(e) => setTf({ ...tf, team_id: e.target.value })}><option value="">Share with a team…</option>${available.map((t) => html`<option value=${t.id} selected=${tf.team_id === t.id}>${t.name}</option>`)}</select>
-        <select class="fit" aria-label="Role for the team" value=${tf.role} onChange=${(e) => setTf({ ...tf, role: e.target.value })}><option value="viewer" selected=${tf.role === 'viewer'}>Viewer</option><option value="admin" selected=${tf.role === 'admin'}>Admin</option></select>
-        <button class="btn primary" disabled=${!tf.team_id}>Share</button></form>`}
-      ${teams.length > 0 && html`<ul class="rows" aria-label="Teams with access">${teams.map((t) => html`<li class="rowitem">
+  const roleSelect = (value, label, onChange) => html`<select class="mini-select" value=${value} aria-label=${label} onChange=${(e) => onChange(e.target.value)}><option value="viewer" selected=${value === 'viewer'}>Viewer</option><option value="admin" selected=${value === 'admin'}>Admin</option></select>`;
+  const avatar = (u) => html`<${Avatar} name=${u.name || u.email} url=${u.avatar_url} />`;
+  const tag = (t) => html`<span class="pill">${t}</span>`;
+  const gap = html`<span class="ri-spacer" aria-hidden="true"></span>`;
+  return html`<${Section} title="People with access" help=${res.data ? `${total} ${total === 1 ? 'person or group' : 'people and groups'} can open this site. ${canInvite ? 'Someone without an account gets an e-mail invitation that is valid for 72 hours.' : 'People need an account on this Tidemark install.'}` : 'Who can open this site, and how they got access.'}>
+    <${AccessAdd} teams=${isOwner ? available : []} canInvite=${canInvite}
+      onEmail=${(email, role) => run(async () => { const r = await api(`/sites/${site.domain}/people`, { method: 'POST', body: { email, role } }); toast(r.invited ? 'Invitation sent' : 'Added'); })}
+      onTeam=${(id, role) => run(async () => { await api(`/sites/${site.domain}/teams`, { method: 'POST', body: { team_id: id, role } }); toast('Shared with the team'); })} />
+    ${err && html`<div class="alert" role="alert">${err}</div>`}
+    ${res.data && html`<ul class="rows" aria-label="People with access">
+      ${owner && html`<li class="rowitem">${avatar(owner)}<div class="grow ri-main"><b class="trunc">${owner.name}</b><span class="muted trunc">${owner.email}</span></div><span class="pill brand">Owner</span>${gap}</li>`}
+      ${orgAdmins.map((u) => html`<li class="rowitem">${avatar(u)}<div class="grow ri-main"><b class="trunc">${u.name}</b><span class="muted trunc">${u.email} · manages the whole organization</span></div>${tag('Organization admin')}${gap}</li>`)}
+      ${teams.map((t) => html`<li class="rowitem access-team" style="flex-wrap:wrap">
         <span class="avatar" aria-hidden="true"><${Icon} name="users" size=${14} /></span>
-        <div class="grow ri-main"><b class="trunc">${t.name}</b><span class="muted trunc">${t.members} ${t.members === 1 ? 'person' : 'people'}</span></div>
-        ${isOwner ? html`<select class="mini-select" value=${t.role} aria-label=${'Role of team ' + t.name} onChange=${(e) => run(() => api(`/sites/${site.domain}/teams/${t.id}`, { method: 'PATCH', body: { role: e.target.value } }))}><option value="viewer" selected=${t.role === 'viewer'}>Viewer</option><option value="admin" selected=${t.role === 'admin'}>Admin</option></select>
+        <div class="grow ri-main"><b class="trunc">${t.name}</b><span class="muted trunc">Team · ${t.members} ${t.members === 1 ? 'person' : 'people'}</span></div>
+        <button class="btn ghost sm" aria-expanded=${!!open[t.id]} onClick=${() => setOpen({ ...open, [t.id]: !open[t.id] })}>${open[t.id] ? 'Hide' : 'Show'} people</button>
+        ${isOwner ? html`${roleSelect(t.role, 'Role of team ' + t.name, (v) => run(() => api(`/sites/${site.domain}/teams/${t.id}`, { method: 'PATCH', body: { role: v } })))}
           <button class="btn ghost icon sm danger" aria-label=${'Stop sharing with ' + t.name} title="Stop sharing with this team" onClick=${() => run(() => api(`/sites/${site.domain}/teams/${t.id}`, { method: 'DELETE' }))}><${Icon} name="trash-2" size=${15} /></button>`
-          : html`<span class="pill">${t.role === 'admin' ? 'Admin' : 'Viewer'}</span><span class="ri-spacer" aria-hidden="true"></span>`}</li>`)}</ul>`}
-      <p class="muted small">${isOwner ? 'A person on several teams, or added directly as well, gets the strongest role they have. Manage teams under Account settings → Teams.' : 'Only the site owner shares it with teams.'}</p>`}
-    ${invites.length > 0 && html`<h4 class="muted small" style="margin:16px 0 6px">Waiting to accept</h4><ul class="rows" aria-label="Pending invitations">${invites.map((i) => html`<li class="rowitem">
-      <span class="avatar" aria-hidden="true"><${Icon} name="mail" size=${14} /></span>
-      <div class="grow ri-main"><b class="trunc">${i.email}</b><span class="muted trunc">${i.role === 'admin' ? 'Admin' : 'Viewer'} · ${left(i.expires_at)}</span></div>
-      <button class="btn ghost sm" disabled=${!canInvite} onClick=${() => run(async () => { await api(`/sites/${site.domain}/invites/${i.id}/resend`, { method: 'POST' }); toast('Invitation sent again'); })}>Resend</button>
-      <button class="btn ghost icon sm danger" aria-label=${'Cancel invitation for ' + i.email} title="Cancel invitation" onClick=${() => run(() => api(`/sites/${site.domain}/invites/${i.id}`, { method: 'DELETE' }))}><${Icon} name="trash-2" size=${15} /></button></li>`)}</ul>`}
+          : html`${tag(t.role === 'admin' ? 'Admin' : 'Viewer')}${gap}`}
+        ${open[t.id] && html`<ul class="muted small" style="flex-basis:100%;margin:0 0 6px 40px;padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:4px 14px">${t.member_names.length ? t.member_names.map((n) => html`<li>${n}</li>`) : html`<li>Nobody on this team yet.</li>`}${t.members > t.member_names.length && html`<li>and ${t.members - t.member_names.length} more</li>`}</ul>`}</li>`)}
+      ${direct.map((u) => html`<li class="rowitem">${avatar(u)}<div class="grow ri-main"><b class="trunc">${u.name}</b><span class="muted trunc">${u.email}</span></div>
+        ${roleSelect(u.role, 'Role of ' + u.name, (v) => run(() => api(`/sites/${site.domain}/people/${u.id}`, { method: 'PATCH', body: { role: v } })))}
+        <button class="btn ghost icon sm danger" aria-label=${'Remove ' + u.name} title="Remove from this site" onClick=${() => run(() => api(`/sites/${site.domain}/people/${u.id}`, { method: 'DELETE' }))}><${Icon} name="trash-2" size=${15} /></button></li>`)}
+      ${invites.map((i) => html`<li class="rowitem"><span class="avatar" aria-hidden="true"><${Icon} name="mail" size=${14} /></span><div class="grow ri-main"><b class="trunc">${i.email}</b><span class="muted trunc">Invited as ${i.role === 'admin' ? 'admin' : 'viewer'} · ${left(i.expires_at)}</span></div>
+        <button class="btn ghost sm" disabled=${!canInvite} onClick=${() => run(async () => { await api(`/sites/${site.domain}/invites/${i.id}/resend`, { method: 'POST' }); toast('Invitation sent again'); })}>Resend</button>
+        <button class="btn ghost icon sm danger" aria-label=${'Cancel invitation for ' + i.email} title="Cancel invitation" onClick=${() => run(() => api(`/sites/${site.domain}/invites/${i.id}`, { method: 'DELETE' }))}><${Icon} name="trash-2" size=${15} /></button></li>`)}
+    </ul>
+    <p class="muted small" style="margin:0">Someone who gets access in more than one way (directly, through a team or as an organization admin) has the strongest role they were given.${isOwner ? ' Manage teams under Settings → Teams.' : ''}</p>`}
   <//>`;
 }
 
@@ -611,6 +682,31 @@ function Alerts({ site }) {
 // -------------------------------------------------------------------------------------- account settings
 const initial = (u) => (u.name || u.email || '?').slice(0, 1).toUpperCase();
 
+/** A picture with Upload and Remove: a profile photo (round) or an organization logo (square). The page crops it to a square and shrinks it first. */
+function ImageField({ label, name, url, shape, path, type, onChange, hint }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const pick = async (e) => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    setBusy(true); setErr(null);
+    try {
+      const body = new FormData();
+      body.append('image', await squareImage(file, { type }), 'image');
+      const r = await api(path, { method: 'POST', body });
+      onChange(r.avatar_url !== undefined ? r.avatar_url : r.logo_url);
+      toast(label + ' updated');
+    } catch (x) { setErr(firstError(x)); }
+    setBusy(false);
+  };
+  const remove = async () => { setBusy(true); setErr(null); try { const r = await api(path, { method: 'DELETE' }); onChange(r.avatar_url !== undefined ? r.avatar_url : r.logo_url); toast(label + ' removed'); } catch (x) { setErr(firstError(x)); } setBusy(false); };
+  return html`<div class="image-field-wrap"><div class="image-field"><${Avatar} size="huge" name=${name} url=${url} shape=${shape} />
+      <div class="ri-main"><b>${label}</b>
+        <div class="row"><label class=${'btn sm' + (busy ? ' disabled' : '')}>${url ? 'Replace' : 'Upload'}<input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled=${busy} onChange=${pick} /></label>${url && html`<button type="button" class="btn sm ghost danger" disabled=${busy} onClick=${remove}>Remove</button>`}</div></div></div>
+    <span class="help">${hint}</span>${err && html`<span class="help" style="color:var(--destructive)">${err}</span>`}</div>`;
+}
+
 function Profile() {
   const { user, setUser } = useContext(UserCtx);
   const [f, setF] = useState({ name: user.name, email: user.email, timezone: user.timezone || 'UTC' });
@@ -622,7 +718,7 @@ function Profile() {
   const THEMES = [['light', 'Light'], ['dark', 'Dark'], ['system', 'System']];
   return html`<form onSubmit=${save}><${Section} title="Profile" help="Your name and email are used to sign in and are shown to people you share sites with."
       footer=${html`<span class="help">${changed ? 'You have unsaved changes.' : 'Your email is also where password resets are sent.'}</span><button class="btn primary sm" disabled=${!changed}>Save changes</button>`}>
-        <div class="profile-head"><span class="avatar big" aria-hidden="true">${initial(f)}</span><div class="ri-main"><b>${f.name || 'Your name'}</b><span class="muted">${f.email}</span></div></div>
+        <${ImageField} label="Profile photo" name=${f.name} url=${user.avatar_url} shape="user" path="/me/avatar" type="image/jpeg" onChange=${(u) => setUser({ ...user, avatar_url: u })} hint="A square picture works best; it is cropped to a circle. PNG, JPEG or WebP. People you share sites with, and your Personal organization, show it." />
         ${err && html`<div class="alert">${err}</div>`}
         <div class="fields2"><${Field} label="Name"><input required value=${f.name} onInput=${(e) => setF({ ...f, name: e.target.value })} /><//>
           <${Field} label="Email"><input type="email" required value=${f.email} onInput=${(e) => setF({ ...f, email: e.target.value })} /><//></div>
@@ -713,29 +809,44 @@ export function ApiKeys() {
   <//>`;
 }
 
-/** Account settings → Teams. A list of teams; opening one shows its people and the sites it can open (the role is chosen per site). */
+/** Settings → Teams. A list of teams; opening one shows its people and the sites it can open (the role is chosen per site). */
 export function Teams() {
+  const { user } = useContext(UserCtx);
+  const scope = useScope(user);
   const { query } = useLocation();
-  const res = useApi('/teams', null, []);
+  const usable = scope.org && !scope.personal && !scope.shared;
+  const res = useApi('/teams', { organization: scope.id }, [scope.id], { enabled: !!usable });
   const teams = (res.data && res.data.data) || [];
+  if (!usable) return html`<${NeedsOrganization} scope=${scope} title="Teams" what="Teams group the people in an organization so you can share a site with all of them at once." />`;
   const open = query.team && teams.find((t) => t.id === query.team);
   if (query.team && res.data && !open) navigate('/settings/teams', { replace: true });
   return open ? html`<${TeamDetail} key=${open.id} team=${open} owned=${res.data.owned_sites} canInvite=${!!res.data.invites_enabled} reload=${res.reload} />`
-    : html`<${TeamList} res=${res} teams=${teams} />`;
+    : html`<${TeamList} res=${res} teams=${teams} org=${scope.org} />`;
+}
+
+/** Personal (and "Shared with me") have no admins or teams: say so, and offer the way out, creating an organization. */
+function NeedsOrganization({ scope, title, what }) {
+  const { setUser } = useContext(UserCtx);
+  const [creating, setCreating] = useState(false);
+  return html`<${Section} title=${title} help=${scope.shared ? 'Sites shared with you one by one are not part of an organization you belong to.' : 'This is your Personal organization: just you. It has no admins or teams and can\'t be renamed, transferred or deleted.'}>
+    <p class="muted small" style="margin:0">${what} To work with other people, switch to an organization in the top bar or create one.</p>
+    <div class="section-actions"><button class="btn primary" onClick=${() => setCreating(true)}><${Icon} name="plus" size=${14} /> Create organization</button></div>
+  <//>
+  ${creating && html`<${CreateOrganization} onClose=${() => setCreating(false)} onCreated=${async (id) => { try { setUser((await api('/me')).user); } catch (e) { /* refreshed on next load */ } scope.set(id); setCreating(false); navigate('/settings/organization'); }} />`}`;
 }
 
 const peopleCount = (t) => t.members.length;
 
-function TeamList({ res, teams }) {
+function TeamList({ res, teams, org }) {
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState('');
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
   const create = async (e) => {
     e.preventDefault(); setErr(null); setBusy(true);
-    try { const r = await api('/teams', { method: 'POST', body: { name } }); setName(''); setAdding(false); navigate('/settings/teams?team=' + r.data.id); } catch (x) { setErr(firstError(x)); setBusy(false); }
+    try { const r = await api('/teams', { method: 'POST', body: { name, organization_id: org.id } }); setName(''); setAdding(false); navigate('/settings/teams?team=' + r.data.id); } catch (x) { setErr(firstError(x)); setBusy(false); }
   };
-  return html`<${Section} title="Teams" help="Group people once, then share a site with the whole group as viewers or admins. Adding someone to a team gives them access to every site the team can open.">
+  return html`<${Section} title="Teams" help=${`Teams in ${org.name}: group people once, then share a site with the whole group as viewers or admins. Adding someone to a team gives them access to every site the team can open.`}>
     ${!adding && html`<div class="section-actions"><button class="btn primary" onClick=${() => setAdding(true)}><${Icon} name="plus" size=${14} /> New team</button></div>`}
     ${adding && html`<form class="goal-add" onSubmit=${create}>${err && html`<div class="alert">${err}</div>`}
       <${Field} label="Team name"><input required autofocus maxlength="80" placeholder="For example Marketing or Client: Acme" value=${name} onInput=${(e) => setName(e.target.value)} /><//>
@@ -756,7 +867,7 @@ function TeamDetail({ team, owned, canInvite, reload }) {
   const [del, setDel] = useState(false);
   const run = async (fn, ok) => { setErr(null); try { await fn(); reload(); if (ok) toast(ok); } catch (x) { setErr(firstError(x)); } };
   const left = (iso) => { const h = Math.max(0, Math.round((new Date(iso) - Date.now()) / 3600000)); return h >= 2 ? `expires in ${h} hours` : 'expires within the hour'; };
-  const available = owned.filter((d) => !team.sites.some((s) => s.domain === d));
+  const available = owned.filter((s) => s.organization_id === team.organization_id && !team.sites.some((x) => x.domain === s.domain)).map((s) => s.domain);
   const add = (e) => { e.preventDefault(); run(async () => { const r = await api(`/teams/${team.id}/members`, { method: 'POST', body: { email } }); setEmail(''); toast(r.invited ? 'Invitation sent' : 'Added to the team'); }); };
   const rename = (e) => { e.preventDefault(); run(() => api('/teams/' + team.id, { method: 'PATCH', body: { name } }), 'Team renamed'); };
   const addSite = (e) => { e.preventDefault(); run(async () => { await api(`/sites/${share.domain}/teams`, { method: 'POST', body: { team_id: team.id, role: share.role } }); setShare({ ...share, domain: '' }); }, 'Shared with the team'); };
@@ -770,7 +881,7 @@ function TeamDetail({ team, owned, canInvite, reload }) {
       <form class="goal-add" onSubmit=${add}><div class="goal-add-row"><input class="grow" type="email" required placeholder=${canInvite ? 'Email address' : 'Email address of an existing user'} aria-label="Email" value=${email} onInput=${(e) => setEmail(e.target.value)} /><button class="btn primary" disabled=${!email}>${canInvite ? 'Add or invite' : 'Add person'}</button></div></form>
       ${team.members.length + team.invites.length === 0 ? html`<div class="empty-inline"><${Icon} name="user-plus" size=${18} /><div><b>Nobody on this team yet</b><span>Add the people who should get access to the same sites.</span></div></div>`
         : html`<ul class="rows" aria-label=${'People in ' + team.name}>
-        ${team.members.map((u) => html`<li class="rowitem"><span class="avatar" aria-hidden="true">${(u.name || u.email || '?').slice(0, 1).toUpperCase()}</span><div class="grow ri-main"><b class="trunc">${u.name}</b><span class="muted trunc">${u.email}</span></div>
+        ${team.members.map((u) => html`<li class="rowitem"><${Avatar} name=${u.name || u.email} url=${u.avatar_url} /><div class="grow ri-main"><b class="trunc">${u.name}</b><span class="muted trunc">${u.email}</span></div>
           <button class="btn ghost icon sm danger" aria-label=${'Remove ' + u.name + ' from the team'} title="Remove from team" onClick=${() => run(() => api(`/teams/${team.id}/members/${u.id}`, { method: 'DELETE' }))}><${Icon} name="trash-2" size=${15} /></button></li>`)}
         ${team.invites.map((i) => html`<li class="rowitem"><span class="avatar" aria-hidden="true"><${Icon} name="mail" size=${14} /></span><div class="grow ri-main"><b class="trunc">${i.email}</b><span class="muted trunc">Waiting to accept · ${left(i.expires_at)}</span></div>
           <button class="btn ghost sm" disabled=${!canInvite} onClick=${() => run(() => api(`/teams/${team.id}/invites/${i.id}/resend`, { method: 'POST' }), 'Invitation sent again')}>Resend</button>
@@ -780,8 +891,8 @@ function TeamDetail({ team, owned, canInvite, reload }) {
       ${available.length > 0 ? html`<form class="goal-add" onSubmit=${addSite}><div class="goal-add-row"><select class="grow" aria-label="Site" value=${share.domain} onChange=${(e) => setShare({ ...share, domain: e.target.value })}><option value="">Share a site with this team…</option>${available.map((d) => html`<option value=${d} selected=${share.domain === d}>${d}</option>`)}</select>
         <div class="seg" role="radiogroup" aria-label="Role">${ROLES.map(([k, l]) => html`<button type="button" role="radio" aria-checked=${share.role === k} class=${share.role === k ? 'on' : ''} onClick=${() => setShare({ ...share, role: k })}>${l}</button>`)}</div>
         <button class="btn primary" disabled=${!share.domain}>Share</button></div></form>`
-        : owned.length === 0 ? html`<div class="empty-inline"><${Icon} name="globe" size=${18} /><div><b>You don't own a site yet</b><span>Only a site's owner can share it with a team.</span></div></div>` : null}
-      ${team.sites.length === 0 && owned.length > 0 && html`<div class="empty-inline"><${Icon} name="globe" size=${18} /><div><b>Not shared with any site yet</b><span>Choose a site above to give the team access to it.</span></div></div>`}
+        : owned.filter((s) => s.organization_id === team.organization_id).length === 0 ? html`<div class="empty-inline"><${Icon} name="globe" size=${18} /><div><b>No sites in this organization yet</b><span>Add a site to the organization, then share it with the team.</span></div></div>` : null}
+      ${team.sites.length === 0 && owned.some((s) => s.organization_id === team.organization_id) && html`<div class="empty-inline"><${Icon} name="globe" size=${18} /><div><b>Not shared with any site yet</b><span>Choose a site above to give the team access to it.</span></div></div>`}
       ${team.sites.length > 0 && html`<ul class="rows" aria-label="Sites this team can open">${team.sites.map((s) => html`<li class="rowitem"><span class="ri-ico" aria-hidden="true"><${Icon} name="globe" size=${16} /></span><b class="grow trunc">${s.domain}</b>
         <select class="mini-select" value=${s.role} aria-label=${'Role of ' + team.name + ' on ' + s.domain} onChange=${(e) => run(() => api(`/sites/${s.domain}/teams/${team.id}`, { method: 'PATCH', body: { role: e.target.value } }))}>${ROLES.map(([k, l]) => html`<option value=${k} selected=${s.role === k}>${l}</option>`)}</select>
         <button class="btn ghost icon sm danger" aria-label=${'Stop sharing ' + s.domain} title="Stop sharing this site" onClick=${() => run(() => api(`/sites/${s.domain}/teams/${team.id}`, { method: 'DELETE' }))}><${Icon} name="trash-2" size=${15} /></button></li>`)}</ul>`}
@@ -790,6 +901,80 @@ function TeamDetail({ team, owned, canInvite, reload }) {
       <div class="section-actions"><button class="btn danger" onClick=${() => setDel(true)}>Delete this team</button></div>
     <//>
     ${del && html`<${Confirm} title=${`Delete the ${team.name} team?`} message="Its members lose the access they only had through this team. Access they have in another way stays." onClose=${() => setDel(false)} onConfirm=${async () => { await api('/teams/' + team.id, { method: 'DELETE' }); navigate('/settings/teams'); }} />`}`;
+}
+
+/** Settings → Organization, for the organization chosen in the switcher: name, admins, ownership and deletion for its owner; a read-only view for admins. */
+export function Organization() {
+  const { user, setUser } = useContext(UserCtx);
+  const scope = useScope(user);
+  const offers = useApi('/organizations', null, []);
+  const usable = scope.org && !scope.personal && !scope.shared;
+  const res = useApi(usable ? '/organizations/' + scope.id : '', null, [scope.id], { enabled: !!usable });
+  const org = res.data;
+  const incoming = (offers.data && offers.data.incoming_transfers) || [];
+  const [name, setName] = useState(null);
+  const [email, setEmail] = useState('');
+  const [err, setErr] = useState(null);
+  const [transfer, setTransfer] = useState(false);
+  const [del, setDel] = useState(false);
+  const [leave, setLeave] = useState(false);
+  const refreshMe = async () => { try { setUser((await api('/me')).user); } catch (e) { /* refreshed on next load */ } };
+  const run = async (fn, ok) => { setErr(null); try { await fn(); res.reload(); if (ok) toast(ok); } catch (x) { setErr(firstError(x)); } };
+  const left = (iso) => { const h = Math.max(0, Math.round((new Date(iso) - Date.now()) / 3600000)); return h >= 2 ? `expires in ${h} hours` : 'expires within the hour'; };
+  const base = '/organizations/' + scope.id;
+  const add = (e) => { e.preventDefault(); run(async () => { const r = await api(base + '/admins', { method: 'POST', body: { email } }); setEmail(''); toast(r.invited ? 'Invitation sent' : 'Added as an admin'); }); };
+  const offerBanners = incoming.map((o) => html`<div class="notice"><${Icon} name="info" size=${16} /><div><b>${o.from} wants to make you the owner of ${o.name}.</b> You would hold its plan and billing and decide who its admins are; ${o.from} stays on as an admin. This offer ${left(o.expires_at)}.
+    <div class="row" style="margin-top:8px"><button class="btn primary sm" onClick=${() => run(async () => { await api(`/organizations/${o.id}/transfer/accept`, { method: 'POST' }); await refreshMe(); offers.reload(); }, 'You are the owner now')}>Accept ownership</button>
+    <button class="btn sm" onClick=${() => run(async () => { await api(`/organizations/${o.id}/transfer/decline`, { method: 'POST' }); offers.reload(); }, 'Offer declined')}>Decline</button></div></div></div>`);
+  if (!usable) return html`${offerBanners}<${NeedsOrganization} scope=${scope} title="Organization" what="Organizations have a name, an owner, admins and teams; they hold sites for a company, a team or a client." />`;
+  if (res.loading && !res.data) return html`<${Loading} />`;
+  if (!org) return html`${offerBanners}<${ErrorBox} error=${res.error} />`;
+  const owner = org.role === 'owner';
+  const canInvite = !!org.invites_enabled;
+  return html`${err && html`<div class="alert" role="alert">${err}</div>`}${offerBanners}
+    ${owner ? html`<${Section} title="Organization name" help="Shown to the people you invite and to anyone you give access to. You are its owner.">
+      <${ImageField} label="Logo" name=${org.name} url=${org.logo_url} shape="org" path=${base + '/logo'} type="image/png" onChange=${async () => { await refreshMe(); res.reload(); }} hint="Helps you and your colleagues tell organizations apart in the switcher. Cropped to a square; PNG, JPEG or WebP." />
+      <form class="goal-add-row" onSubmit=${(e) => { e.preventDefault(); run(async () => { await api(base, { method: 'PATCH', body: { name: name === null ? org.name : name } }); await refreshMe(); }, 'Name saved'); }}><input class="grow" required maxlength="100" aria-label="Organization name" value=${name === null ? org.name : name} onInput=${(e) => setName(e.target.value)} /><button class="btn" disabled=${name === null || !name.trim() || name.trim() === org.name}>Save</button></form>
+    <//>` : html`<${Section} title=${org.name} help=${`You are an admin of this organization. You see and change every site in it, add sites and manage its teams. ${org.owner ? org.owner.name : 'The owner'} keeps billing, the admin list and the organization itself.`}>
+      <div class="section-actions"><button class="btn danger" onClick=${() => setLeave(true)}>Leave organization</button></div>
+    <//>`}
+    <${Section} title="Admins" help=${owner ? 'Admins help you run the organization. They can see and change every site in it, add and delete sites, and manage its teams. Billing, the organization itself and who else is an admin stay with you, the owner.' + (canInvite ? ' Someone without an account gets an e-mail invitation that is valid for 72 hours.' : '') : 'People who help run this organization with its owner.'}>
+      ${owner && html`<form class="goal-add" onSubmit=${add}><div class="goal-add-row"><input class="grow" type="email" required placeholder=${canInvite ? 'Email address' : 'Email address of an existing user'} aria-label="Email" value=${email} onInput=${(e) => setEmail(e.target.value)} /><button class="btn primary" disabled=${!email}>${canInvite ? 'Add or invite' : 'Add person'}</button></div></form>`}
+      ${org.admins.length + org.invites.length === 0 && html`<div class="empty-inline"><${Icon} name="shield" size=${18} /><div><b>${owner ? 'Only you manage this organization' : 'No other admins'}</b>${owner && html`<span>Add a colleague to give them the same view of every site, without sharing each one.</span>`}</div></div>`}
+      ${org.admins.length + org.invites.length > 0 && html`<ul class="rows" aria-label="Organization admins">
+        ${org.admins.map((u) => html`<li class="rowitem"><${Avatar} name=${u.name || u.email} url=${u.avatar_url} /><div class="grow ri-main"><b class="trunc">${u.name}</b>${(u.email || (org.transfer && org.transfer.to.id === u.id)) && html`<span class="muted trunc">${u.email || ''}${org.transfer && org.transfer.to.id === u.id ? ' · ownership offered' : ''}</span>`}</div>
+          ${owner && html`<button class="btn ghost icon sm danger" aria-label=${'Remove ' + u.name + ' as an admin'} title="Remove as admin" onClick=${() => run(() => api(`${base}/admins/${u.id}`, { method: 'DELETE' }))}><${Icon} name="trash-2" size=${15} /></button>`}</li>`)}
+        ${org.invites.map((i) => html`<li class="rowitem"><span class="avatar" aria-hidden="true"><${Icon} name="mail" size=${14} /></span><div class="grow ri-main"><b class="trunc">${i.email}</b><span class="muted trunc">Waiting to accept · ${left(i.expires_at)}</span></div>
+          <button class="btn ghost sm" disabled=${!canInvite} onClick=${() => run(() => api(`${base}/invites/${i.id}/resend`, { method: 'POST' }), 'Invitation sent again')}>Resend</button>
+          <button class="btn ghost icon sm danger" aria-label=${'Cancel invitation for ' + i.email} title="Cancel invitation" onClick=${() => run(() => api(`${base}/invites/${i.id}`, { method: 'DELETE' }))}><${Icon} name="trash-2" size=${15} /></button></li>`)}</ul>`}
+    <//>
+    ${owner && html`<${Section} title="Transfer ownership" danger help="Hand the organization to one of its admins. They have to accept, and you stay on as an admin. They then hold the plan and billing and decide who the admins are.">
+      ${org.transfer ? html`<div class="notice"><${Icon} name="info" size=${16} /><div>Waiting for <b>${org.transfer.to.name}</b> to accept. The offer ${left(org.transfer.expires_at)}.</div></div>
+        <div class="section-actions"><button class="btn" onClick=${() => run(() => api(base + '/transfer', { method: 'DELETE' }), 'Offer cancelled')}>Cancel the offer</button></div>`
+        : org.admins.length === 0 ? html`<p class="muted small">Add an admin above first: ownership can only go to one of the organization's admins.</p>`
+        : html`<div class="section-actions"><button class="btn danger" onClick=${() => setTransfer(true)}>Transfer ownership…</button></div>`}
+    <//>
+    <${Section} title="Delete organization" danger help="Removes the organization, its teams and its admin list. Its sites have to be deleted or moved first, so nothing goes by accident.">
+      <div class="section-actions"><button class="btn danger" onClick=${() => setDel(true)}>Delete organization…</button></div>
+    <//>`}
+    ${transfer && html`<${TransferDialog} org=${org} base=${base} onClose=${() => setTransfer(false)} onDone=${() => { setTransfer(false); res.reload(); toast('Offer sent'); }} />`}
+    ${del && html`<${TypedConfirm} title=${`Delete ${org.name}?`} message=${org.sites ? `It still has ${org.sites} ${org.sites === 1 ? 'site' : 'sites'}: delete them first.` : 'Its teams and admin list are removed. This cannot be undone.'} phrase=${org.name} confirmLabel="Delete organization" onClose=${() => setDel(false)} onConfirm=${async () => { await api(base, { method: 'DELETE', body: { confirm: org.name } }); await refreshMe(); scope.set(''); navigate('/sites'); }} />`}
+    ${leave && html`<${Confirm} title=${`Leave ${org.name}?`} message="You lose access to its sites unless they were also shared with you directly." confirmLabel="Leave" onClose=${() => setLeave(false)} onConfirm=${async () => { await api(base + '/leave', { method: 'POST' }); await refreshMe(); scope.set(''); navigate('/sites'); }} />`}`;
+}
+
+function TransferDialog({ org, base, onClose, onDone }) {
+  const [to, setTo] = useState(org.admins[0].id);
+  const [confirm, setConfirm] = useState('');
+  const [err, setErr] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const send = async (e) => { e.preventDefault(); setErr(null); setBusy(true); try { await api(base + '/transfer', { method: 'POST', body: { user_id: to, confirm } }); onDone(); } catch (x) { setErr(firstError(x)); setBusy(false); } };
+  return html`<${Modal} title="Transfer ownership" onClose=${onClose} footer=${html`<button class="btn" onClick=${onClose}>Cancel</button><button class="btn destructive" form="transfer-form" disabled=${busy || confirm.trim().toLowerCase() !== org.name.toLowerCase()}>${busy ? 'Sending…' : 'Send the offer'}</button>`}>
+    <form id="transfer-form" class="stack" onSubmit=${send}>
+      ${err && html`<div class="alert" role="alert">${err}</div>`}
+      <p style="line-height:1.55;color:var(--muted-foreground)">Nothing changes until they accept. After that they own <b>${org.name}</b> and hold its plan and billing; you stay on as an admin and can be removed by them.</p>
+      <${Field} label="New owner"><select value=${to} onChange=${(e) => setTo(e.target.value)}>${org.admins.map((u) => html`<option value=${u.id} selected=${to === u.id}>${u.name} (${u.email})</option>`)}</select><//>
+      <${Field} label=${`Type ${org.name} to confirm`}><input autocomplete="off" value=${confirm} onInput=${(e) => setConfirm(e.target.value)} /><//>
+    </form><//>`;
 }
 
 export function Users() {
@@ -911,6 +1096,6 @@ export function AccountSettings({ tab }) {
   if (registry.adminUi && user.is_admin && ['users', 'updates', 'customers'].includes(tab)) { window.location.replace(registry.adminUi.href + (tab === 'customers' ? '' : '/' + tab)); return null; }
   const moved = { preferences: 'profile' }; // older links still land in the right place
   const t = [tab, moved[tab]].find((k) => tabs.some((x) => x[0] === k)) || 'profile';
-  const Body = { profile: Profile, reports: EmailReports, security: Security, keys: ApiKeys, teams: Teams, users: Users, updates: Updates, ...Object.fromEntries(extra.map((x) => [x.key, x.component])) }[t];
-  return html`<${SettingsShell} title="Account settings" back=${['/sites', 'Your sites']} scope="Account" dup tabs=${tabs} tab=${t} base="/settings"><${Body} /><//>`;
+  const Body = { profile: Profile, reports: EmailReports, security: Security, keys: ApiKeys, teams: Teams, organization: Organization, users: Users, updates: Updates, ...Object.fromEntries(extra.map((x) => [x.key, x.component])) }[t];
+  return html`<${SettingsShell} title="Settings" back=${['/sites', 'Your sites']} scope="Sites" dup tabs=${tabs} tab=${t} base="/settings"><${Body} /><//>`;
 }

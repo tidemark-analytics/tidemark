@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Organization;
 use App\Models\ReportSubscription;
+use App\Models\Site;
 use App\Models\User;
 use Illuminate\Http\Request;
 
@@ -23,6 +25,7 @@ class AdminController extends Controller
         $data = $r->validate(['name' => 'required|string|max:100', 'email' => 'required|email|unique:users,email', 'password' => 'required|string|min:8', 'is_admin' => 'boolean']);
         $u = User::create($data);
         $u->forceFill(['is_admin' => (bool) ($data['is_admin'] ?? false), 'email_verified_at' => now()])->save(); // accounts an administrator creates need no confirmation
+        Organization::personalFor($u);
 
         return response()->json(['data' => $u], 201);
     }
@@ -49,7 +52,14 @@ class AdminController extends Controller
         $u = User::findOrFail($user);
         $u->sites()->detach();
         $u->teams()->detach();
-        $u->ownedTeams()->each(fn ($t) => $t->erase());
+        \DB::table('organization_user')->where('user_id', $u->id)->delete();
+        // organizations they owned go with them; the sites in them keep their data
+        $u->ownedOrganizations()->each(function (Organization $o) {
+            $o->teams()->each(fn ($t) => $t->erase());
+            \DB::table('organization_user')->where('organization_id', $o->id)->delete();
+            Site::where('organization_id', $o->id)->update(['organization_id' => null]);
+            $o->delete();
+        });
         $u->apiKeys()->delete();
         ReportSubscription::where('user_id', $u->id)->delete();
         $u->delete();

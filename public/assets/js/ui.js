@@ -2,6 +2,15 @@
 import { html, useState, useEffect, useLayoutEffect, useRef, copy, toast, useToasts, Icon, fmt } from './lib.js';
 
 export const Loading = ({ rows = 5 }) => html`<div class="stack sm" aria-busy="true" aria-label="Loading">${Array.from({ length: rows }, (_, i) => html`<div class="skeleton" style=${`height:26px;width:${96 - i * 8}%`}></div>`)}</div>`;
+/** A person's photo or an organization's logo, or their initial when there is none. `shape="org"` gives organizations a rounded square. */
+export function Avatar({ name, url, size = '', shape = 'user', icon }) {
+  const [bad, setBad] = useState(false);
+  useEffect(() => setBad(false), [url]);
+  const cls = 'avatar' + (size ? ' ' + size : '') + (shape === 'org' ? ' org' : '');
+  if (url && !bad) return html`<span class=${cls + ' has-img'} aria-hidden="true"><img src=${url} alt="" onError=${() => setBad(true)} /></span>`;
+  return html`<span class=${cls} aria-hidden="true">${icon ? html`<${Icon} name=${icon} size=${14} />` : (name || '?').slice(0, 1).toUpperCase()}</span>`;
+}
+
 export const Empty = ({ title = 'Nothing here yet', icon = 'chart-column', children }) => html`<div class="empty fade-in"><div class="ico"><${Icon} name=${icon} size=${20} /></div><b>${title}</b>${children && html`<div class="empty-body">${children}</div>`}</div>`;
 export const ErrorBox = ({ error }) => (error ? html`<div class="alert" role="alert"><${Icon} name="info" size=${16} /><div>${error.message}</div></div>` : null);
 export const Notice = ({ children, icon = 'info', tone = '' }) => html`<div class=${'notice ' + tone}><${Icon} name=${icon} size=${16} /><div>${children}</div></div>`;
@@ -29,7 +38,6 @@ export const FavTile = ({ name = '?', rollup, size = '' }) => {
   // the site's own icon, fetched and kept by the server, covers the letter tile once it has loaded; with no icon the tile stays
   return html`<span class=${'favtile ' + size} style=${`--tile:hsl(${hue} 42% 38%)`} aria-hidden="true">${name.slice(0, 1)}${!missing && html`<img class="fav-img" alt="" loading="lazy" decoding="async" src=${`${window.SD.base}/api/sites/${encodeURIComponent(name)}/favicon`} onLoad=${(e) => e.target.classList.add('loaded')} onError=${() => setMissing(true)} />`}</span>`;
 };
-export const Avatar = ({ name = '?', size = '' }) => html`<span class=${'avatar ' + size} aria-hidden="true">${name.slice(0, 1).toUpperCase()}</span>`;
 /** Tooltip around one control: appears on hover and keyboard focus. */
 export const Tooltip = ({ text, kbd, side = '', children }) => html`<span class="tip-wrap">${children}<span class=${'tip ' + side} role="tooltip">${text}${kbd && html`<kbd>${kbd}</kbd>`}</span></span>`;
 export const Breadcrumb = ({ items }) => html`<nav class="breadcrumb" aria-label="Breadcrumb">${items.map((it, i) => html`${i > 0 && html`<${Icon} name="chevron-right" size=${14} class="bc-sep" />`}${it.to && i < items.length - 1 ? html`<a data-link href=${window.SD.base + it.to}>${it.label}</a>` : html`<span aria-current=${i === items.length - 1 ? 'page' : undefined}>${it.label}</span>`}`)}</nav>`;
