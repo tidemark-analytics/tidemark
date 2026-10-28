@@ -701,10 +701,10 @@ function ImageField({ label, name, url, shape, path, type, onChange, hint }) {
     setBusy(false);
   };
   const remove = async () => { setBusy(true); setErr(null); try { const r = await api(path, { method: 'DELETE' }); onChange(r.avatar_url !== undefined ? r.avatar_url : r.logo_url); toast(label + ' removed'); } catch (x) { setErr(firstError(x)); } setBusy(false); };
-  return html`<div class="image-field"><${Avatar} size="huge" name=${name} url=${url} shape=${shape} />
-    <div class="ri-main"><b>${label}</b>
-      <div class="row"><label class=${'btn sm' + (busy ? ' disabled' : '')}>${url ? 'Replace' : 'Upload'}<input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled=${busy} onChange=${pick} /></label>${url && html`<button type="button" class="btn sm ghost danger" disabled=${busy} onClick=${remove}>Remove</button>`}</div>
-      <span class="help">${hint}</span>${err && html`<span class="help" style="color:var(--destructive)">${err}</span>`}</div></div>`;
+  return html`<div class="image-field-wrap"><div class="image-field"><${Avatar} size="huge" name=${name} url=${url} shape=${shape} />
+      <div class="ri-main"><b>${label}</b>
+        <div class="row"><label class=${'btn sm' + (busy ? ' disabled' : '')}>${url ? 'Replace' : 'Upload'}<input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled=${busy} onChange=${pick} /></label>${url && html`<button type="button" class="btn sm ghost danger" disabled=${busy} onClick=${remove}>Remove</button>`}</div></div></div>
+    <span class="help">${hint}</span>${err && html`<span class="help" style="color:var(--destructive)">${err}</span>`}</div>`;
 }
 
 function Profile() {
