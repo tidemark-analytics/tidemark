@@ -110,4 +110,37 @@ class OrganizationEntitlementsTest extends TestCase
         $this->assertSame([['recording', $org]], $this->calls);
         $this->assertSame(1, DB::table('events')->count());
     }
+
+    public function test_the_recording_check_is_told_whether_an_event_is_an_interaction_and_the_event_remembers_it(): void
+    {
+        $this->owner();
+        $org = $this->postJson('/api/organizations', ['name' => 'Roomy'])->json('data.id');
+        $this->postJson('/api/sites', ['domain' => 'example.com', 'organization' => $org])->assertCreated();
+        $send = fn (array $payload) => $this->call('POST', '/api/event', [], [], [], $this->transformHeadersToServerVars(['Accept-Language' => 'en-US,en;q=0.9', 'User-Agent' => self::CHROME, 'Content-Type' => 'application/json']),
+            json_encode($payload + ['u' => 'https://example.com/', 'd' => 'example.com', 'w' => 1200]))->assertStatus(202);
+
+        $seen = [];
+        $this->app->instance(Entitlements::class, new class($seen) implements Entitlements
+        {
+            public function __construct(private array &$seen) {}
+
+            public function canCreateSite(User $user): true|string
+            {
+                return true;
+            }
+
+            public function allowsRecording(array $site): bool
+            {
+                $this->seen[] = $site['interactive'];
+
+                return true;
+            }
+        });
+        $send(['n' => 'pageview']);
+        $send(['n' => 'Engagement', 'i' => 0, 'p' => ['depth' => 50]]);
+        $send(['n' => 'Signup']);
+
+        $this->assertSame([true, false, true], $seen);
+        $this->assertSame([1, 0, 1], DB::table('events')->orderBy('id')->pluck('interactive')->map(fn ($v) => (int) $v)->all());
+    }
 }
