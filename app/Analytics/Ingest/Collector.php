@@ -83,7 +83,9 @@ class Collector
         if ($this->shielded($site, $ip, $geo['country'], $pathname, $hostname)) {
             return ['status' => 202, 'body' => 'ok'];
         }
-        if (! $this->entitlements->allowsRecording($site)) {
+        // measurements such as scroll depth are not interactions: an extension that meters events can leave them out of the count
+        $isInteraction = $name === 'pageview' || ! $this->declaredNotInteractive($p);
+        if (! $this->entitlements->allowsRecording($site + ['interactive' => $isInteraction])) {
             return ['status' => 202, 'body' => 'ok'];
         }
 
@@ -113,7 +115,7 @@ class Collector
             'device' => Sources::deviceFromWidth(isset($p['w']) ? (int) $p['w'] : null, $agent['mobile'], $agent['tablet']),
             'props' => $this->scrubProps($this->props($p['p'] ?? $p['props'] ?? null), $clean),
             'revenue' => $revenue,
-            'interactive' => $name === 'pageview' || ! $this->declaredNotInteractive($p),
+            'interactive' => $isInteraction,
         ]);
         if ($masked) {
             PiiMasks::record($site['id'], $masked);
