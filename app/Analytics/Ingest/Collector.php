@@ -15,8 +15,9 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Accepts Plausible's event payload — {n: name, u: url, d: domain, r: referrer, w: screen width, p: props, h: hash mode} —
- * so existing Plausible snippets work by changing only the script URL.
+ * Accepts Plausible's event payload — {n: name, u: url, d: domain, r: referrer, w: screen width, p: props, h: hash mode, i: interactive} —
+ * so existing Plausible snippets work by changing only the script URL. An event sent with `i: 0` (or `interactive: false`) is not an
+ * interaction: it does not count against a bounce (see DatabaseSink).
  */
 class Collector
 {
@@ -112,12 +113,21 @@ class Collector
             'device' => Sources::deviceFromWidth(isset($p['w']) ? (int) $p['w'] : null, $agent['mobile'], $agent['tablet']),
             'props' => $this->scrubProps($this->props($p['p'] ?? $p['props'] ?? null), $clean),
             'revenue' => $revenue,
+            'interactive' => $name === 'pageview' || ! $this->declaredNotInteractive($p),
         ]);
         if ($masked) {
             PiiMasks::record($site['id'], $masked);
         }
 
         return ['status' => 202, 'body' => 'ok'];
+    }
+
+    /** @param array<string,mixed> $payload */
+    private function declaredNotInteractive(array $payload): bool
+    {
+        $flag = $payload['i'] ?? $payload['interactive'] ?? true;
+
+        return in_array($flag, [false, 0, '0', 'false'], true);
     }
 
     /** Anonymous visitor id: HMAC of ip + user agent + site, keyed by a salt that changes every day. Nothing is stored that could be reversed. */

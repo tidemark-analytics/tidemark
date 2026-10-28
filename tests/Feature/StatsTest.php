@@ -81,6 +81,24 @@ class StatsTest extends TestCase
         $this->getJson($this->url('props', ['filters' => json_encode([['is', 'goal', ['Signup']]])]))->assertOk();
     }
 
+    public function test_engagement_measurements_show_up_as_a_goal_with_their_properties(): void
+    {
+        $this->postJson('/api/sites/demo.example.com/goals', ['type' => 'event', 'value' => 'Engagement'])->assertCreated();
+        $hit = fn (array $payload) => $this->call('POST', '/api/event', [], [], [], $this->transformHeadersToServerVars([
+            'Accept-Language' => 'en-US,en;q=0.9', 'Content-Type' => 'text/plain',
+            'User-Agent' => 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+        ]), json_encode($payload + ['u' => 'https://demo.example.com/guide', 'd' => 'demo.example.com', 'w' => 1920]));
+
+        $hit(['n' => 'pageview'])->assertStatus(202);
+        $hit(['n' => 'Engagement', 'i' => 0, 'p' => ['depth' => '75', 'time' => '1-3m']])->assertStatus(202);
+
+        $goal = json_encode([['is', 'goal', ['Engagement']]]);
+        $keys = collect($this->getJson($this->url('props', ['period' => 'day', 'filters' => $goal]))->assertOk()->json('results'))->pluck('name')->all();
+        $this->assertEqualsCanonicalizing(['depth', 'time'], $keys);
+        $values = collect($this->getJson($this->url('props/depth', ['period' => 'day', 'filters' => $goal]))->assertOk()->json('results'))->pluck('name')->all();
+        $this->assertSame(['75'], $values);
+    }
+
     public function test_realtime_and_export(): void
     {
         $this->getJson($this->url('top', ['period' => 'realtime']))->assertOk();

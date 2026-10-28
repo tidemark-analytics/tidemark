@@ -151,7 +151,8 @@ function Tracking({ site, reload }) {
     <${Section} title="Tracking extras" help="Each one adds a small extension to the script and a matching goal.">
       <${Toggle} label="Outbound link clicks" checked=${site.track_outbound} onChange=${(v) => patch({ track_outbound: v })} />
       <${Toggle} label="File downloads" checked=${site.track_downloads} onChange=${(v) => patch({ track_downloads: v })} />
-      <${Toggle} label="Form submissions" checked=${site.track_forms} onChange=${(v) => patch({ track_forms: v })} /><//>
+      <${Toggle} label="Form submissions" checked=${site.track_forms} onChange=${(v) => patch({ track_forms: v })} />
+      <${Toggle} label="Scroll depth and time on page" help="One extra event per page view as a visitor leaves it: how far they scrolled and how long they were active. It does not change bounce rate." checked=${site.track_engagement} onChange=${(v) => patch({ track_engagement: v })} /><//>
     ${!site.rollup && site.can_manage && html`<${PrivacyControls} site=${site} reload=${reload} />`}
     ${!site.rollup && site.can_manage && html`<${BotFiltering} site=${site} reload=${reload} />`}
     <${Shields} site=${site} />`;

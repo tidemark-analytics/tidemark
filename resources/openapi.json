@@ -1271,6 +1271,10 @@
           "h": {
             "type": "integer",
             "description": "1 when the site uses hash-based routing."
+          },
+          "i": {
+            "type": "integer",
+            "description": "0 for an event that is not an interaction (Plausible's `interactive: false`, also accepted). It is stored but does not count against a bounce or start a visit, and sent again for the same page view it replaces the earlier one. Page views are always interactive."
           }
         }
       },
