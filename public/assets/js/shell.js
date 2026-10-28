@@ -183,7 +183,7 @@ export function CreateOrganization({ onClose, onCreated }) {
 }
 
 /** Breadcrumb switcher: search, recents, then sites and rollups in their own groups. */
-function SiteSwitcher({ list, current, domain, recents }) {
+function SiteSwitcher({ list, current, domain, recents, user, scopeId }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
   const [sel, setSel] = useState(0);
@@ -191,12 +191,18 @@ function SiteSwitcher({ list, current, domain, recents }) {
   const input = useRef();
   const trigger = useRef();
   const query = q.trim().toLowerCase();
+  const orgs = (user && user.organizations) || [];
+  // which organization a site belongs to, for the label next to it and for grouping; sites of other people's organizations are "Shared with me"
+  const orgOf = (s) => { const o = s.rollup ? orgs.find((x) => x.personal) : orgs.find((x) => x.id === s.organization_id); return o ? { id: o.id, name: o.personal ? 'Personal' : o.name } : { id: 'shared', name: 'Shared with me' }; };
   const groups = useMemo(() => {
     if (query) return [['Results', list.filter((s) => s.domain.toLowerCase().includes(query))]];
     const byDomain = Object.fromEntries(list.map((s) => [s.domain, s]));
     const recent = recents.map((d) => byDomain[d]).filter((s) => s && s.domain !== domain).slice(0, 3);
-    return [['Recent', recent], ['Sites', list.filter((s) => !s.rollup)], ['Rollups', list.filter((s) => s.rollup)]].filter(([, l]) => l.length);
-  }, [list, query, recents, domain]);
+    // the current organization's sites first, then the others (Personal first), then what is shared with you
+    const order = [scopeId, ...orgs.map((o) => o.id), 'shared'].filter((id, i, all) => id && all.indexOf(id) === i);
+    const byOrg = order.map((id) => [orgs.find((o) => o.id === id) ? orgOf({ organization_id: id }).name : 'Shared with me', list.filter((s) => !s.rollup && orgOf(s).id === id)]);
+    return [['Recent', recent], ...byOrg, ['Rollups', list.filter((s) => s.rollup)]].filter(([, l]) => l.length);
+  }, [list, query, recents, domain, scopeId, user]);
   const flat = groups.flatMap(([, l]) => l);
   useEffect(() => {
     if (!open) return;
@@ -223,7 +229,7 @@ function SiteSwitcher({ list, current, domain, recents }) {
     ${open && html`<div class="switch-pop" role="dialog" aria-label="Switch site">
       <div class="cmd-in"><${Icon} name="search" size=${15} /><input ref=${input} value=${q} placeholder="Find site…" role="combobox" aria-expanded="true" aria-controls="switch-list" aria-activedescendant=${flat[sel] ? 'sw-' + sel : undefined} aria-label="Find site" onInput=${(e) => setQ(e.target.value)} onKeyDown=${onKey} /></div>
       <div class="cmd-list" id="switch-list" role="listbox" aria-label="Sites">${flat.length === 0 ? html`<div class="cmd-empty">No site matches “${q}”</div>` : groups.map(([label, items]) => html`<div role="group" aria-label=${label}><div class="grp" aria-hidden="true">${label}</div>${items.map((s) => { n++; const i = n; return html`<button id=${'sw-' + i} tabindex="-1" role="option" aria-selected=${s.domain === domain} class=${'cmd-item ' + (i === sel ? 'on' : '')} onMouseMove=${() => setSel(i)} onClick=${() => pick(s)}>
-        <${FavTile} name=${s.domain} rollup=${s.rollup} size="sm" /><span class="trunc">${s.domain}</span>${s.domain === domain && html`<${Icon} name="check" size=${14} class="tick" />`}</button>`; })}</div>`)}</div>
+        <${FavTile} name=${s.domain} rollup=${s.rollup} size="sm" /><span class="trunc">${s.domain}</span>${(label === 'Recent' || label === 'Results') && orgs.length > 1 && html`<span class="muted small trunc" style="margin-left:auto;max-width:34%">${orgOf(s).name}</span>`}${s.domain === domain && html`<${Icon} name="check" size=${14} class="tick" />`}</button>`; })}</div>`)}</div>
       <div class="cmd-foot"><button class="cmd-item" onClick=${() => { setOpen(false); navigate('/sites'); }}><${Icon} name="layout-dashboard" size=${15} /><span>All sites</span></button>
         <button class="cmd-item" onClick=${() => { setOpen(false); navigate('/sites/new'); }}><${Icon} name="plus" size=${15} /><span>New site</span></button></div>
     </div>`}
@@ -277,13 +283,21 @@ export function AppBar({ user, path, sites, side }) {
   const domain = siteFromPath(path);
   const current = domain ? sites.list.find((s) => s.domain === domain) : null;
   const recents = useRecents(domain);
+  const scope = useScope(user);
+  // opening a site puts the organization switcher on the organization that site belongs to
+  useEffect(() => {
+    if (!current) return;
+    const mine = (user.organizations || []).find((o) => (current.rollup ? o.personal : o.id === current.organization_id));
+    const target = mine ? mine.id : user.shared_sites ? 'shared' : null;
+    if (target && target !== scope.id) scope.set(target);
+  }, [current && current.id, current && current.organization_id, user.organizations]);
   return html`<header class="topbar"><div class="topbar-in">
     <button class="btn ghost icon side-toggle" aria-label="Open navigation" aria-expanded=${side.open} aria-controls="app-side" onClick=${() => side.setOpen(!side.open)}><${Icon} name="menu" size=${18} /></button>
     <${Link} to="/sites" class="brand-mark" aria-label="Tidemark, all sites"><${Logo} size=${24} /><//>
     <nav class="crumbs" aria-label="Breadcrumb">
       <span class="crumb-sep" aria-hidden="true">/</span>
       <${OrgSwitcher} user=${user} /><span class="crumb-sep" aria-hidden="true">/</span>
-      ${domain ? html`<${SiteSwitcher} list=${sites.list} current=${current} domain=${domain} recents=${recents} /><span class="crumb-sep s2" aria-hidden="true">/</span><span class="crumb-cur muted sec" aria-current="page">${sectionLabel(path, domain)}</span>`
+      ${domain ? html`<${SiteSwitcher} list=${sites.list} current=${current} domain=${domain} recents=${recents} user=${user} scopeId=${scope.id} /><span class="crumb-sep s2" aria-hidden="true">/</span><span class="crumb-cur muted sec" aria-current="page">${sectionLabel(path, domain)}</span>`
         : html`<span class="crumb-cur" aria-current="page">${sectionLabel(path, domain)}</span>`}
     </nav>
     <div class="tb-right">
