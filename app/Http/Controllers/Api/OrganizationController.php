@@ -17,59 +17,98 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
- * The organization a person owns: its name, who administers it with them, and handing it to one of those admins. Only the owner does
- * this. An admin sees every site and manages teams, but the organization itself (name, admins, ownership, billing) stays with the owner.
+ * Organizations: who sites belong to. Everyone has a Personal one (just theirs: no admins, no invitations, no transfer, never deleted) and
+ * can create others. An organization has one owner and any number of admins; admins see and change every site in it and manage its teams,
+ * while the organization itself (name, admins, ownership, deletion, billing) stays with the owner.
  */
 class OrganizationController extends Controller
 {
-    public function show(Request $r)
+    /** What the switcher needs besides /me: offers of ownership waiting for this person. */
+    public function index(Request $r)
     {
-        $user = $r->user();
-        $org = $user->ownedOrganizations()->orderBy('created_at')->first();
-        if ($org) {
-            Invitation::where('expires_at', '<', now())->where('organization_id', $org->id)->delete();
-        }
-        $incoming = Organization::where('transfer_to', $user->id)->where('transfer_expires_at', '>', now())->with('owner')->get();
+        $incoming = Organization::where('transfer_to', $r->user()->id)->where('transfer_expires_at', '>', now())->with('owner')->get();
 
         return [
-            'invites_enabled' => Invitation::enabled(),
-            'organization' => $org ? [
-                'id' => $org->id, 'name' => $org->name,
-                'admins' => $org->admins()->orderBy('name')->get()->map(fn ($u) => ['id' => $u->id, 'name' => $u->name, 'email' => $u->email]),
-                'invites' => Invitation::where('organization_id', $org->id)->orderBy('created_at')->get()->map(fn ($i) => ['id' => $i->id, 'email' => $i->email, 'expires_at' => $i->expires_at->toIso8601String()]),
-                'transfer' => $org->hasPendingTransfer() ? ['to' => ['id' => $org->transfer_to, 'name' => $org->transferTarget?->name, 'email' => $org->transferTarget?->email], 'expires_at' => $org->transfer_expires_at->toIso8601String()] : null,
-            ] : null,
-            // organizations this person helps manage, and offers to take one over
-            'member_of' => $user->administeredOrganizations()->with('owner')->orderBy('name')->get()->map(fn ($o) => ['id' => $o->id, 'name' => $o->name, 'owner' => $o->owner?->name]),
             'incoming_transfers' => $incoming->map(fn ($o) => ['id' => $o->id, 'name' => $o->name, 'from' => $o->owner?->name, 'expires_at' => $o->transfer_expires_at->toIso8601String()]),
         ];
     }
 
-    /** For someone who joined to help (or was invited to a team) and has none of their own yet. */
+    public function show(Request $r, string $organization)
+    {
+        $org = $this->member($r, $organization);
+        $owner = $org->owner_id === $r->user()->id;
+        if ($owner) {
+            Invitation::where('expires_at', '<', now())->where('organization_id', $org->id)->delete();
+        }
+
+        return [
+            'id' => $org->id, 'name' => $org->name, 'personal' => $org->personal, 'role' => $owner ? 'owner' : 'admin',
+            'owner' => $org->owner?->only(['id', 'name']),
+            'invites_enabled' => Invitation::enabled(),
+            'sites' => $org->sites()->count(),
+            'admins' => $org->personal ? [] : $org->admins()->orderBy('name')->get()->map(fn ($u) => ['id' => $u->id, 'name' => $u->name, 'email' => $owner ? $u->email : null]),
+            'invites' => $owner ? Invitation::where('organization_id', $org->id)->orderBy('created_at')->get()->map(fn ($i) => ['id' => $i->id, 'email' => $i->email, 'expires_at' => $i->expires_at->toIso8601String()]) : [],
+            'transfer' => $owner && $org->hasPendingTransfer() ? ['to' => ['id' => $org->transfer_to, 'name' => $org->transferTarget?->name, 'email' => $org->transferTarget?->email], 'expires_at' => $org->transfer_expires_at->toIso8601String()] : null,
+        ];
+    }
+
+    /** Anyone may start an organization, up to a limit; the owner then holds its plan on Cloud like for everything they own. */
     public function store(Request $r)
     {
         $data = $r->validate(['name' => 'required|string|max:100']);
-        if ($r->user()->ownedOrganizations()->exists()) {
-            throw ValidationException::withMessages(['name' => 'You already own an organization.']);
+        if (Organization::ownedCount($r->user()) >= (int) config('tidemark.organization_limit')) {
+            throw ValidationException::withMessages(['name' => 'You own the most organizations this install allows.']);
         }
-        $org = Organization::forOwner($r->user(), $data['name']);
+        $org = Organization::create(['owner_id' => $r->user()->id, 'name' => trim($data['name'])]);
 
         return response()->json(['data' => ['id' => $org->id, 'name' => $org->name]], 201);
     }
 
-    public function update(Request $r)
+    public function update(Request $r, string $organization)
     {
+        $org = $this->owned($r, $organization);
         $data = $r->validate(['name' => 'required|string|max:100']);
-        $this->mine($r)->update(['name' => trim($data['name'])]);
+        $org->update(['name' => trim($data['name'])]);
+
+        return ['ok' => true];
+    }
+
+    /** Only an empty organization goes: its sites must be moved or deleted first, so nothing is lost by accident. */
+    public function destroy(Request $r, string $organization)
+    {
+        $org = $this->owned($r, $organization);
+        $data = $r->validate(['confirm' => 'required|string']);
+        if (mb_strtolower(trim($data['confirm'])) !== mb_strtolower($org->name)) {
+            throw ValidationException::withMessages(['confirm' => 'Type the organization\'s name exactly to confirm.']);
+        }
+        if ($org->sites()->exists()) {
+            throw ValidationException::withMessages(['confirm' => 'Delete this organization\'s sites first.']);
+        }
+        DB::transaction(function () use ($org) {
+            $org->teams()->each(fn ($t) => $t->erase());
+            DB::table('organization_user')->where('organization_id', $org->id)->delete();
+            Invitation::where('organization_id', $org->id)->delete();
+            $org->delete();
+        });
+
+        return ['ok' => true];
+    }
+
+    /** An admin steps down. The owner cannot leave: they transfer ownership or delete the organization. */
+    public function leave(Request $r, string $organization)
+    {
+        $org = $this->member($r, $organization);
+        abort_if($org->owner_id === $r->user()->id, 422, 'The owner cannot leave. Transfer ownership or delete the organization.');
+        $org->admins()->detach($r->user()->id);
 
         return ['ok' => true];
     }
 
     // ---- admins ------------------------------------------------------------------------------------------
     /** Someone with an account becomes an admin at once (and is told by e-mail); an unknown address gets an invitation when those are enabled. */
-    public function addAdmin(Request $r)
+    public function addAdmin(Request $r, string $organization)
     {
-        $org = $this->mine($r);
+        $org = $this->shared($r, $organization);
         $data = $r->validate(['email' => 'required|email']);
         $email = strtolower(trim($data['email']));
         $owner = $r->user();
@@ -100,9 +139,9 @@ class OrganizationController extends Controller
         return response()->json(['ok' => true], 201);
     }
 
-    public function removeAdmin(Request $r, string $user)
+    public function removeAdmin(Request $r, string $organization, string $user)
     {
-        $org = $this->mine($r);
+        $org = $this->shared($r, $organization);
         $org->admins()->detach($user);
         if ($org->transfer_to === $user) {
             $org->update(['transfer_to' => null, 'transfer_expires_at' => null]);
@@ -111,9 +150,9 @@ class OrganizationController extends Controller
         return ['ok' => true];
     }
 
-    public function resendInvite(Request $r, string $invite)
+    public function resendInvite(Request $r, string $organization, string $invite)
     {
-        $org = $this->mine($r);
+        $org = $this->shared($r, $organization);
         $old = Invitation::where('organization_id', $org->id)->whereKey($invite)->firstOrFail();
         abort_unless(Invitation::enabled(), 422, 'Invitations are turned off.');
         Invitation::guardAbuse($r->user());
@@ -124,18 +163,18 @@ class OrganizationController extends Controller
         return ['ok' => true];
     }
 
-    public function revokeInvite(Request $r, string $invite)
+    public function revokeInvite(Request $r, string $organization, string $invite)
     {
-        Invitation::where('organization_id', $this->mine($r)->id)->whereKey($invite)->delete();
+        Invitation::where('organization_id', $this->shared($r, $organization)->id)->whereKey($invite)->delete();
 
         return ['ok' => true];
     }
 
     // ---- ownership ---------------------------------------------------------------------------------------
     /** The owner offers the organization to one of its admins. Nothing changes until that person accepts, within the invitation window. */
-    public function transfer(Request $r)
+    public function transfer(Request $r, string $organization)
     {
-        $org = $this->mine($r);
+        $org = $this->shared($r, $organization);
         $data = $r->validate(['user_id' => 'required|string', 'confirm' => 'required|string']);
         if (mb_strtolower(trim($data['confirm'])) !== mb_strtolower($org->name)) {
             throw ValidationException::withMessages(['confirm' => 'Type the organization\'s name exactly to confirm.']);
@@ -144,7 +183,7 @@ class OrganizationController extends Controller
         if (! $to) {
             throw ValidationException::withMessages(['user_id' => 'Choose one of the organization\'s admins. Add the person as an admin first.']);
         }
-        $this->authorize($org, $to);
+        $this->authorizeTransfer($org, $to);
         $org->update(['transfer_to' => $to->id, 'transfer_expires_at' => now()->addHours((int) config('tidemark.invite_hours'))]);
         if (AuthController::mailConfigured()) {
             Mail::to($to->email)->send(new OwnershipTransferMail($org, $r->user()));
@@ -153,9 +192,9 @@ class OrganizationController extends Controller
         return ['ok' => true];
     }
 
-    public function cancelTransfer(Request $r)
+    public function cancelTransfer(Request $r, string $organization)
     {
-        $this->mine($r)->update(['transfer_to' => null, 'transfer_expires_at' => null]);
+        $this->shared($r, $organization)->update(['transfer_to' => null, 'transfer_expires_at' => null]);
 
         return ['ok' => true];
     }
@@ -166,7 +205,7 @@ class OrganizationController extends Controller
         $me = $r->user();
         $org = Organization::where('transfer_to', $me->id)->findOrFail($organization);
         abort_unless($org->hasPendingTransfer(), 410, 'This offer has expired. Ask the owner to send it again.');
-        $this->authorize($org, $me);
+        $this->authorizeTransfer($org, $me);
         $previous = $org->owner_id;
         DB::transaction(function () use ($org, $me, $previous) {
             $org->admins()->detach($me->id);
@@ -189,7 +228,7 @@ class OrganizationController extends Controller
         return ['ok' => true];
     }
 
-    private function authorize(Organization $org, User $to): void
+    private function authorizeTransfer(Organization $org, User $to): void
     {
         $e = app(Entitlements::class);
         if ($e instanceof AuthorizesOwnershipTransfer && ($why = $e->allowsOwnershipTransfer($org, $to)) !== true) {
@@ -197,8 +236,27 @@ class OrganizationController extends Controller
         }
     }
 
-    private function mine(Request $r): Organization
+    /** An organization this person owns or administers. */
+    private function member(Request $r, string $id): Organization
     {
-        return $r->user()->ownedOrganizations()->orderBy('created_at')->firstOrFail();
+        return Organization::whereIn('id', Organization::idsFor($r->user()))->findOrFail($id);
+    }
+
+    /** One the person owns. */
+    private function owned(Request $r, string $id): Organization
+    {
+        $org = Organization::where('owner_id', $r->user()->id)->findOrFail($id);
+        abort_if($org->personal, 422, 'Your Personal organization is just for you: it cannot be renamed or deleted.');
+
+        return $org;
+    }
+
+    /** One the person owns that can have other people in it (not Personal). */
+    private function shared(Request $r, string $id): Organization
+    {
+        $org = Organization::where('owner_id', $r->user()->id)->findOrFail($id);
+        abort_if($org->personal, 422, 'Your Personal organization is just for you. Create an organization to work with other people.');
+
+        return $org;
     }
 }

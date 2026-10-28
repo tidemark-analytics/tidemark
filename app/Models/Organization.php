@@ -7,7 +7,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Support\Str;
 
 /**
  * Who sites belong to. It has a name, one owner (who also holds the plan and billing on Cloud) and any number of admins who manage it with
@@ -17,11 +16,11 @@ class Organization extends Model
 {
     use HasUuids;
 
-    protected $fillable = ['name', 'owner_id', 'transfer_to', 'transfer_expires_at'];
+    protected $fillable = ['name', 'owner_id', 'personal', 'transfer_to', 'transfer_expires_at'];
 
     protected function casts(): array
     {
-        return ['transfer_expires_at' => 'datetime'];
+        return ['transfer_expires_at' => 'datetime', 'personal' => 'boolean'];
     }
 
     public function owner(): BelongsTo
@@ -55,20 +54,17 @@ class Organization extends Model
         return $this->transfer_to !== null && $this->transfer_expires_at?->isFuture() === true;
     }
 
-    public static function defaultName(User $user): string
+    /** The Personal organization every person has: created with their sign-in (or the first time something needs it). */
+    public static function personalFor(User $user): self
     {
-        return Str::limit($user->name."'s organization", 100, '');
+        return static::where('owner_id', $user->id)->where('personal', true)->first()
+            ?? static::create(['owner_id' => $user->id, 'name' => 'Personal', 'personal' => true]);
     }
 
-    /** The organization this person owns, created on first need (sign-up, a first site) so nobody has to set one up before they start. */
-    public static function forOwner(User $user, ?string $name = null): self
+    /** Organizations people create themselves (not their Personal one) that they own. */
+    public static function ownedCount(User $user): int
     {
-        $org = static::where('owner_id', $user->id)->orderBy('created_at')->first();
-        if ($org) {
-            return $org;
-        }
-
-        return static::create(['owner_id' => $user->id, 'name' => trim((string) $name) !== '' ? trim((string) $name) : static::defaultName($user)]);
+        return static::where('owner_id', $user->id)->where('personal', false)->count();
     }
 
     /** Ids of every organization this person owns or administers. */

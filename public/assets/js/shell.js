@@ -1,7 +1,8 @@
 // The signed-in app shell: top bar with breadcrumb switchers, the context-aware sidebar, the live-visitors sheet,
 // the ⌘K command palette and the keyboard shortcuts.
 import { html, useState, useEffect, useMemo, useRef, useApi, api, navigate, Link, Icon, fmtShort, fmt, BASE, PERIODS, UserCtx, useContext, setTheme, currentTheme, countryName, flag, scopeQuery } from './lib.js';
-import { Pop, Sheet, FavTile } from './ui.js';
+import { Pop, Sheet, FavTile, Modal, Field } from './ui.js';
+import { useScope } from './org.js';
 import { Logo } from './logo.js';
 import { registry, badgeOf, badgeText, useBadgeCounts, useBadgePolling } from './extensions.js';
 
@@ -128,6 +129,59 @@ function HelpMenu({ user }) {
 }
 
 // ------------------------------------------------------------------------------------------- site switcher
+/** Organization switcher: the organizations you belong to (Personal first), sites shared with you one by one, and a way to create one. */
+function OrgSwitcher({ user }) {
+  const { setUser } = useContext(UserCtx);
+  const scope = useScope(user);
+  const [open, setOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const wrap = useRef();
+  useEffect(() => {
+    if (!open) return;
+    const out = (e) => wrap.current && !wrap.current.contains(e.target) && setOpen(false);
+    const key = (e) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('mousedown', out); document.addEventListener('keydown', key);
+    return () => { document.removeEventListener('mousedown', out); document.removeEventListener('keydown', key); };
+  }, [open]);
+  if (!scope.orgs.length) return null;
+  const pick = (id) => { setOpen(false); scope.set(id); if (location.pathname !== '/sites' && !location.pathname.startsWith('/settings')) navigate('/sites'); };
+  const label = scope.shared ? 'Shared with me' : scope.org.personal ? 'Personal' : scope.org.name;
+  const tile = (name) => html`<span class="avatar sm" aria-hidden="true">${(name || '?').slice(0, 1).toUpperCase()}</span>`;
+  return html`<div class="pop-wrap" ref=${wrap}>
+    <button class=${'crumb-btn' + (open ? ' open' : '')} aria-haspopup="menu" aria-expanded=${open} aria-label=${'Switch organization, current: ' + label} onClick=${() => setOpen(!open)}>
+      ${tile(scope.shared ? 'S' : scope.org.name)}<span class="trunc">${label}</span><${Icon} name="chevrons-up-down" size=${14} class="chev" />
+    </button>
+    ${open && html`<div class="switch-pop" role="menu" aria-label="Organizations">
+      <div class="cmd-list">
+        <div class="grp">Organizations</div>
+        ${scope.orgs.map((o) => html`<button class=${'cmd-item' + (!scope.shared && o.id === scope.id ? ' on' : '')} role="menuitemradio" aria-checked=${!scope.shared && o.id === scope.id} onClick=${() => pick(o.id)}>
+          ${tile(o.name)}<span class="trunc">${o.personal ? 'Personal' : o.name}</span>${o.personal && html`<span class="pill">You</span>`}${!scope.shared && o.id === scope.id && html`<${Icon} name="check" size=${14} class="tick" />`}</button>`)}
+        ${user.shared_sites && html`<div class="grp">Others</div>
+          <button class=${'cmd-item' + (scope.shared ? ' on' : '')} role="menuitemradio" aria-checked=${scope.shared} onClick=${() => pick('shared')}>${tile('S')}<span class="trunc">Shared with me</span>${scope.shared && html`<${Icon} name="check" size=${14} class="tick" />`}</button>`}
+      </div>
+      <div class="cmd-foot"><button class="cmd-item" role="menuitem" onClick=${() => { setOpen(false); setCreating(true); }}><${Icon} name="plus" size=${15} /><span>Create organization</span></button></div>
+    </div>`}
+    ${creating && html`<${CreateOrganization} onClose=${() => setCreating(false)} onCreated=${async (id) => { try { const me = await api('/me'); setUser(me.user); } catch (e) { /* the switcher refreshes on the next load */ } scope.set(id); setCreating(false); navigate('/settings/organization'); }} />`}
+  </div>`;
+}
+
+export function CreateOrganization({ onClose, onCreated }) {
+  const [name, setName] = useState('');
+  const [err, setErr] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const submit = async (e) => {
+    e.preventDefault(); setErr(null); setBusy(true);
+    try { const r = await api('/organizations', { method: 'POST', body: { name } }); await onCreated(r.data.id); }
+    catch (x) { setErr((x.errors && Object.values(x.errors)[0][0]) || x.message); setBusy(false); }
+  };
+  return html`<${Modal} title="Create an organization" onClose=${onClose} footer=${html`<button class="btn" onClick=${onClose}>Cancel</button><button class="btn primary" form="create-org-form" disabled=${busy || !name.trim()}>${busy ? 'Creating…' : 'Create organization'}</button>`}>
+    <form id="create-org-form" class="stack" onSubmit=${submit}>
+      ${err && html`<div class="alert" role="alert">${err}</div>`}
+      <p style="line-height:1.55;color:var(--muted-foreground)">An organization holds sites for a company, a team or a client. You can add admins and teams to it, and give it to someone else later. Your Personal organization stays just for you.</p>
+      <${Field} label="Name"><input required autofocus maxlength="100" placeholder="For example Acme Studio" value=${name} onInput=${(e) => setName(e.target.value)} /><//>
+    </form><//>`;
+}
+
 /** Breadcrumb switcher: search, recents, then sites and rollups in their own groups. */
 function SiteSwitcher({ list, current, domain, recents }) {
   const [open, setOpen] = useState(false);
@@ -228,6 +282,7 @@ export function AppBar({ user, path, sites, side }) {
     <${Link} to="/sites" class="brand-mark" aria-label="Tidemark, all sites"><${Logo} size=${24} /><//>
     <nav class="crumbs" aria-label="Breadcrumb">
       <span class="crumb-sep" aria-hidden="true">/</span>
+      <${OrgSwitcher} user=${user} /><span class="crumb-sep" aria-hidden="true">/</span>
       ${domain ? html`<${SiteSwitcher} list=${sites.list} current=${current} domain=${domain} recents=${recents} /><span class="crumb-sep s2" aria-hidden="true">/</span><span class="crumb-cur muted sec" aria-current="page">${sectionLabel(path, domain)}</span>`
         : html`<span class="crumb-cur" aria-current="page">${sectionLabel(path, domain)}</span>`}
     </nav>

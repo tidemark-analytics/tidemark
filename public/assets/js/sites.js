@@ -1,6 +1,7 @@
 import { html, useState, useEffect, useMemo, useApi, api, navigate, Link, Icon, toast, fmtShort, useDocTitle, UserCtx, useContext, BASE, useLocation, setQuery } from './lib.js';
 import { Loading, Empty, Field, ErrorBox, Sparkline, Toggle, Pop, FavTile, Badge, SettingCard, Segmented, Breadcrumb, Notice } from './ui.js';
 import { Snippet } from './dashboard.js';
+import { useScope } from './org.js';
 
 const VIEW_KEY = 'tidemark.sitesView';
 const readView = () => { try { return localStorage.getItem(VIEW_KEY) === 'list' ? 'list' : 'grid'; } catch (e) { return 'grid'; } };
@@ -34,7 +35,9 @@ const SitesSkeleton = () => html`<div class="sites" aria-busy="true" aria-label=
 
 export function SitesPage() {
   useDocTitle('Sites');
-  const res = useApi('/sites', null, []);
+  const { user } = useContext(UserCtx) || {};
+  const scope = useScope(user);
+  const res = useApi('/sites', scope.id ? { organization: scope.id } : null, [scope.id]);
   const { query } = useLocation();
   const [q, setQ] = useState('');
   const [sort, setSort] = useState('visitors');
@@ -47,7 +50,6 @@ export function SitesPage() {
     return f.sort((a, b) => (a.rollup !== b.rollup ? (a.rollup ? -1 : 1) : sort === 'name' ? a.domain.localeCompare(b.domain) : b.visitors - a.visitors || a.domain.localeCompare(b.domain)));
   }, [res.data, q, sort, kind]);
   const total = all.length;
-  const { user } = useContext(UserCtx) || {};
   const real = all.filter((s) => !s.rollup);
   const realSites = all.filter((s) => !s.rollup && s.role).length;
   const rollups = list.filter((s) => s.rollup), sites = list.filter((s) => !s.rollup);
@@ -76,22 +78,22 @@ export function NewSite() {
   const { query } = useLocation();
   const importing = query.import === 'plausible';
   const { user } = useContext(UserCtx);
-  const orgs = (user && user.organizations) || [];
-  const [org, setOrg] = useState('');
+  const scope = useScope(user);
+  const target = scope.shared ? ((scope.orgs.find((o) => o.personal) || {}).id || '') : scope.id;
   const [domain, setDomain] = useState('');
   const [timezone, setTimezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
   const submit = async (e) => {
     e.preventDefault(); setBusy(true); setErr(null);
-    try { const r = await api('/sites', { method: 'POST', body: { domain, timezone, ...(org ? { organization: org } : {}) } }); navigate(importing ? `/${r.data.domain}/settings/data` : `/${r.data.domain}/installation`); }
+    try { const r = await api('/sites', { method: 'POST', body: { domain, timezone, ...(target ? { organization: target } : {}) } }); navigate(importing ? `/${r.data.domain}/settings/data` : `/${r.data.domain}/installation`); }
     catch (x) { setErr((x.errors && x.errors.domain && x.errors.domain[0]) || x.message); setBusy(false); }
   };
   return html`<main class="main narrow"><header class="page-head"><div class="grow"><${Breadcrumb} items=${[{ label: 'Sites', to: '/sites' }, { label: 'New site' }]} /><h1 style="margin-top:8px">${importing ? 'Add a site and import from Plausible' : 'Add a site'}</h1><div class="sub">Tell Tidemark which domain you want to measure.${importing ? ' You will pick the Plausible export on the next page.' : ''}</div></div></header>
     <form onSubmit=${submit}><${SettingCard} title="Site details" help="You can change the timezone later in the site's settings."
       footer=${html`<span class="help">No cookies, no personal data: Tidemark counts visits only.</span><div class="row"><${Link} to="/sites" class="btn ghost">Cancel<//><button class="btn primary" disabled=${busy || !domain}>${busy ? 'Adding…' : 'Add site'}</button></div>`}>
       ${err && html`<div class="alert" role="alert"><${Icon} name="circle-alert" size=${16} /><div>${err}</div></div>`}
-      ${orgs.length > 1 && html`<${Field} label="Organization" help="Who the site belongs to. The owner's plan and limits apply."><select value=${org || (orgs.find((o) => o.role === 'owner') || orgs[0]).id} onChange=${(e) => setOrg(e.target.value)}>${orgs.map((o) => html`<option value=${o.id} selected=${(org || (orgs.find((x) => x.role === 'owner') || orgs[0]).id) === o.id}>${o.name}</option>`)}</select><//>`}
+      ${scope.orgs.length > 1 && html`<p class="muted small" style="margin:0">This site will belong to <b>${(scope.orgs.find((o) => o.id === target) || {}).name === 'Personal' || (scope.orgs.find((o) => o.id === target) || {}).personal ? 'your Personal organization' : (scope.orgs.find((o) => o.id === target) || {}).name}</b>. Switch organization in the top bar to add it somewhere else.</p>`}
       <${Field} label="Domain" help="Just the domain: no https:// and no path."><input required autofocus placeholder="example.com" value=${domain} onInput=${(e) => setDomain(e.target.value)} autocapitalize="off" spellcheck="false" /><//>
       <${Field} label="Reporting timezone" help="Days start and end at midnight in this timezone."><select value=${timezone} onChange=${(e) => setTimezone(e.target.value)}>${zones().map((z) => html`<option value=${z} selected=${z === timezone}>${z}</option>`)}</select><//>
     <//></form></main>`;

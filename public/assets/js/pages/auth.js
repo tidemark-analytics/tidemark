@@ -45,7 +45,7 @@ export function Login({ setUser }) {
 }
 
 export function Register({ setUser }) {
-  const [f, setF] = useState({ name: '', organization: '', email: '', password: '', password_confirmation: '' });
+  const [f, setF] = useState({ name: '', email: '', password: '', password_confirmation: '' });
   const [err, setErr] = useState('');
   if (!window.SD.registration) return html`<${AuthShell} title="Registration is closed" sub="Ask an administrator for an account."><${Link} to="/login" class="btn">Back to sign in<//><//>`;
   const submit = async (e) => {
@@ -57,7 +57,6 @@ export function Register({ setUser }) {
   return html`<${AuthShell} title="Create your account" sub="Privacy-first analytics in a minute.">
     <form class="stack" onSubmit=${submit}>${err && html`<div class="alert" role="alert"><${Icon} name="circle-alert" size=${16} /><div>${err}</div></div>`}
       <${Field} label="Name"><input required value=${f.name} onInput=${set('name')} /><//>
-      <${Field} label="Organization" help="Your company, team or project. Sites you add belong to it, and you can rename it later."><input maxlength="100" placeholder=${f.name ? f.name + "'s organization" : 'Optional'} value=${f.organization} onInput=${set('organization')} /><//>
       <${Field} label="Email"><input type="email" required value=${f.email} onInput=${set('email')} /><//>
       <${Field} label="Password" help="At least 8 characters."><input type="password" required minlength="8" autocomplete="new-password" value=${f.password} onInput=${set('password')} /><//>
       <${Field} label="Confirm password"><input type="password" required autocomplete="new-password" value=${f.password_confirmation} onInput=${set('password_confirmation')} /><//>

@@ -60,10 +60,9 @@ class AuthController extends Controller
             'name' => 'required|string|max:100',
             'email' => 'required|email|max:255|unique:users,email',
             'password' => ['required', 'confirmed', Password::min(8)],
-            'organization' => 'nullable|string|max:100',
         ]);
-        $user = User::create(collect($data)->except('organization')->all());
-        Organization::forOwner($user, $data['organization'] ?? null);
+        $user = User::create($data);
+        Organization::personalFor($user);
         event(new Registered($user));
         if (config('tidemark.verify_email')) {
             $user->sendEmailVerificationNotification();
@@ -239,6 +238,8 @@ class AuthController extends Controller
 
     private function present(User $u): array
     {
+        Organization::personalFor($u); // everyone has a Personal organization, including people who signed up before they existed
+
         return [
             'id' => $u->id, 'name' => $u->name, 'email' => $u->email, 'is_admin' => $u->is_admin,
             'timezone' => $u->timezone, 'locale' => $u->locale, 'two_factor' => $u->hasTwoFactor(),
@@ -246,7 +247,9 @@ class AuthController extends Controller
             'updater_enabled' => (bool) config('tidemark.updater'),
             'can_rollup' => Site::rollupsAllowedFor($u),
             // organizations this person owns or administers, for the choice when adding a site or a team
-            'organizations' => Organization::whereIn('id', Organization::idsFor($u))->orderBy('name')->get()->map(fn ($o) => ['id' => $o->id, 'name' => $o->name, 'role' => $o->owner_id === $u->id ? 'owner' : 'admin'])->values(),
+            'organizations' => Organization::whereIn('id', Organization::idsFor($u))->orderByDesc('personal')->orderBy('name')->get()->map(fn ($o) => ['id' => $o->id, 'name' => $o->name, 'personal' => $o->personal, 'role' => $o->owner_id === $u->id ? 'owner' : 'admin'])->values(),
+            // sites of other people's organizations this person can open (shown under "Shared with me")
+            'shared_sites' => Site::where('kind', '!=', 'rollup')->memberOf($u)->where(fn ($q) => $q->whereNull('organization_id')->orWhereNotIn('organization_id', Organization::idsFor($u)))->exists(),
         ];
     }
 }

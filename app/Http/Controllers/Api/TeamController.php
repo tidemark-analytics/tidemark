@@ -21,7 +21,8 @@ class TeamController extends Controller
     public function index(Request $r)
     {
         $user = $r->user();
-        $orgs = Organization::idsFor($user);
+        // teams are for organizations with other people in them, so Personal has none; the page asks for the organization chosen in the switcher
+        $orgs = Organization::where('personal', false)->whereIn('id', Organization::idsFor($user))->when($r->query('organization'), fn ($q, $id) => $q->whereKey($id))->pluck('id')->all();
         $teamIds = Team::whereIn('organization_id', $orgs)->pluck('id');
         Invitation::where('expires_at', '<', now())->whereIn('team_id', $teamIds)->delete();
         $teams = Team::whereIn('id', $teamIds)->with(['organization', 'members' => fn ($q) => $q->orderBy('name'), 'sites'])->orderBy('name')->get();
@@ -42,8 +43,10 @@ class TeamController extends Controller
 
     public function store(Request $r)
     {
-        $org = $r->input('organization_id', fn () => Organization::forOwner($r->user())->id);
+        $r->validate(['organization_id' => 'required|string']);
+        $org = $r->input('organization_id');
         abort_unless(in_array($org, Organization::idsFor($r->user()), true), 403, 'You are not part of that organization.');
+        abort_if(Organization::whereKey($org)->value('personal'), 422, 'Teams are for organizations. Create an organization to work with other people.');
         $data = $this->validated($r, null, $org);
         $team = Team::create(['organization_id' => $org, 'name' => $data['name']]);
 

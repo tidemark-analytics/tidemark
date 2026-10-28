@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Invitation;
+use App\Models\Organization;
 use App\Models\Site;
 use App\Models\User;
 use Illuminate\Auth\Events\Registered;
@@ -35,6 +36,7 @@ class InviteController extends Controller
             $data = $request->validate(['name' => 'required|string|max:100', 'password' => ['required', 'confirmed', Password::min(8)]]);
             $user = User::create(['name' => $data['name'], 'email' => $invite->email, 'password' => $data['password']]);
             $user->forceFill(['email_verified_at' => now()])->save(); // they proved they own the inbox
+            Organization::personalFor($user);
             event(new Registered($user));
             Auth::guard('web')->login($user);
             $request->session()->regenerate();

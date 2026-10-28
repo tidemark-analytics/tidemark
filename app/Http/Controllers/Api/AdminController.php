@@ -25,7 +25,7 @@ class AdminController extends Controller
         $data = $r->validate(['name' => 'required|string|max:100', 'email' => 'required|email|unique:users,email', 'password' => 'required|string|min:8', 'is_admin' => 'boolean']);
         $u = User::create($data);
         $u->forceFill(['is_admin' => (bool) ($data['is_admin'] ?? false), 'email_verified_at' => now()])->save(); // accounts an administrator creates need no confirmation
-        Organization::forOwner($u);
+        Organization::personalFor($u);
 
         return response()->json(['data' => $u], 201);
     }
