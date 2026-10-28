@@ -19,7 +19,7 @@ class InviteController extends Controller
         $invite = $this->live($token);
         $has = User::whereRaw('lower(email) = ?', [strtolower($invite->email)])->exists();
 
-        return ['email' => $invite->email, 'role' => $invite->role, 'site' => $invite->site->domain, 'inviter' => $invite->inviter?->name, 'has_account' => $has, 'signed_in_as' => Auth::user()?->email];
+        return ['email' => $invite->email, 'role' => $invite->role, 'site' => $invite->site?->domain, 'team' => $invite->team?->name, 'inviter' => $invite->inviter?->name, 'has_account' => $has, 'signed_in_as' => Auth::user()?->email];
     }
 
     public function accept(Request $request, string $token)
@@ -38,19 +38,28 @@ class InviteController extends Controller
             Auth::guard('web')->login($user);
             $request->session()->regenerate();
         }
-        $site = $invite->site;
-        if (! $site->members()->where('users.id', $user->id)->exists()) {
-            $site->members()->attach($user->id, ['role' => $invite->role, 'id' => (string) Str::uuid()]);
+        $landing = null;
+        if ($invite->team) {
+            if (! $invite->team->members()->where('users.id', $user->id)->exists()) {
+                $invite->team->members()->attach($user->id, ['id' => (string) Str::uuid()]);
+            }
+            $landing = $invite->team->sites()->orderBy('domain')->value('domain');
+        } else {
+            $site = $invite->site;
+            if (! $site->members()->where('users.id', $user->id)->exists()) {
+                $site->members()->attach($user->id, ['role' => $invite->role, 'id' => (string) Str::uuid()]);
+            }
+            $landing = $site->domain;
         }
         $invite->delete();
 
-        return ['ok' => true, 'site' => $site->domain];
+        return ['ok' => true, 'site' => $landing];
     }
 
     private function live(string $token): Invitation
     {
         $invite = Invitation::live($token);
-        abort_if(! $invite || ! $invite->site, 410, 'This invitation has expired or was already used. Ask for a new one.');
+        abort_if(! $invite || ! ($invite->site || $invite->team), 410, 'This invitation has expired or was already used. Ask for a new one.');
 
         return $invite;
     }

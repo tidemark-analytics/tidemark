@@ -35,6 +35,18 @@ class User extends Authenticatable
         return $this->belongsToMany(Site::class)->withPivot('role')->withTimestamps();
     }
 
+    /** Teams this person belongs to. */
+    public function teams(): BelongsToMany
+    {
+        return $this->belongsToMany(Team::class, 'team_user')->withTimestamps();
+    }
+
+    /** Teams this person owns (they manage the members and what each team can open). */
+    public function ownedTeams(): HasMany
+    {
+        return $this->hasMany(Team::class, 'owner_id');
+    }
+
     public function apiKeys(): HasMany
     {
         return $this->hasMany(ApiKey::class);

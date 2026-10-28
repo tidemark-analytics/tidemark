@@ -32,6 +32,12 @@ class Site extends Model
         return $this->belongsToMany(User::class)->withPivot('role')->withTimestamps();
     }
 
+    /** Teams this site is shared with, each with the role it holds here. */
+    public function teams(): BelongsToMany
+    {
+        return $this->belongsToMany(Team::class, 'site_team')->withPivot('role')->withTimestamps();
+    }
+
     public function isRollup(): bool
     {
         return $this->kind === 'rollup';
@@ -112,10 +118,32 @@ class Site extends Model
         return $this->hasMany(ShieldRule::class);
     }
 
-    /** Sites a user may open: ones they are a member of, or everything for admins. */
+    /** Sites a user may open: ones they belong to (directly or through a team), or everything for administrators. */
     public function scopeVisibleTo($query, User $user)
     {
-        return $user->is_admin ? $query : $query->whereHas('members', fn ($q) => $q->where('users.id', $user->id));
+        return $user->is_admin ? $query : $query->memberOf($user);
+    }
+
+    /** Sites a user belongs to, directly or through a team, whatever their global role. */
+    public function scopeMemberOf($query, User $user)
+    {
+        return $query->where(fn ($q) => $q
+            ->whereHas('members', fn ($m) => $m->where('users.id', $user->id))
+            ->orWhereHas('teams', fn ($t) => $t->whereHas('members', fn ($m) => $m->where('users.id', $user->id))));
+    }
+
+    /** The strongest of the user's direct role and the roles of the teams they are in. */
+    public function memberRole(User $user): ?string
+    {
+        $roles = [$this->members()->where('users.id', $user->id)->first()?->pivot->role];
+        if ($roles[0] !== 'owner') {
+            $roles = array_merge($roles, $this->teams()->whereHas('members', fn ($m) => $m->where('users.id', $user->id))->get()->map(fn ($t) => $t->pivot->role)->all());
+        }
+        $rank = ['owner' => 3, 'admin' => 2, 'viewer' => 1];
+        $roles = array_filter($roles);
+        usort($roles, fn ($a, $b) => ($rank[$b] ?? 0) <=> ($rank[$a] ?? 0));
+
+        return $roles[0] ?? null;
     }
 
     public function roleOf(?User $user): ?string
@@ -123,9 +151,8 @@ class Site extends Model
         if (! $user) {
             return null;
         }
-        $role = $this->members()->where('users.id', $user->id)->first()?->pivot->role;
 
-        return $role ?? ($user->is_admin ? 'owner' : null);
+        return $this->memberRole($user) ?? ($user->is_admin ? 'owner' : null);
     }
 
     /** Whether this site may use funnels (always true unless an extension limits it). */

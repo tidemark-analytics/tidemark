@@ -48,6 +48,8 @@ class AdminController extends Controller
         abort_if($user === $r->user()->id, 422, 'You cannot delete yourself.');
         $u = User::findOrFail($user);
         $u->sites()->detach();
+        $u->teams()->detach();
+        $u->ownedTeams()->each(fn ($t) => $t->erase());
         $u->apiKeys()->delete();
         ReportSubscription::where('user_id', $u->id)->delete();
         $u->delete();
