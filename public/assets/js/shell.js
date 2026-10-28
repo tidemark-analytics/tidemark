@@ -193,15 +193,15 @@ function SiteSwitcher({ list, current, domain, recents, user, scopeId }) {
   const query = q.trim().toLowerCase();
   const orgs = (user && user.organizations) || [];
   // which organization a site belongs to, for the label next to it and for grouping; sites of other people's organizations are "Shared with me"
-  const orgOf = (s) => { const o = s.rollup ? orgs.find((x) => x.personal) : orgs.find((x) => x.id === s.organization_id); return o ? { id: o.id, name: o.personal ? 'Personal' : o.name } : { id: 'shared', name: 'Shared with me' }; };
+  const orgOf = (s) => { const o = orgs.find((x) => x.id === s.organization_id); return o ? { id: o.id, name: o.personal ? 'Personal' : o.name } : { id: 'shared', name: 'Shared with me' }; };
   const groups = useMemo(() => {
     if (query) return [['Results', list.filter((s) => s.domain.toLowerCase().includes(query))]];
     const byDomain = Object.fromEntries(list.map((s) => [s.domain, s]));
     const recent = recents.map((d) => byDomain[d]).filter((s) => s && s.domain !== domain).slice(0, 3);
     // the current organization's sites first, then the others (Personal first), then what is shared with you
     const order = [scopeId, ...orgs.map((o) => o.id), 'shared'].filter((id, i, all) => id && all.indexOf(id) === i);
-    const byOrg = order.map((id) => [orgs.find((o) => o.id === id) ? orgOf({ organization_id: id }).name : 'Shared with me', list.filter((s) => !s.rollup && orgOf(s).id === id)]);
-    return [['Recent', recent], ...byOrg, ['Rollups', list.filter((s) => s.rollup)]].filter(([, l]) => l.length);
+    const byOrg = order.map((id) => [orgs.find((o) => o.id === id) ? orgOf({ organization_id: id }).name : 'Shared with me', list.filter((s) => orgOf(s).id === id)]);
+    return [['Recent', recent], ...byOrg].filter(([, l]) => l.length);
   }, [list, query, recents, domain, scopeId, user]);
   const flat = groups.flatMap(([, l]) => l);
   useEffect(() => {
@@ -319,8 +319,12 @@ export function Sidebar({ user, path, sites, side }) {
   useBadgePolling(path);
   useBadgeCounts();
   const domain = siteFromPath(path);
-  const list = sites ? sites.list : [];
-  const current = domain && list.find((s) => s.domain === domain);
+  const scope = useScope(user);
+  const all = sites ? sites.list : [];
+  const current = domain && all.find((s) => s.domain === domain);
+  // the counts are for the organization chosen in the switcher, like the Sites page
+  const mineIds = (user.organizations || []).map((o) => o.id);
+  const list = all.filter((s) => (scope.shared ? !mineIds.includes(s.organization_id) && !s.rollup : s.organization_id === scope.id));
   const canManage = !current || current.role === 'owner' || current.role === 'admin';
   const hasRollups = list.some((s) => s.rollup);
   const tabs = accountTabs(user);
@@ -334,7 +338,7 @@ export function Sidebar({ user, path, sites, side }) {
       <div class="side-site-head"><${FavTile} name=${domain} rollup=${current && current.rollup} /><b>${domain}</b></div>
       ${SITE_NAV.filter((i) => !i.manage || canManage).map((i) => html`<${SideLink} to=${'/' + domain + i.route + (i.scoped ? scopeQuery() : '')} icon=${i.icon} label=${i.label} on=${itemOn(i)} />`)}`
     : html`<div class="side-grp">Workspace</div>
-      <${SideLink} to="/sites" icon="layout-dashboard" label="Sites" on=${path === '/sites' || path === '/sites/new' || path === '/sites/rollup'}>${list.length > 0 && html`<em class="side-count">${list.length}</em>`}<//>
+      <${SideLink} to="/sites" icon="layout-dashboard" label="Sites" on=${path === '/sites' || path === '/sites/new' || path === '/sites/rollup'}>${list.some((s) => !s.rollup) && html`<em class="side-count">${list.filter((s) => !s.rollup).length}</em>`}<//>
       ${hasRollups && html`<${SideLink} to="/sites?kind=rollups" icon="layers" label="Rollups" on=${false}><em class="side-count">${list.filter((s) => s.rollup).length}</em><//>`}
       <div class="side-grp">Settings</div>
       ${tabs.map(([k, l, dot]) => html`${k === 'organization' && html`<div class="side-grp">Organization</div>`}<${SideLink} to=${tabPath(k)} icon=${ACCOUNT_ICONS[k] || 'settings'} label=${l} on=${accountOn(k)}>${dot && html`<span class="notif inline" aria-hidden="true"></span><span class="sr-only"> (update available)</span>`}<//>`)}
