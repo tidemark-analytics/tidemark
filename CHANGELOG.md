@@ -4,6 +4,8 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [0.35.0] - 2026-10-28
+
 ### Added
 - Events now remember whether they were an interaction (`events.interactive`, false for events sent with `i: 0` such as scroll depth), and the recording check an extension implements (`Entitlements::allowsRecording`) is told. A hosted service can use it to leave measurements out of the events it meters.
 - For extensions: the dashboard extension API now has `org`, the organization chosen in the top-bar switcher (`org.useScope(user)`), so a package's pages can follow it, and `registerAfterCreateOrganization` to choose where someone lands right after creating an organization (a hosted service can send them to choose a plan).
