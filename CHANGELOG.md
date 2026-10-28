@@ -4,6 +4,9 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Changed
+- The README shows the current dashboard, and has a section for people who would rather not host Tidemark themselves, pointing to Tidemark Cloud. The notes on how the hosted version is built are gone from it.
+
 ## [0.34.0] - 2026-10-26
 
 ### Added
