@@ -209,6 +209,7 @@ function MoveSite({ site, reload }) {
     i.loses_access.length > 0 && `${names(i.loses_access)} lose${i.loses_access.length === 1 ? 's' : ''} the access they had through ${label(d.organization)}.`,
     i.teams.length > 0 && `Shared with ${names(i.teams.map((t) => `${t.name} (${t.members} ${t.members === 1 ? 'person' : 'people'})`))}: unshared, because teams belong to an organization.`,
     i.direct_people_kept > 0 && `The ${i.direct_people_kept} ${i.direct_people_kept === 1 ? 'person' : 'people'} you added to this site directly keep their access.`,
+    ...(i.warnings || []),
     'Statistics, goals, shared links and alerts move with it.',
   ].filter(Boolean) : [];
   return html`<${Section} title="Move to another organization" help=${`This site is in ${label(d.organization)}. Moving it keeps its data and the people you added to it directly; access that came from the organization (its admins and teams) changes.`}>

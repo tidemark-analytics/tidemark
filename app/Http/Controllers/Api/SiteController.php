@@ -7,6 +7,7 @@ use App\Analytics\Support\Sql;
 use App\Analytics\Support\UrlParams;
 use App\Contracts\Entitlements;
 use App\Contracts\LimitsSiteList;
+use App\Contracts\ScopesToOrganizations;
 use App\Events\SiteCreated;
 use App\Http\Controllers\Controller;
 use App\Models\FunnelStep;
@@ -86,7 +87,8 @@ class SiteController extends Controller
             $org = Organization::personalFor($user);
         }
         $owner = $org->owner_id === $user->id ? $user : User::findOrFail($org->owner_id);
-        $allowed = app(Entitlements::class)->canCreateSite($owner);
+        $e = app(Entitlements::class);
+        $allowed = $e instanceof ScopesToOrganizations ? $e->canCreateSiteIn($org) : $e->canCreateSite($owner);
         if ($allowed !== true) {
             throw ValidationException::withMessages(['domain' => $allowed]);
         }
