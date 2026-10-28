@@ -609,7 +609,7 @@ main:focus { outline: none; }
 .crumb-cur { padding: 0 8px; font-size: 14px; font-weight: 500; color: var(--foreground); white-space: nowrap; display: inline-flex; align-items: center; gap: 8px; }
 .crumb-cur.muted { color: var(--muted-foreground); font-weight: 400; }
 .tb-right { display: flex; align-items: center; gap: 8px; flex: none; }
-.find { display: inline-flex; align-items: center; gap: 8px; height: 32px; width: 220px; padding: 0 8px 0 10px; background: var(--control); border: 1px solid var(--input); border-radius: var(--radius-md); color: var(--muted-foreground); cursor: pointer; font-size: 13px; text-align: left; transition: border-color .12s; }
+.find { display: inline-flex; align-items: center; gap: 8px; height: 36px; width: 220px; padding: 0 8px 0 10px; background: var(--control); border: 1px solid var(--input); border-radius: var(--radius-md); color: var(--muted-foreground); cursor: pointer; font-size: 13px; text-align: left; transition: border-color .12s; }
 .find:hover { border-color: var(--muted-foreground); }
 .find span { flex: 1; }
 .live-pill { display: inline-flex; align-items: center; gap: 8px; height: 28px; padding: 0 10px; border: 1px solid var(--border); border-radius: 999px; background: var(--card); font-size: 13px; font-weight: 500; cursor: pointer; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -863,6 +863,9 @@ button.fact:hover { border-color: var(--muted-foreground); background: var(--mut
 .goal-add { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--muted); }
 .goal-add-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .goal-add-row .grow { min-width: 200px; }
+/* Controls that sit side by side in a form row are always the same height (36px, the default), whatever size class they carry: an input next to
+   a .btn.sm or a .mini-select would otherwise look off by 4px. For one-off rows elsewhere, keep the default sizes (no .sm, no .mini-select). */
+.goal-add-row > :is(input, select, .btn) { height: 36px; }
 .goal-add input, .goal-add select { background: var(--background); }
 .rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; }
 .rowitem { display: flex; align-items: center; gap: 12px; padding: 10px 14px; min-height: 56px; }
@@ -873,6 +876,8 @@ button.fact:hover { border-color: var(--muted-foreground); background: var(--mut
 .rowitem .tick { color: var(--foreground); flex: none; }
 .rowitem .avatar { flex: none; }
 .rowitem.pick { padding: 0; }
+.team-row { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; padding: 10px 14px; min-height: 56px; color: inherit; text-decoration: none; }
+.team-row:focus-visible { outline: 2px solid var(--ring, var(--brand)); outline-offset: -2px; border-radius: var(--radius-md); }
 .rowitem.pick label { display: flex; flex-direction: row; align-items: center; gap: 12px; padding: 10px 14px; min-height: 56px; cursor: pointer; margin: 0; }
 .rowitem.pick b { font-weight: 500; font-size: 14px; }
 .ri-ico { flex: none; width: 32px; height: 32px; display: grid; place-items: center; border-radius: var(--radius-md); background: var(--muted); border: 1px solid var(--border); color: var(--muted-foreground); }
@@ -881,6 +886,7 @@ button.fact:hover { border-color: var(--muted-foreground); background: var(--mut
 .ri-main b { font-weight: 500; font-size: 14px; }
 .ri-main .muted { font-size: 13px; }
 .ri-spacer { flex: none; width: 32px; }
+.fit { width: auto; flex: none; }
 .mini-select { height: 32px; padding: 0 28px 0 10px; font-size: 13px; width: auto; flex: none; }
 .empty-inline { display: flex; gap: 12px; align-items: flex-start; padding: 16px; border: 1px dashed var(--input); border-radius: var(--radius-md); color: var(--muted-foreground); }
 .empty-inline .icon { margin-top: 2px; color: var(--muted-foreground); }
@@ -1088,7 +1094,7 @@ button.fact:hover { border-color: var(--muted-foreground); background: var(--mut
   .app.side-collapsed .side-site-head { justify-content: flex-start; padding: 6px 10px 10px; }
     .side-collapse { display: none; }
   .side-toggle { display: inline-grid; }
-  .find { width: 32px; padding: 0; justify-content: center; }
+  .find { width: 36px; padding: 0; justify-content: center; }
   .find span, .find kbd { display: none; }
 }
 @media (max-width: 900px) { .page-head > .row { width: 100%; } .page-head h1 { font-size: 22px; } }

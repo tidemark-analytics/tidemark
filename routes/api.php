@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\SettingsController as S;
 use App\Http\Controllers\Api\SiteController;
 use App\Http\Controllers\Api\StatsApiController;
 use App\Http\Controllers\Api\StatsController;
+use App\Http\Controllers\Api\TeamController;
 use App\Http\Controllers\Api\UpdateController;
 use App\Http\Controllers\EventController;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
@@ -80,6 +81,14 @@ Route::middleware('api.auth')->group(function () {
     Route::post('/me/keys', [AuthController::class, 'createKey']);
     Route::delete('/me/keys/{id}', [AuthController::class, 'deleteKey']);
 
+    Route::get('/teams', [TeamController::class, 'index']);
+    Route::post('/teams', [TeamController::class, 'store']);
+    Route::patch('/teams/{team}', [TeamController::class, 'update']);
+    Route::delete('/teams/{team}', [TeamController::class, 'destroy']);
+    Route::post('/teams/{team}/members', [TeamController::class, 'addMember']);
+    Route::delete('/teams/{team}/members/{user}', [TeamController::class, 'removeMember']);
+    Route::post('/teams/{team}/invites/{invite}/resend', [TeamController::class, 'resendInvite'])->middleware('throttle:10,1');
+    Route::delete('/teams/{team}/invites/{invite}', [TeamController::class, 'revokeInvite']);
     Route::get('/rollups/candidates', [RollupController::class, 'candidates']);
     Route::post('/rollups', [RollupController::class, 'store']);
     Route::get('/sites', [SiteController::class, 'index']);
@@ -140,6 +149,11 @@ Route::middleware('api.auth')->group(function () {
         Route::delete('/people/{user}', [S::class, 'removePerson']);
         Route::post('/invites/{invite}/resend', [S::class, 'resendInvite'])->middleware('throttle:10,1');
         Route::delete('/invites/{invite}', [S::class, 'revokeInvite']);
+    });
+    Route::middleware('site:owner')->prefix('/sites/{site}')->group(function () {
+        Route::post('/teams', [S::class, 'addTeam']);
+        Route::patch('/teams/{team}', [S::class, 'updateTeam']);
+        Route::delete('/teams/{team}', [S::class, 'removeTeam']);
     });
     Route::middleware('site:owner')->delete('/sites/{site}', [SiteController::class, 'destroy']);
 

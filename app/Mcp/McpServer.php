@@ -3,6 +3,7 @@
 namespace App\Mcp;
 
 use App\Http\Controllers\Api\StatsApiController;
+use App\Models\Site;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
@@ -134,7 +135,7 @@ class McpServer
     /** @return array{sites: array<int, array{domain:string,timezone:string,role:string}>} */
     private function sites(User $user): array
     {
-        return ['sites' => $user->sites()->orderBy('domain')->get()->map(fn ($s) => ['domain' => $s->domain, 'timezone' => $s->timezone, 'role' => $s->pivot->role])->all()];
+        return ['sites' => Site::memberOf($user)->orderBy('domain')->get()->map(fn ($s) => ['domain' => $s->domain, 'timezone' => $s->timezone, 'role' => $s->memberRole($user)])->all()];
     }
 
     /** Runs one of the Stats API endpoints as the key's owner and returns its answer as an object. */

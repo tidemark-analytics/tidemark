@@ -27,7 +27,7 @@ class SiteController extends Controller
         $entitlements = app(Entitlements::class);
         $otherPath = $entitlements instanceof LimitsSiteList ? $entitlements->otherSitesPath($user) : null;
         // an extension can keep an administrator's list to their own sites; the rest are browsed elsewhere
-        $query = $otherPath !== null ? Site::query()->whereHas('members', fn ($q) => $q->where('users.id', $user->id)) : Site::visibleTo($user)->where(fn ($q) => $q->where('kind', '!=', 'rollup')->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id)));
+        $query = $otherPath !== null ? Site::memberOf($user) : Site::visibleTo($user)->where(fn ($q) => $q->where('kind', '!=', 'rollup')->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id)));
         $sites = $query->orderBy('domain')->get()->map(function (Site $s) use ($user) {
             $r = $s->only(['id', 'domain', 'public']) + ['role' => $s->roleOf($user), 'created_at' => $s->created_at, 'rollup' => $s->isRollup()] + ($s->isRollup() ? ['members' => count($s->memberSiteIds())] : []);
             $r += (new Stats($s))->last24h();
@@ -127,6 +127,7 @@ class SiteController extends Controller
             $site->{$rel}()->delete();
         }
         $site->members()->detach();
+        $site->teams()->detach();
         Cache::forget('tdm:site:'.$site->domain);
         $site->delete();
 

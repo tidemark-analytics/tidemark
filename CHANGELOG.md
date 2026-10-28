@@ -5,11 +5,13 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 ## [Unreleased]
 
 ### Added
+- Teams (Account settings → Teams): group people once, then share a site with the whole team from the site's Sharing and access settings, choosing Viewer or Admin for that team on that site. A person's role on a site is the strongest of their direct role and their teams' roles, and removing someone from a team or deleting the team takes back only the access it gave. Only the site's owner shares it with their own teams. Adding someone with no account to a team sends the same 72-hour e-mail invitation (when `TIDEMARK_INVITES` is on); people with an account are added at once and told by e-mail. Reports, the site list and MCP follow team access.
 - E-mail invitations (opt-in with `TIDEMARK_INVITES=true`, needs working mail settings): adding someone without an account under a site's People now sends them an invitation instead of asking you to contact an administrator. They set a name and password from the link, which works once and expires after 72 hours (`TIDEMARK_INVITE_HOURS`). Nothing is created for them until they accept, pending invitations can be resent or cancelled, and people who already have an account are added straight away and told by e-mail.
 - Scroll depth and time on page: an opt-in `engagement` script variant (Site settings → Tracking) that sends one non-interactive `Engagement` event per page view with how far the visitor scrolled (`depth`: 0, 25, 50, 75, 100) and how long they were active (`time`, in five bands). It doesn't affect bounce rate or visit duration, repeats for the same page view replace the earlier one, and the properties work in goals, filters and funnels. Numbers only: no element, text or position is captured.
 - The Events API accepts `i: 0` (or Plausible's `interactive: false`) for an event that is not an interaction: it is stored, but doesn't count against a bounce and never starts a visit.
 
 ### Changed
+- Buttons, inputs and selects that sit side by side are now the same height everywhere: the header search box (32px beside 36px icon buttons), the chart's Note and Table buttons beside the Daily/Weekly toggle, and the team sharing row. Form rows (`.goal-add-row`) keep their controls at 36px whatever size class they carry.
 - The README shows the current dashboard, and has a section for people who would rather not host Tidemark themselves, pointing to Tidemark Cloud. The notes on how the hosted version is built are gone from it.
 
 ## [0.34.0] - 2026-10-26

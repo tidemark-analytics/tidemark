@@ -14,13 +14,13 @@ use App\Models\Invitation;
 use App\Models\SharedLink;
 use App\Models\ShieldRule;
 use App\Models\Site;
+use App\Models\Team;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -255,6 +255,10 @@ class SettingsController extends Controller
             'data' => $site->members()->get()->map(fn ($u) => ['id' => $u->id, 'name' => $u->name, 'email' => $u->email, 'role' => $u->pivot->role]),
             'invites' => Invitation::where('site_id', $site->id)->orderBy('created_at')->get()->map(fn ($i) => ['id' => $i->id, 'email' => $i->email, 'role' => $i->role, 'expires_at' => $i->expires_at->toIso8601String()]),
             'invites_enabled' => Invitation::enabled(),
+            'teams' => $site->teams()->withCount('members')->orderBy('name')->get()->map(fn ($t) => ['id' => $t->id, 'name' => $t->name, 'role' => $t->pivot->role, 'members' => $t->members_count]),
+            // only the site's owner decides which of their teams it is shared with
+            'available_teams' => $r->attributes->get('role') === 'owner' && ! $site->isRollup()
+                ? Team::where('owner_id', $this->ownerId($site))->whereNotIn('id', $site->teams()->pluck('teams.id'))->orderBy('name')->get(['id', 'name']) : [],
         ];
     }
 
@@ -274,10 +278,10 @@ class SettingsController extends Controller
             if (! Invitation::enabled()) {
                 throw ValidationException::withMessages(['email' => 'No account with that e-mail. Ask an administrator to create one first.']);
             }
-            $this->guardInviteAbuse($inviter);
+            Invitation::guardAbuse($inviter);
             $invite = Invitation::issue($email, $inviter, $site, $data['role']);
             Mail::to($email)->send(new InviteMail($site, $inviter, $data['role'], $invite));
-            RateLimiter::hit('invite:'.$inviter->id, 86400);
+            Invitation::countSent($inviter);
 
             return response()->json(['ok' => true, 'invited' => true], 201);
         }
@@ -298,10 +302,10 @@ class SettingsController extends Controller
         $s = $r->attributes->get('site');
         $old = Invitation::where('site_id', $s->id)->whereKey($invite)->firstOrFail();
         abort_unless(Invitation::enabled(), 422, 'Invitations are turned off.');
-        $this->guardInviteAbuse($r->user());
+        Invitation::guardAbuse($r->user());
         $new = Invitation::issue($old->email, $r->user(), $s, $old->role);
         Mail::to($new->email)->send(new InviteMail($s, $r->user(), $new->role, $new));
-        RateLimiter::hit('invite:'.$r->user()->id, 86400);
+        Invitation::countSent($r->user());
 
         return ['ok' => true];
     }
@@ -313,18 +317,42 @@ class SettingsController extends Controller
         return ['ok' => true];
     }
 
-    /** Invitations send mail from this install, so they are capped per person per day and in total. */
-    private function guardInviteAbuse(User $inviter): void
+    private function ownerId(Site $site): ?string
     {
-        if (config('tidemark.verify_email') && ! $inviter->hasVerifiedEmail()) {
-            throw ValidationException::withMessages(['email' => 'Confirm your own e-mail address before inviting people.']);
+        return $site->members()->wherePivot('role', 'owner')->value('users.id');
+    }
+
+    /** Share the site with one of the owner's teams, as viewers or as admins. */
+    public function addTeam(Request $r)
+    {
+        $site = $r->attributes->get('site');
+        abort_if($site->isRollup(), 422, 'A rollup is private to its owner. Share it with a shared link instead.');
+        $data = $r->validate(['team_id' => 'required|string', 'role' => ['required', Rule::in(['admin', 'viewer'])]]);
+        $team = Team::where('owner_id', $this->ownerId($site))->find($data['team_id']);
+        if (! $team) {
+            throw ValidationException::withMessages(['team_id' => 'Choose one of the owner\'s teams.']);
         }
-        if (RateLimiter::tooManyAttempts('invite:'.$inviter->id, (int) config('tidemark.invite_daily_limit'))) {
-            throw ValidationException::withMessages(['email' => 'You have sent a lot of invitations today. Try again tomorrow.']);
+        if ($site->teams()->where('teams.id', $team->id)->exists()) {
+            throw ValidationException::withMessages(['team_id' => 'This team already has access.']);
         }
-        if (Invitation::where('invited_by', $inviter->id)->where('expires_at', '>', now())->count() >= (int) config('tidemark.invite_pending_limit')) {
-            throw ValidationException::withMessages(['email' => 'Too many invitations are waiting to be accepted. Revoke some first.']);
-        }
+        $site->teams()->attach($team->id, ['role' => $data['role'], 'id' => (string) Str::uuid()]);
+
+        return response()->json(['ok' => true], 201);
+    }
+
+    public function updateTeam(Request $r, string $site, string $team)
+    {
+        $data = $r->validate(['role' => ['required', Rule::in(['admin', 'viewer'])]]);
+        $r->attributes->get('site')->teams()->updateExistingPivot($team, ['role' => $data['role']]);
+
+        return ['ok' => true];
+    }
+
+    public function removeTeam(Request $r, string $site, string $team)
+    {
+        $r->attributes->get('site')->teams()->detach($team);
+
+        return ['ok' => true];
     }
 
     public function updatePerson(Request $r, string $site, string $user)
