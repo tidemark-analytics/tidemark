@@ -5,7 +5,7 @@ import { squareImage } from './image.js';
 import { Snippet } from './dashboard.js';
 import { useScope } from './org.js';
 import { CreateOrganization } from './shell.js';
-import { registry } from './extensions.js';
+import { registry, pathAfterOrganizationCreated } from './extensions.js';
 import { accountTabs } from './shell.js';
 import { brandTheme } from './brand.js';
 import { importPlausible, removeImported } from './data-import.js';
@@ -833,7 +833,7 @@ function NeedsOrganization({ scope, title, what }) {
     <p class="muted small" style="margin:0">${what} To work with other people, switch to an organization in the top bar or create one.</p>
     <div class="section-actions"><button class="btn primary" onClick=${() => setCreating(true)}><${Icon} name="plus" size=${14} /> Create organization</button></div>
   <//>
-  ${creating && html`<${CreateOrganization} onClose=${() => setCreating(false)} onCreated=${async (id) => { try { setUser((await api('/me')).user); } catch (e) { /* refreshed on next load */ } scope.set(id); setCreating(false); navigate('/settings/organization'); }} />`}`;
+  ${creating && html`<${CreateOrganization} onClose=${() => setCreating(false)} onCreated=${async (id) => { try { setUser((await api('/me')).user); } catch (e) { /* refreshed on next load */ } scope.set(id); setCreating(false); navigate(pathAfterOrganizationCreated(id)); }} />`}`;
 }
 
 const peopleCount = (t) => t.members.length;

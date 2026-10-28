@@ -22,9 +22,13 @@
 // ui.js also exports Tabs, Badge, Breadcrumb, Sheet, SettingCard, TypedConfirm, Tooltip, FavTile and table helpers (useSort, SortTh, Pagination).
 import * as lib from './lib.js';
 import * as ui from './ui.js';
+import * as org from './org.js';
 import * as chart from './chart.js';
 
-export const registry = { routes: [], accountTabs: [], banners: [], menuItems: [], adminUi: null };
+export const registry = { routes: [], accountTabs: [], banners: [], menuItems: [], adminUi: null, afterCreateOrganization: null };
+
+/** Where to go after someone creates an organization: an extension may choose (for example a page that finishes setting it up), otherwise its settings. */
+export const pathAfterOrganizationCreated = (id) => { try { return (registry.afterCreateOrganization && registry.afterCreateOrganization(id)) || '/settings/organization'; } catch (e) { return '/settings/organization'; } };
 
 // ---------------------------------------------------------------------------------------------- menu item badges
 const badgeCounts = new Map();
@@ -60,6 +64,8 @@ const api = {
   version: 1,
   html: lib.html,
   lib, ui, chart,
+  /** The organization chosen in the top-bar switcher: `org.useScope(user)` gives { id, org, orgs, shared, personal, owner, set }, `org.getScope()` and `org.setScope(id)` read and change it. */
+  org,
   /** A full page: pattern like '/pricing' or '/billing/:id?'; component receives the matched params. */
   registerRoute: (pattern, component) => registry.routes.push([pattern, component]),
   /** A tab in Account settings: { key, label, component, visible?(user), dot?(user) }. */
@@ -68,6 +74,8 @@ const api = {
   registerMenuItem: (item) => registry.menuItems.push(item),
   /** A separate administration interface served at `href` (a full page, not a route of this app): { href, label? }. Administrators get a link to it in the sidebar, and Users and Updates leave Account settings (the other interface can show them). */
   registerAdminUi: (ui) => { registry.adminUi = { label: 'Admin', ...ui }; },
+  /** Where to send someone right after they create an organization: `fn(organizationId)` returns a path (default: Settings → Organization). Hosted services use it to finish setting the organization up, such as choosing its plan. */
+  registerAfterCreateOrganization: (fn) => { registry.afterCreateOrganization = fn; },
   /** A component shown under the top bar on every signed-in page; receives { user }. */
   registerBanner: (component) => registry.banners.push(component),
 };

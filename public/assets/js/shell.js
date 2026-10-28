@@ -4,7 +4,7 @@ import { html, useState, useEffect, useMemo, useRef, useApi, api, navigate, Link
 import { Pop, Sheet, FavTile, Modal, Field, Avatar } from './ui.js';
 import { useScope } from './org.js';
 import { Logo } from './logo.js';
-import { registry, badgeOf, badgeText, useBadgeCounts, useBadgePolling } from './extensions.js';
+import { registry, pathAfterOrganizationCreated, badgeOf, badgeText, useBadgeCounts, useBadgePolling } from './extensions.js';
 
 const NOT_A_SITE = new Set(['', 'sites', 'settings', 'login', 'register', 'forgot-password', 'reset-password', 'share']);
 // the first segment of an extension's page ('/support' for '/support/:number?') is not a site either
@@ -161,7 +161,7 @@ function OrgSwitcher({ user }) {
       </div>
       <div class="cmd-foot"><button class="cmd-item" role="menuitem" onClick=${() => { setOpen(false); setCreating(true); }}><${Icon} name="plus" size=${15} /><span>Create organization</span></button></div>
     </div>`}
-    ${creating && html`<${CreateOrganization} onClose=${() => setCreating(false)} onCreated=${async (id) => { try { const me = await api('/me'); setUser(me.user); } catch (e) { /* the switcher refreshes on the next load */ } scope.set(id); setCreating(false); navigate('/settings/organization'); }} />`}
+    ${creating && html`<${CreateOrganization} onClose=${() => setCreating(false)} onCreated=${async (id) => { try { const me = await api('/me'); setUser(me.user); } catch (e) { /* the switcher refreshes on the next load */ } scope.set(id); setCreating(false); navigate(pathAfterOrganizationCreated(id)); }} />`}
   </div>`;
 }
 
