@@ -28,7 +28,7 @@ class SiteAccess
         $role = $site->roleOf($user);
 
         $allowed = match ($ability) {
-            'owner' => $role === 'owner',
+            'owner' => $role === 'owner' || $site->isOrganizationAdmin($user), // an organization admin does what the owner does on its sites
             'manage' => in_array($role, ['owner', 'admin'], true),
             default => $role !== null || $site->public,
         };

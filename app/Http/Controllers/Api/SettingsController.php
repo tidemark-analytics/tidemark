@@ -6,17 +6,21 @@ use App\Analytics\Support\FilteredHits;
 use App\Analytics\Support\PiiMasks;
 use App\Analytics\Support\Sql;
 use App\Http\Controllers\Controller;
+use App\Mail\InviteMail;
 use App\Models\Funnel;
 use App\Models\FunnelStep;
 use App\Models\Goal;
+use App\Models\Invitation;
 use App\Models\SharedLink;
 use App\Models\ShieldRule;
 use App\Models\Site;
+use App\Models\Team;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -244,25 +248,108 @@ class SettingsController extends Controller
     // ---- people ------------------------------------------------------------------------------------------
     public function people(Request $r)
     {
-        return ['data' => $r->attributes->get('site')->members()->get()->map(fn ($u) => ['id' => $u->id, 'name' => $u->name, 'email' => $u->email, 'role' => $u->pivot->role])];
+        $site = $r->attributes->get('site');
+        Invitation::where('expires_at', '<', now())->where('site_id', $site->id)->delete();
+
+        return [
+            'data' => $site->members()->get()->map(fn ($u) => ['id' => $u->id, 'name' => $u->name, 'email' => $u->email, 'avatar_url' => $u->avatarUrl(), 'role' => $u->pivot->role]),
+            'invites' => Invitation::where('site_id', $site->id)->orderBy('created_at')->get()->map(fn ($i) => ['id' => $i->id, 'email' => $i->email, 'role' => $i->role, 'expires_at' => $i->expires_at->toIso8601String()]),
+            'invites_enabled' => Invitation::enabled(),
+            'teams' => $site->teams()->withCount('members')->with(['members' => fn ($q) => $q->orderBy('name')->limit(25)])->orderBy('name')->get()->map(fn ($t) => ['id' => $t->id, 'name' => $t->name, 'role' => $t->pivot->role, 'members' => $t->members_count, 'member_names' => $t->members->pluck('name')->values()]),
+            // people who administer the whole organization: admins here without being listed above
+            'organization_admins' => $site->isRollup() || ! $site->organization ? [] : $site->organization->admins()->orderBy('name')->get()->map(fn ($u) => ['id' => $u->id, 'name' => $u->name, 'email' => $u->email, 'avatar_url' => $u->avatarUrl()]),
+            // only the site's owner decides which of their teams it is shared with
+            'available_teams' => ($r->attributes->get('role') === 'owner' || $site->isOrganizationAdmin($r->user())) && ! $site->isRollup() && $site->organization_id
+                ? Team::where('organization_id', $site->organization_id)->whereNotIn('id', $site->teams()->pluck('teams.id'))->withCount('members')->orderBy('name')->get()->map(fn ($t) => ['id' => $t->id, 'name' => $t->name, 'members' => $t->members_count])->values() : [],
+        ];
     }
 
-    /** Add an existing account to the site (accounts are created by an administrator; there is no e-mail invite flow). */
+    /**
+     * Give a person access. Someone who already has an account is added straight away; an address without one gets an e-mail
+     * invitation when invitations are enabled (otherwise an administrator has to create the account first).
+     */
     public function addPerson(Request $r)
     {
         $site = $r->attributes->get('site');
         abort_if($site->isRollup(), 422, 'A rollup is private to its owner. Share it with a shared link instead.');
         $data = $r->validate(['email' => 'required|email', 'role' => ['required', Rule::in(['admin', 'viewer'])]]);
-        $user = User::where('email', $data['email'])->first();
+        $email = strtolower(trim($data['email']));
+        $inviter = $r->user();
+        $user = User::whereRaw('lower(email) = ?', [$email])->first();
         if (! $user) {
-            throw ValidationException::withMessages(['email' => 'No account with that e-mail. Ask an administrator to create one first.']);
+            if (! Invitation::enabled()) {
+                throw ValidationException::withMessages(['email' => 'No account with that e-mail. Ask an administrator to create one first.']);
+            }
+            Invitation::guardAbuse($inviter);
+            $invite = Invitation::issue($email, $inviter, $site, $data['role']);
+            Mail::to($email)->send(new InviteMail($site, $inviter, $data['role'], $invite));
+            Invitation::countSent($inviter);
+
+            return response()->json(['ok' => true, 'invited' => true], 201);
         }
         if ($site->members()->where('users.id', $user->id)->exists()) {
             throw ValidationException::withMessages(['email' => 'This person already has access.']);
         }
         $site->members()->attach($user->id, ['role' => $data['role'], 'id' => (string) Str::uuid()]);
+        Invitation::where('email', $email)->where('site_id', $site->id)->delete();
+        if (AuthController::mailConfigured()) {
+            Mail::to($user->email)->send(new InviteMail($site, $inviter, $data['role']));
+        }
 
         return response()->json(['ok' => true], 201);
+    }
+
+    public function resendInvite(Request $r, string $site, string $invite)
+    {
+        $s = $r->attributes->get('site');
+        $old = Invitation::where('site_id', $s->id)->whereKey($invite)->firstOrFail();
+        abort_unless(Invitation::enabled(), 422, 'Invitations are turned off.');
+        Invitation::guardAbuse($r->user());
+        $new = Invitation::issue($old->email, $r->user(), $s, $old->role);
+        Mail::to($new->email)->send(new InviteMail($s, $r->user(), $new->role, $new));
+        Invitation::countSent($r->user());
+
+        return ['ok' => true];
+    }
+
+    public function revokeInvite(Request $r, string $site, string $invite)
+    {
+        Invitation::where('site_id', $r->attributes->get('site')->id)->whereKey($invite)->delete();
+
+        return ['ok' => true];
+    }
+
+    /** Share the site with one of the owner's teams, as viewers or as admins. */
+    public function addTeam(Request $r)
+    {
+        $site = $r->attributes->get('site');
+        abort_if($site->isRollup(), 422, 'A rollup is private to its owner. Share it with a shared link instead.');
+        $data = $r->validate(['team_id' => 'required|string', 'role' => ['required', Rule::in(['admin', 'viewer'])]]);
+        $team = Team::where('organization_id', $site->organization_id)->find($data['team_id']);
+        if (! $team) {
+            throw ValidationException::withMessages(['team_id' => 'Choose one of the owner\'s teams.']);
+        }
+        if ($site->teams()->where('teams.id', $team->id)->exists()) {
+            throw ValidationException::withMessages(['team_id' => 'This team already has access.']);
+        }
+        $site->teams()->attach($team->id, ['role' => $data['role'], 'id' => (string) Str::uuid()]);
+
+        return response()->json(['ok' => true], 201);
+    }
+
+    public function updateTeam(Request $r, string $site, string $team)
+    {
+        $data = $r->validate(['role' => ['required', Rule::in(['admin', 'viewer'])]]);
+        $r->attributes->get('site')->teams()->updateExistingPivot($team, ['role' => $data['role']]);
+
+        return ['ok' => true];
+    }
+
+    public function removeTeam(Request $r, string $site, string $team)
+    {
+        $r->attributes->get('site')->teams()->detach($team);
+
+        return ['ok' => true];
     }
 
     public function updatePerson(Request $r, string $site, string $user)

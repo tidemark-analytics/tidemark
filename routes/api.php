@@ -7,16 +7,21 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BrandingController;
 use App\Http\Controllers\Api\DataController;
 use App\Http\Controllers\Api\FaviconController;
+use App\Http\Controllers\Api\ImageController;
+use App\Http\Controllers\Api\InviteController;
 use App\Http\Controllers\Api\McpController;
 use App\Http\Controllers\Api\OpenApiController;
+use App\Http\Controllers\Api\OrganizationController;
 use App\Http\Controllers\Api\PlausibleImportController;
 use App\Http\Controllers\Api\ReportSubscriptionController;
 use App\Http\Controllers\Api\RollupController;
 use App\Http\Controllers\Api\SegmentController;
 use App\Http\Controllers\Api\SettingsController as S;
 use App\Http\Controllers\Api\SiteController;
+use App\Http\Controllers\Api\SiteMoveController;
 use App\Http\Controllers\Api\StatsApiController;
 use App\Http\Controllers\Api\StatsController;
+use App\Http\Controllers\Api\TeamController;
 use App\Http\Controllers\Api\UpdateController;
 use App\Http\Controllers\EventController;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
@@ -41,6 +46,8 @@ Route::middleware('api.auth:optional')->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:5,1');
     Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:10,1');
+    Route::get('/invites/{token}', [InviteController::class, 'show'])->middleware('throttle:30,1');
+    Route::post('/invites/{token}/accept', [InviteController::class, 'accept'])->middleware('throttle:10,1');
     Route::get('/auth/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])->middleware('signed')->name('verification.verify');
 
     // Readable by members, by anyone when the dashboard is public, or via a shared link.
@@ -77,6 +84,34 @@ Route::middleware('api.auth')->group(function () {
     Route::post('/me/keys', [AuthController::class, 'createKey']);
     Route::delete('/me/keys/{id}', [AuthController::class, 'deleteKey']);
 
+    Route::post('/me/avatar', [ImageController::class, 'uploadAvatar']);
+    Route::delete('/me/avatar', [ImageController::class, 'deleteAvatar']);
+    Route::get('/avatars/users/{user}', [ImageController::class, 'showUser']);
+    Route::get('/avatars/organizations/{organization}', [ImageController::class, 'showOrganization']);
+    Route::post('/organizations/{organization}/logo', [ImageController::class, 'uploadLogo']);
+    Route::delete('/organizations/{organization}/logo', [ImageController::class, 'deleteLogo']);
+    Route::get('/organizations', [OrganizationController::class, 'index']);
+    Route::post('/organizations', [OrganizationController::class, 'store']);
+    Route::get('/organizations/{organization}', [OrganizationController::class, 'show']);
+    Route::patch('/organizations/{organization}', [OrganizationController::class, 'update']);
+    Route::delete('/organizations/{organization}', [OrganizationController::class, 'destroy']);
+    Route::post('/organizations/{organization}/leave', [OrganizationController::class, 'leave']);
+    Route::post('/organizations/{organization}/admins', [OrganizationController::class, 'addAdmin']);
+    Route::delete('/organizations/{organization}/admins/{user}', [OrganizationController::class, 'removeAdmin']);
+    Route::post('/organizations/{organization}/invites/{invite}/resend', [OrganizationController::class, 'resendInvite'])->middleware('throttle:10,1');
+    Route::delete('/organizations/{organization}/invites/{invite}', [OrganizationController::class, 'revokeInvite']);
+    Route::post('/organizations/{organization}/transfer', [OrganizationController::class, 'transfer'])->middleware('throttle:10,1');
+    Route::delete('/organizations/{organization}/transfer', [OrganizationController::class, 'cancelTransfer']);
+    Route::post('/organizations/{organization}/transfer/accept', [OrganizationController::class, 'acceptTransfer']);
+    Route::post('/organizations/{organization}/transfer/decline', [OrganizationController::class, 'declineTransfer']);
+    Route::get('/teams', [TeamController::class, 'index']);
+    Route::post('/teams', [TeamController::class, 'store']);
+    Route::patch('/teams/{team}', [TeamController::class, 'update']);
+    Route::delete('/teams/{team}', [TeamController::class, 'destroy']);
+    Route::post('/teams/{team}/members', [TeamController::class, 'addMember']);
+    Route::delete('/teams/{team}/members/{user}', [TeamController::class, 'removeMember']);
+    Route::post('/teams/{team}/invites/{invite}/resend', [TeamController::class, 'resendInvite'])->middleware('throttle:10,1');
+    Route::delete('/teams/{team}/invites/{invite}', [TeamController::class, 'revokeInvite']);
     Route::get('/rollups/candidates', [RollupController::class, 'candidates']);
     Route::post('/rollups', [RollupController::class, 'store']);
     Route::get('/sites', [SiteController::class, 'index']);
@@ -135,6 +170,15 @@ Route::middleware('api.auth')->group(function () {
         Route::post('/people', [S::class, 'addPerson']);
         Route::patch('/people/{user}', [S::class, 'updatePerson']);
         Route::delete('/people/{user}', [S::class, 'removePerson']);
+        Route::post('/invites/{invite}/resend', [S::class, 'resendInvite'])->middleware('throttle:10,1');
+        Route::delete('/invites/{invite}', [S::class, 'revokeInvite']);
+    });
+    Route::middleware('site:owner')->prefix('/sites/{site}')->group(function () {
+        Route::post('/teams', [S::class, 'addTeam']);
+        Route::patch('/teams/{team}', [S::class, 'updateTeam']);
+        Route::delete('/teams/{team}', [S::class, 'removeTeam']);
+        Route::get('/move', [SiteMoveController::class, 'show']);
+        Route::post('/move', [SiteMoveController::class, 'move']);
     });
     Route::middleware('site:owner')->delete('/sites/{site}', [SiteController::class, 'destroy']);
 

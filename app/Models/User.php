@@ -17,12 +17,13 @@ class User extends Authenticatable
 
     protected $fillable = ['name', 'email', 'password', 'timezone', 'locale', 'is_admin'];
 
-    protected $hidden = ['password', 'remember_token', 'two_factor_secret'];
+    protected $hidden = ['password', 'remember_token', 'two_factor_secret', 'avatar'];
 
     protected function casts(): array
     {
         return [
             'email_verified_at' => 'datetime',
+            'avatar_updated_at' => 'datetime',
             'two_factor_confirmed_at' => 'datetime',
             'password' => 'hashed',
             'is_admin' => 'boolean',
@@ -35,9 +36,33 @@ class User extends Authenticatable
         return $this->belongsToMany(Site::class)->withPivot('role')->withTimestamps();
     }
 
+    /** Teams this person belongs to. */
+    public function teams(): BelongsToMany
+    {
+        return $this->belongsToMany(Team::class, 'team_user')->withTimestamps();
+    }
+
+    /** Organizations this person owns. */
+    public function ownedOrganizations(): HasMany
+    {
+        return $this->hasMany(Organization::class, 'owner_id');
+    }
+
+    /** Organizations this person is an admin of (they do not own them). */
+    public function administeredOrganizations(): BelongsToMany
+    {
+        return $this->belongsToMany(Organization::class, 'organization_user')->withTimestamps();
+    }
+
     public function apiKeys(): HasMany
     {
         return $this->hasMany(ApiKey::class);
+    }
+
+    /** Where the profile photo is served from (the version in the URL changes with each upload so browsers refetch it), or null. */
+    public function avatarUrl(): ?string
+    {
+        return $this->avatar_mime ? url('/api/avatars/users/'.$this->id).'?v='.($this->avatar_updated_at?->timestamp ?? 0) : null;
     }
 
     public function hasTwoFactor(): bool

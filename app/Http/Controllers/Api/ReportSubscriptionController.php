@@ -20,14 +20,14 @@ class ReportSubscriptionController extends Controller
 
         return [
             'mail' => AuthController::mailConfigured(),
-            'data' => $user->sites()->orderBy('domain')->get()->map(fn (Site $s) => ['id' => $s->id, 'domain' => $s->domain, 'frequency' => $subs[$s->id] ?? null])->values(),
+            'data' => Site::memberOf($user)->orderBy('domain')->get()->map(fn (Site $s) => ['id' => $s->id, 'domain' => $s->domain, 'frequency' => $subs[$s->id] ?? null])->values(),
         ];
     }
 
     public function update(Request $r, string $site)
     {
         $data = $r->validate(['frequency' => ['required', Rule::in([...ReportSubscription::FREQUENCIES, 'off'])]]);
-        $s = $r->user()->sites()->whereKey($site)->firstOrFail();
+        $s = Site::memberOf($r->user())->whereKey($site)->firstOrFail();
         $match = ['user_id' => $r->user()->id, 'site_id' => $s->id];
         if ($data['frequency'] === 'off') {
             ReportSubscription::where($match)->delete();

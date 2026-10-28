@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Http\Controllers\Api\AuthController;
 use App\Mail\SiteReportMail;
 use App\Models\ReportSubscription;
+use App\Models\Site;
 use App\Reports\ReportWindow;
 use App\Reports\SiteReport;
 use Carbon\CarbonImmutable;
@@ -27,7 +28,7 @@ class SendReports extends Command
             $user = $sub->user;
             $site = $sub->site;
             // someone who left the site, or a deleted account, stops getting its reports
-            if (! $user || ! $site || ! $site->members()->whereKey($user->id)->exists()) {
+            if (! $user || ! $site || ! Site::memberOf($user)->whereKey($site->id)->exists()) {
                 $sub->delete();
 
                 continue;

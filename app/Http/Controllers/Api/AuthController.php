@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ApiKey;
+use App\Models\Invitation;
+use App\Models\Organization;
 use App\Models\Site;
 use App\Models\User;
 use App\Support\Totp;
@@ -60,6 +62,7 @@ class AuthController extends Controller
             'password' => ['required', 'confirmed', Password::min(8)],
         ]);
         $user = User::create($data);
+        Organization::personalFor($user);
         event(new Registered($user));
         if (config('tidemark.verify_email')) {
             $user->sendEmailVerificationNotification();
@@ -149,7 +152,7 @@ class AuthController extends Controller
 
     public function config()
     {
-        return ['registration' => (bool) config('tidemark.registration'), 'mode' => config('tidemark.mode'), 'name' => config('app.name'), 'password_reset' => self::mailConfigured()];
+        return ['registration' => (bool) config('tidemark.registration'), 'mode' => config('tidemark.mode'), 'name' => config('app.name'), 'password_reset' => self::mailConfigured(), 'invites' => Invitation::enabled()];
     }
 
     public function update(Request $request)
@@ -235,12 +238,18 @@ class AuthController extends Controller
 
     private function present(User $u): array
     {
+        Organization::personalFor($u); // everyone has a Personal organization, including people who signed up before they existed
+
         return [
-            'id' => $u->id, 'name' => $u->name, 'email' => $u->email, 'is_admin' => $u->is_admin,
+            'id' => $u->id, 'name' => $u->name, 'email' => $u->email, 'avatar_url' => $u->avatarUrl(), 'is_admin' => $u->is_admin,
             'timezone' => $u->timezone, 'locale' => $u->locale, 'two_factor' => $u->hasTwoFactor(),
             'email_verified' => $u->hasVerifiedEmail(), 'verification_required' => (bool) config('tidemark.verify_email'),
             'updater_enabled' => (bool) config('tidemark.updater'),
             'can_rollup' => Site::rollupsAllowedFor($u),
+            // organizations this person owns or administers, for the choice when adding a site or a team
+            'organizations' => Organization::whereIn('id', Organization::idsFor($u))->orderByDesc('personal')->orderBy('name')->get()->map(fn ($o) => ['id' => $o->id, 'name' => $o->name, 'personal' => $o->personal, 'logo_url' => $o->logoUrl(), 'role' => $o->owner_id === $u->id ? 'owner' : 'admin'])->values(),
+            // sites of other people's organizations this person can open (shown under "Shared with me")
+            'shared_sites' => Site::where('kind', '!=', 'rollup')->memberOf($u)->where(fn ($q) => $q->whereNull('organization_id')->orWhereNotIn('organization_id', Organization::idsFor($u)))->exists(),
         ];
     }
 }

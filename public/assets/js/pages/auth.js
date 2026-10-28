@@ -101,3 +101,39 @@ export function ResetPassword() {
         <${Field} label="Confirm new password"><input type="password" required autocomplete="new-password" value=${f.password_confirmation} onInput=${(e) => setF({ ...f, password_confirmation: e.target.value })} /><//>
         <button class="btn primary">Change password</button></form>`}<//>`;
 }
+
+/** The page behind the link in an invitation e-mail: set a name and password (or sign in) and land on the shared site. */
+export function Invite({ setUser }) {
+  const { query } = useLocation();
+  const [info, setInfo] = useState(null);
+  const [gone, setGone] = useState(!query.token);
+  const [f, setF] = useState({ name: '', password: '', password_confirmation: '' });
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { if (query.token) api('/invites/' + query.token).then(setInfo).catch(() => setGone(true)); }, [query.token]);
+  if (gone) return html`<${AuthShell} title="Invitation not valid" sub="This invitation has expired or was already used. Invitations last 72 hours; ask the person who sent it to invite you again."><${Link} to="/login" class="btn">Go to sign in<//><//>`;
+  if (!info) return html`<${AuthShell} title="Invitation" sub="Loading…"><//>`;
+  const what = info.organization ? html`<b>${info.inviter || 'Someone'}</b> invited you to help manage <b>${info.organization}</b>. You will be able to see and change every site in it.` : info.team ? html`<b>${info.inviter || 'Someone'}</b> invited you to the <b>${info.team}</b> team. It gives you access to the sites the team is shared with.` : html`<b>${info.inviter || 'Someone'}</b> invited you to <b>${info.site}</b> as ${info.role === 'admin' ? 'an admin' : 'a viewer'}.`;
+  const accept = async (e) => {
+    e.preventDefault(); setErr(''); setBusy(true);
+    try { const r = await api('/invites/' + query.token + '/accept', { method: 'POST', body: f }); const me = await api('/me'); setUser(me.user); navigate(r.site ? '/' + r.site : '/sites'); toast('Welcome!'); }
+    catch (x) { setErr((x.errors && Object.values(x.errors)[0][0]) || x.message); setBusy(false); }
+  };
+  if (info.has_account) {
+    const mine = info.signed_in_as && info.signed_in_as.toLowerCase() === info.email.toLowerCase();
+    return html`<${AuthShell} title="You have an invitation" sub=${info.email}>
+      <p>${what}</p>
+      ${err && html`<div class="alert" role="alert"><${Icon} name="circle-alert" size=${16} /><div>${err}</div></div>`}
+      ${mine ? html`<button class="btn primary" disabled=${busy} onClick=${accept}>Accept</button>` : html`<p class="help">You already have an account with this address. Sign in with it, then open this link again.</p><${Link} to="/login" class="btn primary">Sign in<//>`}<//>`;
+  }
+  const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  return html`<${AuthShell} title="Accept your invitation" sub=${info.email}>
+    <p>${what} Choose a name and password to create your account.</p>
+    <form class="stack" onSubmit=${accept}>${err && html`<div class="alert" role="alert"><${Icon} name="circle-alert" size=${16} /><div>${err}</div></div>`}
+      <${Field} label="Name"><input required autofocus value=${f.name} onInput=${set('name')} /><//>
+      <${Field} label="Password" help="At least 8 characters."><input type="password" required minlength="8" autocomplete="new-password" value=${f.password} onInput=${set('password')} /><//>
+      <${Field} label="Confirm password"><input type="password" required autocomplete="new-password" value=${f.password_confirmation} onInput=${set('password_confirmation')} /><//>
+      ${(window.SD.legal || {}).terms && html`<p class="help auth-links" style="font-size:12px">By creating an account you agree to the <a href=${window.SD.legal.terms} target="_blank" rel="noopener">Terms of Service</a>${window.SD.legal.privacy ? html` and acknowledge the <a href=${window.SD.legal.privacy} target="_blank" rel="noopener">privacy notice</a>` : ''}.</p>`}
+      <button class="btn primary" disabled=${busy}>${busy ? 'Creating…' : info.team ? 'Create account' : 'Create account and open the site'}</button>
+    </form><//>`;
+}

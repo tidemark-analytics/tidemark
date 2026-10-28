@@ -15,8 +15,9 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Accepts Plausible's event payload — {n: name, u: url, d: domain, r: referrer, w: screen width, p: props, h: hash mode} —
- * so existing Plausible snippets work by changing only the script URL.
+ * Accepts Plausible's event payload — {n: name, u: url, d: domain, r: referrer, w: screen width, p: props, h: hash mode, i: interactive} —
+ * so existing Plausible snippets work by changing only the script URL. An event sent with `i: 0` (or `interactive: false`) is not an
+ * interaction: it does not count against a bounce (see DatabaseSink).
  */
 class Collector
 {
@@ -82,7 +83,9 @@ class Collector
         if ($this->shielded($site, $ip, $geo['country'], $pathname, $hostname)) {
             return ['status' => 202, 'body' => 'ok'];
         }
-        if (! $this->entitlements->allowsRecording($site)) {
+        // measurements such as scroll depth are not interactions: an extension that meters events can leave them out of the count
+        $isInteraction = $name === 'pageview' || ! $this->declaredNotInteractive($p);
+        if (! $this->entitlements->allowsRecording($site + ['interactive' => $isInteraction])) {
             return ['status' => 202, 'body' => 'ok'];
         }
 
@@ -112,12 +115,21 @@ class Collector
             'device' => Sources::deviceFromWidth(isset($p['w']) ? (int) $p['w'] : null, $agent['mobile'], $agent['tablet']),
             'props' => $this->scrubProps($this->props($p['p'] ?? $p['props'] ?? null), $clean),
             'revenue' => $revenue,
+            'interactive' => $isInteraction,
         ]);
         if ($masked) {
             PiiMasks::record($site['id'], $masked);
         }
 
         return ['status' => 202, 'body' => 'ok'];
+    }
+
+    /** @param array<string,mixed> $payload */
+    private function declaredNotInteractive(array $payload): bool
+    {
+        $flag = $payload['i'] ?? $payload['interactive'] ?? true;
+
+        return in_array($flag, [false, 0, '0', 'false'], true);
     }
 
     /** Anonymous visitor id: HMAC of ip + user agent + site, keyed by a salt that changes every day. Nothing is stored that could be reversed. */
@@ -191,7 +203,7 @@ class Collector
             $found = Cache::remember('tdm:site:'.$candidate, 60, function () use ($candidate) {
                 $site = Site::real()->where('domain', $candidate)->first();
 
-                return $site ? ['id' => $site->id, 'domain' => $site->domain, 'owner_id' => $site->members()->wherePivot('role', 'owner')->value('users.id'), 'honor_gpc' => (bool) $site->honor_gpc, 'honor_dnt' => (bool) $site->honor_dnt, 'location_precision' => $site->location_precision ?: 'city', 'url_params' => UrlParams::parse($site->url_params), 'referrer_domain_only' => (bool) $site->referrer_domain_only, 'pii_scrub' => Site::piiScrubEnforced() || (bool) ($site->pii_scrub ?? true), 'bot_filter' => (bool) ($site->bot_filter ?? true), 'shields' => $site->shields()->get()->groupBy('type')->map(fn ($g) => $g->pluck('value')->all())->all(), 'currencies' => Schema::hasColumn('goals', 'currency') ? $site->goals()->where('type', 'event')->whereNotNull('currency')->pluck('currency', 'value')->all() : []] : 0;
+                return $site ? ['id' => $site->id, 'domain' => $site->domain, 'owner_id' => $site->members()->wherePivot('role', 'owner')->value('users.id'), 'organization_id' => $site->organization_id, 'honor_gpc' => (bool) $site->honor_gpc, 'honor_dnt' => (bool) $site->honor_dnt, 'location_precision' => $site->location_precision ?: 'city', 'url_params' => UrlParams::parse($site->url_params), 'referrer_domain_only' => (bool) $site->referrer_domain_only, 'pii_scrub' => Site::piiScrubEnforced() || (bool) ($site->pii_scrub ?? true), 'bot_filter' => (bool) ($site->bot_filter ?? true), 'shields' => $site->shields()->get()->groupBy('type')->map(fn ($g) => $g->pluck('value')->all())->all(), 'currencies' => Schema::hasColumn('goals', 'currency') ? $site->goals()->where('type', 'event')->whereNotNull('currency')->pluck('currency', 'value')->all() : []] : 0;
             });
             if ($found) {
                 return $found;

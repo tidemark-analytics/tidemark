@@ -33,7 +33,7 @@ class SiteReport
             $metrics[] = ['key' => $key, 'label' => $label, 'value' => self::format($key, $cur[$key]), 'change' => self::change($cur[$key], $prev[$key]), 'good_when_down' => $key === 'bounce_rate'];
         }
 
-        $role = $site->members()->whereKey($user->id)->first()?->pivot->role;
+        $role = $site->memberRole($user);
 
         return [
             'site' => $site,

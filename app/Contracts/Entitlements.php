@@ -18,7 +18,7 @@ interface Entitlements
      * Called for every accepted event, so it must be fast (use a cache). Return false to drop the event silently; the
      * tracker still gets "202 ok" so visitors' browsers never see an error.
      *
-     * @param  array{id:string,domain:string,owner_id:?string}  $site
+     * @param  array{id:string,domain:string,owner_id:?string,organization_id:?string,interactive:bool}  $site  (`interactive` is false for an event sent with `i: 0`, such as scroll depth)
      */
     public function allowsRecording(array $site): bool;
 }

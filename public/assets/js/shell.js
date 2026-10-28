@@ -1,9 +1,10 @@
 // The signed-in app shell: top bar with breadcrumb switchers, the context-aware sidebar, the live-visitors sheet,
 // the ⌘K command palette and the keyboard shortcuts.
 import { html, useState, useEffect, useMemo, useRef, useApi, api, navigate, Link, Icon, fmtShort, fmt, BASE, PERIODS, UserCtx, useContext, setTheme, currentTheme, countryName, flag, scopeQuery } from './lib.js';
-import { Pop, Sheet, FavTile } from './ui.js';
+import { Pop, Sheet, FavTile, Modal, Field, Avatar } from './ui.js';
+import { useScope } from './org.js';
 import { Logo } from './logo.js';
-import { registry, badgeOf, badgeText, useBadgeCounts, useBadgePolling } from './extensions.js';
+import { registry, pathAfterOrganizationCreated, badgeOf, badgeText, useBadgeCounts, useBadgePolling } from './extensions.js';
 
 const NOT_A_SITE = new Set(['', 'sites', 'settings', 'login', 'register', 'forgot-password', 'reset-password', 'share']);
 // the first segment of an extension's page ('/support' for '/support/:number?') is not a site either
@@ -32,11 +33,11 @@ export const SITE_NAV = [
 export const GLOBAL_NAV = [
   { id: 'sites', label: 'Sites', icon: 'layout-dashboard', to: '/sites', key: 's' },
 ];
-const ACCOUNT_ICONS = { profile: 'user', security: 'shield-check', keys: 'key', reports: 'mail', users: 'users', updates: 'refresh-cw', billing: 'credit-card' };
+const ACCOUNT_ICONS = { profile: 'user', security: 'shield-check', keys: 'key', reports: 'mail', teams: 'users', organization: 'shield', users: 'user-plus', updates: 'refresh-cw', billing: 'credit-card' };
 /** The tabs of Account settings: [key, label, dot?]. Also drives the sidebar and the palette. */
 export function accountTabs(user) {
   const extra = registry.accountTabs.filter((x) => !x.visible || x.visible(user));
-  return [['profile', 'Profile'], ['security', 'Security'], ['keys', 'API keys'], ['reports', 'Email reports'], ...extra.map((x) => [x.key, x.label, !!(x.dot && x.dot(user))]),
+  return [['profile', 'Profile'], ['security', 'Security'], ['keys', 'API keys'], ['reports', 'Email reports'], ['organization', 'Organization'], ['teams', 'Teams'], ...extra.map((x) => [x.key, x.label, !!(x.dot && x.dot(user))]),
     ...(user.is_admin && !registry.adminUi ? [['users', 'Users'], ...(user.updater_enabled === false ? [] : [['updates', 'Updates', !!user.update]])] : [])];
 }
 
@@ -97,10 +98,10 @@ export function useSidebarState(path) {
 export function AccountMenu({ user, align = 'right', btnClass = 'btn ghost avatar-btn', named }) {
   const [theme, setT] = useState(currentTheme());
   const pick = (t) => { setTheme(t); setT(t); };
-  return html`<${Pop} align=${align} ariaLabel="Account menu" btnClass=${btnClass} label=${html`<span class="avatar" aria-hidden="true">${(user.name || '?').slice(0, 1).toUpperCase()}</span>${named && html`<span class="who-name"><b>${user.name}</b><span>${user.email}</span></span>`}${user.update && html`<span class="notif on-avatar" aria-hidden="true"></span><span class="sr-only">Update available</span>`}`}>
+  return html`<${Pop} align=${align} ariaLabel="Account menu" btnClass=${btnClass} label=${html`<${Avatar} name=${user.name} url=${user.avatar_url} />${named && html`<span class="who-name"><b>${user.name}</b><span>${user.email}</span></span>`}${user.update && html`<span class="notif on-avatar" aria-hidden="true"></span><span class="sr-only">Update available</span>`}`}>
     ${(close) => html`<div style="min-width:240px"><div class="who"><b>${user.name}</b><span class="muted">${user.email}</span></div><hr />
       <${Link} to="/sites" class="item" onClick=${close}><span>Your sites</span><${Icon} name="globe" size=${14} /><//>
-      <${Link} to="/settings" class="item" onClick=${close}><span>Account settings${user.update && html`<span class="notif inline" aria-hidden="true"></span><span class="sr-only"> (update available)</span>`}</span><${Icon} name="settings" size=${14} /><//>
+      <${Link} to="/settings" class="item" onClick=${close}><span>Settings${user.update && html`<span class="notif inline" aria-hidden="true"></span><span class="sr-only"> (update available)</span>`}</span><${Icon} name="settings" size=${14} /><//>
       ${user.is_admin && registry.adminUi && html`<a class="item" href=${BASE + registry.adminUi.href} onClick=${close}><span>${registry.adminUi.label}</span><${Icon} name="shield-check" size=${14} /></a>`}
       ${registry.menuItems.filter((m) => !m.help && (!m.visible || m.visible(user))).map((m) => (m.onClick
         ? html`<button class="item" onClick=${() => { close(); m.onClick(); }}><span>${m.label}</span><${Icon} name=${m.icon || 'external-link'} size=${14} /></button>`
@@ -128,8 +129,61 @@ function HelpMenu({ user }) {
 }
 
 // ------------------------------------------------------------------------------------------- site switcher
+/** Organization switcher: the organizations you belong to (Personal first), sites shared with you one by one, and a way to create one. */
+function OrgSwitcher({ user }) {
+  const { setUser } = useContext(UserCtx);
+  const scope = useScope(user);
+  const [open, setOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const wrap = useRef();
+  useEffect(() => {
+    if (!open) return;
+    const out = (e) => wrap.current && !wrap.current.contains(e.target) && setOpen(false);
+    const key = (e) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('mousedown', out); document.addEventListener('keydown', key);
+    return () => { document.removeEventListener('mousedown', out); document.removeEventListener('keydown', key); };
+  }, [open]);
+  if (!scope.orgs.length) return null;
+  const pick = (id) => { setOpen(false); scope.set(id); if (location.pathname !== '/sites' && !location.pathname.startsWith('/settings')) navigate('/sites'); };
+  const label = scope.shared ? 'Shared with me' : scope.org.personal ? 'Personal' : scope.org.name;
+  const tile = (name, url) => html`<${Avatar} name=${name} url=${url} size="sm" shape="org" />`;
+  return html`<div class="pop-wrap" ref=${wrap}>
+    <button class=${'crumb-btn' + (open ? ' open' : '')} aria-haspopup="menu" aria-expanded=${open} aria-label=${'Switch organization, current: ' + label} onClick=${() => setOpen(!open)}>
+      ${tile(scope.shared ? 'S' : scope.org.name, scope.shared ? null : scope.org.logo_url)}<span class="trunc">${label}</span><${Icon} name="chevrons-up-down" size=${14} class="chev" />
+    </button>
+    ${open && html`<div class="switch-pop" role="menu" aria-label="Organizations">
+      <div class="cmd-list">
+        <div class="grp">Organizations</div>
+        ${scope.orgs.map((o) => html`<button class=${'cmd-item' + (!scope.shared && o.id === scope.id ? ' on' : '')} role="menuitemradio" aria-checked=${!scope.shared && o.id === scope.id} onClick=${() => pick(o.id)}>
+          ${tile(o.name, o.logo_url)}<span class="trunc">${o.personal ? 'Personal' : o.name}</span>${o.personal && html`<span class="pill">You</span>`}${!scope.shared && o.id === scope.id && html`<${Icon} name="check" size=${14} class="tick" />`}</button>`)}
+        ${user.shared_sites && html`<div class="grp">Others</div>
+          <button class=${'cmd-item' + (scope.shared ? ' on' : '')} role="menuitemradio" aria-checked=${scope.shared} onClick=${() => pick('shared')}>${tile('S')}<span class="trunc">Shared with me</span>${scope.shared && html`<${Icon} name="check" size=${14} class="tick" />`}</button>`}
+      </div>
+      <div class="cmd-foot"><button class="cmd-item" role="menuitem" onClick=${() => { setOpen(false); setCreating(true); }}><${Icon} name="plus" size=${15} /><span>Create organization</span></button></div>
+    </div>`}
+    ${creating && html`<${CreateOrganization} onClose=${() => setCreating(false)} onCreated=${async (id) => { try { const me = await api('/me'); setUser(me.user); } catch (e) { /* the switcher refreshes on the next load */ } scope.set(id); setCreating(false); navigate(pathAfterOrganizationCreated(id)); }} />`}
+  </div>`;
+}
+
+export function CreateOrganization({ onClose, onCreated }) {
+  const [name, setName] = useState('');
+  const [err, setErr] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const submit = async (e) => {
+    e.preventDefault(); setErr(null); setBusy(true);
+    try { const r = await api('/organizations', { method: 'POST', body: { name } }); await onCreated(r.data.id); }
+    catch (x) { setErr((x.errors && Object.values(x.errors)[0][0]) || x.message); setBusy(false); }
+  };
+  return html`<${Modal} title="Create an organization" onClose=${onClose} footer=${html`<button class="btn" onClick=${onClose}>Cancel</button><button class="btn primary" form="create-org-form" disabled=${busy || !name.trim()}>${busy ? 'Creating…' : 'Create organization'}</button>`}>
+    <form id="create-org-form" class="stack" onSubmit=${submit}>
+      ${err && html`<div class="alert" role="alert">${err}</div>`}
+      <p style="line-height:1.55;color:var(--muted-foreground)">An organization holds sites for a company, a team or a client. You can add admins and teams to it, and give it to someone else later. Your Personal organization stays just for you.</p>
+      <${Field} label="Name"><input required autofocus maxlength="100" placeholder="For example Acme Studio" value=${name} onInput=${(e) => setName(e.target.value)} /><//>
+    </form><//>`;
+}
+
 /** Breadcrumb switcher: search, recents, then sites and rollups in their own groups. */
-function SiteSwitcher({ list, current, domain, recents }) {
+function SiteSwitcher({ list, current, domain, recents, user, scopeId }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
   const [sel, setSel] = useState(0);
@@ -137,12 +191,18 @@ function SiteSwitcher({ list, current, domain, recents }) {
   const input = useRef();
   const trigger = useRef();
   const query = q.trim().toLowerCase();
+  const orgs = (user && user.organizations) || [];
+  // which organization a site belongs to, for the label next to it and for grouping; sites of other people's organizations are "Shared with me"
+  const orgOf = (s) => { const o = s.rollup ? orgs.find((x) => x.personal) : orgs.find((x) => x.id === s.organization_id); return o ? { id: o.id, name: o.personal ? 'Personal' : o.name } : { id: 'shared', name: 'Shared with me' }; };
   const groups = useMemo(() => {
     if (query) return [['Results', list.filter((s) => s.domain.toLowerCase().includes(query))]];
     const byDomain = Object.fromEntries(list.map((s) => [s.domain, s]));
     const recent = recents.map((d) => byDomain[d]).filter((s) => s && s.domain !== domain).slice(0, 3);
-    return [['Recent', recent], ['Sites', list.filter((s) => !s.rollup)], ['Rollups', list.filter((s) => s.rollup)]].filter(([, l]) => l.length);
-  }, [list, query, recents, domain]);
+    // the current organization's sites first, then the others (Personal first), then what is shared with you
+    const order = [scopeId, ...orgs.map((o) => o.id), 'shared'].filter((id, i, all) => id && all.indexOf(id) === i);
+    const byOrg = order.map((id) => [orgs.find((o) => o.id === id) ? orgOf({ organization_id: id }).name : 'Shared with me', list.filter((s) => !s.rollup && orgOf(s).id === id)]);
+    return [['Recent', recent], ...byOrg, ['Rollups', list.filter((s) => s.rollup)]].filter(([, l]) => l.length);
+  }, [list, query, recents, domain, scopeId, user]);
   const flat = groups.flatMap(([, l]) => l);
   useEffect(() => {
     if (!open) return;
@@ -169,7 +229,7 @@ function SiteSwitcher({ list, current, domain, recents }) {
     ${open && html`<div class="switch-pop" role="dialog" aria-label="Switch site">
       <div class="cmd-in"><${Icon} name="search" size=${15} /><input ref=${input} value=${q} placeholder="Find site…" role="combobox" aria-expanded="true" aria-controls="switch-list" aria-activedescendant=${flat[sel] ? 'sw-' + sel : undefined} aria-label="Find site" onInput=${(e) => setQ(e.target.value)} onKeyDown=${onKey} /></div>
       <div class="cmd-list" id="switch-list" role="listbox" aria-label="Sites">${flat.length === 0 ? html`<div class="cmd-empty">No site matches “${q}”</div>` : groups.map(([label, items]) => html`<div role="group" aria-label=${label}><div class="grp" aria-hidden="true">${label}</div>${items.map((s) => { n++; const i = n; return html`<button id=${'sw-' + i} tabindex="-1" role="option" aria-selected=${s.domain === domain} class=${'cmd-item ' + (i === sel ? 'on' : '')} onMouseMove=${() => setSel(i)} onClick=${() => pick(s)}>
-        <${FavTile} name=${s.domain} rollup=${s.rollup} size="sm" /><span class="trunc">${s.domain}</span>${s.domain === domain && html`<${Icon} name="check" size=${14} class="tick" />`}</button>`; })}</div>`)}</div>
+        <${FavTile} name=${s.domain} rollup=${s.rollup} size="sm" /><span class="trunc">${s.domain}</span>${(label === 'Recent' || label === 'Results') && orgs.length > 1 && html`<span class="muted small trunc" style="margin-left:auto;max-width:34%">${orgOf(s).name}</span>`}${s.domain === domain && html`<${Icon} name="check" size=${14} class="tick" />`}</button>`; })}</div>`)}</div>
       <div class="cmd-foot"><button class="cmd-item" onClick=${() => { setOpen(false); navigate('/sites'); }}><${Icon} name="layout-dashboard" size=${15} /><span>All sites</span></button>
         <button class="cmd-item" onClick=${() => { setOpen(false); navigate('/sites/new'); }}><${Icon} name="plus" size=${15} /><span>New site</span></button></div>
     </div>`}
@@ -213,7 +273,7 @@ function sectionLabel(path, domain) {
   if (path === '/sites') return 'Sites';
   if (path === '/sites/new') return 'New site';
   if (path === '/sites/rollup') return 'New rollup';
-  if (path.startsWith('/settings')) return 'Account';
+  if (path.startsWith('/settings')) return 'Settings';
   const seg = (path.split('/')[1] || '');
   return seg ? seg.charAt(0).toUpperCase() + seg.slice(1) : 'Sites';
 }
@@ -223,12 +283,21 @@ export function AppBar({ user, path, sites, side }) {
   const domain = siteFromPath(path);
   const current = domain ? sites.list.find((s) => s.domain === domain) : null;
   const recents = useRecents(domain);
+  const scope = useScope(user);
+  // opening a site puts the organization switcher on the organization that site belongs to
+  useEffect(() => {
+    if (!current) return;
+    const mine = (user.organizations || []).find((o) => (current.rollup ? o.personal : o.id === current.organization_id));
+    const target = mine ? mine.id : user.shared_sites ? 'shared' : null;
+    if (target && target !== scope.id) scope.set(target);
+  }, [current && current.id, current && current.organization_id, user.organizations]);
   return html`<header class="topbar"><div class="topbar-in">
     <button class="btn ghost icon side-toggle" aria-label="Open navigation" aria-expanded=${side.open} aria-controls="app-side" onClick=${() => side.setOpen(!side.open)}><${Icon} name="menu" size=${18} /></button>
     <${Link} to="/sites" class="brand-mark" aria-label="Tidemark, all sites"><${Logo} size=${24} /><//>
     <nav class="crumbs" aria-label="Breadcrumb">
       <span class="crumb-sep" aria-hidden="true">/</span>
-      ${domain ? html`<${SiteSwitcher} list=${sites.list} current=${current} domain=${domain} recents=${recents} /><span class="crumb-sep s2" aria-hidden="true">/</span><span class="crumb-cur muted sec" aria-current="page">${sectionLabel(path, domain)}</span>`
+      <${OrgSwitcher} user=${user} /><span class="crumb-sep" aria-hidden="true">/</span>
+      ${domain ? html`<${SiteSwitcher} list=${sites.list} current=${current} domain=${domain} recents=${recents} user=${user} scopeId=${scope.id} /><span class="crumb-sep s2" aria-hidden="true">/</span><span class="crumb-cur muted sec" aria-current="page">${sectionLabel(path, domain)}</span>`
         : html`<span class="crumb-cur" aria-current="page">${sectionLabel(path, domain)}</span>`}
     </nav>
     <div class="tb-right">
@@ -267,8 +336,8 @@ export function Sidebar({ user, path, sites, side }) {
     : html`<div class="side-grp">Workspace</div>
       <${SideLink} to="/sites" icon="layout-dashboard" label="Sites" on=${path === '/sites' || path === '/sites/new' || path === '/sites/rollup'}>${list.length > 0 && html`<em class="side-count">${list.length}</em>`}<//>
       ${hasRollups && html`<${SideLink} to="/sites?kind=rollups" icon="layers" label="Rollups" on=${false}><em class="side-count">${list.filter((s) => s.rollup).length}</em><//>`}
-      <div class="side-grp">Account</div>
-      ${tabs.map(([k, l, dot]) => html`<${SideLink} to=${tabPath(k)} icon=${ACCOUNT_ICONS[k] || 'settings'} label=${l} on=${accountOn(k)}>${dot && html`<span class="notif inline" aria-hidden="true"></span><span class="sr-only"> (update available)</span>`}<//>`)}
+      <div class="side-grp">Settings</div>
+      ${tabs.map(([k, l, dot]) => html`${k === 'organization' && html`<div class="side-grp">Organization</div>`}<${SideLink} to=${tabPath(k)} icon=${ACCOUNT_ICONS[k] || 'settings'} label=${l} on=${accountOn(k)}>${dot && html`<span class="notif inline" aria-hidden="true"></span><span class="sr-only"> (update available)</span>`}<//>`)}
       ${user.is_admin && registry.adminUi && html`<a class="side-link" title=${registry.adminUi.label} href=${BASE + registry.adminUi.href}><${Icon} name="shield-check" size=${16} /><span>${registry.adminUi.label}</span><${Icon} name="chevron-right" size=${13} class="side-ext" /></a>`}
       <div class="side-grp">Resources</div>
       <${SideExt} href="https://www.tidemarkanalytics.com/docs/" icon="book-open" label="Documentation" />
@@ -324,7 +393,7 @@ export function CommandPalette({ path, sites }) {
     }
     list.forEach((s) => out.push({ group: 'Sites', icon: s.rollup ? 'layers' : 'globe', label: s.domain, hint: s.rollup ? 'Rollup' : '', run: go('/' + s.domain) }));
     out.push({ group: 'Go to', icon: 'layout-dashboard', label: 'All sites', hint: 'g a', run: go('/sites') }, { group: 'Go to', icon: 'plus', label: 'Add a site', run: go('/sites/new') });
-    if (user) accountTabs(user).forEach(([k, l]) => out.push({ group: 'Account', icon: ACCOUNT_ICONS[k] || 'settings', label: l, run: go(k === 'profile' ? '/settings' : '/settings/' + k) }));
+    if (user) accountTabs(user).forEach(([k, l]) => out.push({ group: 'Settings', icon: ACCOUNT_ICONS[k] || 'settings', label: l, run: go(k === 'profile' ? '/settings' : '/settings/' + k) }));
     out.push({ group: 'Preferences', icon: 'sun', label: 'Theme: light', run: () => setTheme('light') }, { group: 'Preferences', icon: 'moon', label: 'Theme: dark', run: () => setTheme('dark') }, { group: 'Preferences', icon: 'monitor', label: 'Theme: match system', run: () => setTheme('system') },
       { group: 'Preferences', icon: 'keyboard', label: 'Keyboard shortcuts', hint: '?', run: openShortcuts }, { group: 'Preferences', icon: 'book-open', label: 'Documentation', run: () => window.open('https://www.tidemarkanalytics.com/docs/', '_blank', 'noopener') });
     return out;

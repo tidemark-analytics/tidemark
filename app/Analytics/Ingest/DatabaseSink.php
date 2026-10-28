@@ -3,10 +3,16 @@
 namespace App\Analytics\Ingest;
 
 use App\Analytics\Support\Sql;
+use Illuminate\Database\ConnectionInterface;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 
-/** Stitches hits into visits (30 minutes of inactivity ends a visit) and stores the event + its props. */
+/**
+ * Stitches hits into visits (30 minutes of inactivity ends a visit) and stores the event + its props. A hit that is not interactive
+ * (an engagement measurement sent when the visitor leaves a page) is attached to the visit that is still open and changes nothing about
+ * it, so it cannot clear a bounce or lengthen a visit; with no open visit it is dropped rather than starting a visit of its own. It is a
+ * measurement of one page view, so sent again (the visitor left the tab and came back) it replaces the earlier one instead of adding a row.
+ */
 class DatabaseSink implements EventSink
 {
     public const VISIT_TIMEOUT = 30; // minutes
@@ -16,6 +22,7 @@ class DatabaseSink implements EventSink
         $db = Sql::connection();
         $now = $hit['at'];
         $isPageview = $hit['name'] === 'pageview';
+        $interactive = $hit['interactive'] ?? true;
         $cacheKey = 'tdm:v:'.$hit['site_id'].':'.$hit['visitor_id'];
 
         $visitId = Cache::get($cacheKey);
@@ -26,7 +33,15 @@ class DatabaseSink implements EventSink
                 ->where('ended_at', '>=', date('Y-m-d H:i:s', strtotime($now) - self::VISIT_TIMEOUT * 60))->orderByDesc('ended_at')->first();
         }
 
-        if ($visit) {
+        if (! $interactive) {
+            if (! $visit) {
+                return;
+            }
+            $visitId = $visit->id;
+            if ($this->replaceEarlierMeasurement($db, $visitId, $hit)) {
+                return;
+            }
+        } elseif ($visit) {
             $events = $visit->events + 1;
             $db->table('visits')->where('id', $visit->id)->update([
                 'ended_at' => $now,
@@ -51,12 +66,20 @@ class DatabaseSink implements EventSink
                 'pageviews' => $isPageview ? 1 : 0, 'events' => 1, 'is_bounce' => true, 'duration' => 0,
             ]);
         }
-        Cache::put($cacheKey, $visitId, now()->addMinutes(self::VISIT_TIMEOUT));
+        if ($interactive) {
+            Cache::put($cacheKey, $visitId, now()->addMinutes(self::VISIT_TIMEOUT));
+        }
 
         $eventId = $db->table('events')->insertGetId([
             'site_id' => $hit['site_id'], 'visit_id' => $visitId, 'visitor_id' => $hit['visitor_id'],
-            'name' => $hit['name'], 'pathname' => $hit['pathname'], 'hostname' => $hit['hostname'], 'created_at' => $now,
+            'name' => $hit['name'], 'pathname' => $hit['pathname'], 'hostname' => $hit['hostname'], 'created_at' => $now, 'interactive' => $interactive,
         ] + (empty($hit['revenue']) ? [] : ['revenue' => $hit['revenue']['amount'], 'currency' => $hit['revenue']['currency'], 'revenue_reporting' => $hit['revenue']['reporting']])); // only events with revenue need the columns, so an update still collects until it has migrated
+        $this->storeProps($db, $hit, $eventId);
+    }
+
+    /** @param array<string,mixed> $hit */
+    private function storeProps(ConnectionInterface $db, array $hit, int $eventId): void
+    {
         if ($hit['props']) {
             $rows = [];
             foreach ($hit['props'] as $k => $v) {
@@ -64,5 +87,28 @@ class DatabaseSink implements EventSink
             }
             $db->table('event_props')->insert($rows);
         }
+    }
+
+    /**
+     * True when a non-interactive hit took the place of the visit's earlier one for the same page view: same name and page, and no
+     * pageview of that page since (which would make this the measurement of a new view).
+     *
+     * @param  array<string,mixed>  $hit
+     */
+    private function replaceEarlierMeasurement(ConnectionInterface $db, string $visitId, array $hit): bool
+    {
+        $earlier = $db->table('events')->where('visit_id', $visitId)->where('name', $hit['name'])->where('pathname', $hit['pathname'])->orderByDesc('id')->first();
+        if (! $earlier) {
+            return false;
+        }
+        $view = $db->table('events')->where('visit_id', $visitId)->where('name', 'pageview')->where('pathname', $hit['pathname'])->orderByDesc('id')->value('id');
+        if ($view !== null && $view > $earlier->id) {
+            return false;
+        }
+        $db->table('events')->where('id', $earlier->id)->update(['created_at' => $hit['at']]);
+        $db->table('event_props')->where('event_id', $earlier->id)->delete();
+        $this->storeProps($db, $hit, $earlier->id);
+
+        return true;
     }
 }

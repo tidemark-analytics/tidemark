@@ -30,7 +30,13 @@
     var payload = { n: name, u: options.u || location.href, d: domain, r: doc.referrer || null, w: window.innerWidth };
     if (options.props) { payload.p = options.props; }
     if (options.revenue) { payload.$ = options.revenue; }
-    if (hashMode && !options.u) { payload.h = 1; }
+    if (hashMode && (!options.u || options.hash)) { payload.h = 1; }
+    if (options.interactive === false) { payload.i = 0; }
+
+    // a measurement sent as the page is closing goes out as a beacon, which the browser finishes after the page is gone
+    if (options.beacon && window.navigator.sendBeacon) {
+      try { if (window.navigator.sendBeacon(endpoint, JSON.stringify(payload))) { return; } } catch (e) { /* fall back to a request */ }
+    }
 
     var req = new XMLHttpRequest();
     req.open('POST', endpoint, true);
@@ -44,11 +50,56 @@
   var queue = (window.plausible && window.plausible.q) || [];
   window.plausible = send;
 
+  // Engagement (script.engagement.js): how far down the page the visitor scrolled and how long they were actively on it, sent as a
+  // non-interactive "Engagement" event (so it never changes bounce rate) whenever the page is left or its tab hidden. Each send carries the
+  // totals so far and the server keeps only the latest for the page view. Only two coarse buckets are sent, no element, text or position.
+  // Active time stops after a minute without scrolling, moving, typing or touching.
+  var engagement = has('engagement') ? (function () {
+    var IDLE = 60000, url, hash, depthMax, activeMs, since, idle, lastTick, last;
+    function scrollPercent() {
+      var d = doc.documentElement, b = doc.body;
+      var total = Math.max(d.scrollHeight, b ? b.scrollHeight : 0, 1);
+      return Math.min(100, Math.round(((window.pageYOffset || d.scrollTop || 0) + (window.innerHeight || d.clientHeight || 0)) / total * 100));
+    }
+    function pause() { if (since) { activeMs += Date.now() - since; since = 0; } clearTimeout(idle); }
+    function active() {
+      var t = Date.now();
+      if (doc.visibilityState === 'hidden' || (since && t - lastTick < 1000)) { return; }
+      lastTick = t;
+      if (!since) { since = t; }
+      clearTimeout(idle);
+      idle = setTimeout(pause, IDLE);
+    }
+    function seen() { var p = scrollPercent(); if (p > depthMax) { depthMax = p; } }
+    function reset() {
+      url = location.href; hash = hashMode; activeMs = 0; since = 0; lastTick = 0; last = ''; depthMax = 0;
+      clearTimeout(idle);
+      seen(); active();
+    }
+    function flush() {
+      seen(); pause();
+      var s = activeMs / 1000;
+      var props = { depth: depthMax >= 100 ? '100' : depthMax >= 75 ? '75' : depthMax >= 50 ? '50' : depthMax >= 25 ? '25' : '0', time: s < 10 ? '0-10s' : s < 30 ? '10-30s' : s < 60 ? '30-60s' : s < 180 ? '1-3m' : '3m+' };
+      var key = props.depth + props.time;
+      if (key === last) { return; }
+      last = key;
+      send('Engagement', { u: url, hash: hash, interactive: false, beacon: true, props: props });
+    }
+    window.addEventListener('scroll', function () { seen(); active(); }, { passive: true });
+    ['mousemove', 'keydown', 'touchstart', 'click'].forEach(function (type) { doc.addEventListener(type, active, { passive: true, capture: true }); });
+    doc.addEventListener('visibilitychange', function () { if (doc.visibilityState === 'hidden') { flush(); } else { active(); } });
+    window.addEventListener('pagehide', flush);
+    reset();
+    return { reset: reset, flush: flush };
+  })() : null;
+
   var lastPage;
   function page(options) {
     if (!hashMode && lastPage === location.pathname) { return; }
+    if (engagement && lastPage !== undefined) { engagement.flush(); } // the page being left, still reported under its own address
     lastPage = location.pathname;
     send('pageview', options);
+    if (engagement) { engagement.reset(); }
   }
 
   if (!has('manual')) {

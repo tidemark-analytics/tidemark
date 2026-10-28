@@ -91,8 +91,8 @@ function MainChart({ site, scope, top, graph, live }) {
   return html`<section class="card graph-card" aria-label="Graph">
     <div class="card-h chart-h"><${Tabs} label="Metric" value=${current} onChange=${setMetric} items=${Object.entries(defs).map(([k, [l]]) => [k, l])} />
       <div class="row chart-tools">${intervals.length > 1 && html`<${Segmented} label="Interval" value=${g.interval} onChange=${(i) => setQuery({ interval: i })} items=${intervals.map((i) => [i, INTERVAL_LABEL[i] || i])} />`}
-        ${site.role && !scope.goal && html`<button class="btn sm ghost" onClick=${() => setNoteModal({ date: todayIn(site.timezone), list: [] })}><${Icon} name="plus" size=${13} /> Note</button>`}
-        <button class="btn sm ghost" onClick=${() => setAsTable(!asTable)}>${asTable ? 'Chart' : 'Table'}</button></div></div>
+        ${site.role && !scope.goal && html`<button class="btn ghost" onClick=${() => setNoteModal({ date: todayIn(site.timezone), list: [] })}><${Icon} name="plus" size=${13} /> Note</button>`}
+        <button class="btn ghost" onClick=${() => setAsTable(!asTable)}>${asTable ? 'Chart' : 'Table'}</button></div></div>
     <div class="chart-meta"><span class="legend"><span><i style="background:var(--series-1)"></i>${name}</span>${g && g.comparison && html`<span><i style="background:var(--series-2)"></i>${scope.comparison === 'year_over_year' ? 'Previous year' : 'Previous period'}</span>`}</span>
       ${brushable && !asTable && html`<span class="muted small hint-zoom">Drag across the chart to zoom in</span>`}</div>
     <div class=${'graph-b ' + (busy && g ? 'stale' : '')}>

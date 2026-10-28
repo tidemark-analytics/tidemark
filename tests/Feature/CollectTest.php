@@ -62,6 +62,64 @@ class CollectTest extends TestCase
         $this->assertSame(2, DB::table('events')->count());
     }
 
+    public function test_a_non_interactive_event_is_stored_but_leaves_the_visit_as_it_was(): void
+    {
+        $this->site();
+        $this->hit(['u' => 'https://example.com/post']);
+        $before = DB::table('visits')->first();
+        $this->hit(['n' => 'Engagement', 'u' => 'https://example.com/post', 'i' => 0, 'p' => ['depth' => '75', 'time' => '30-60s']])->assertStatus(202);
+
+        $v = DB::table('visits')->first();
+        $this->assertSame(1, DB::table('visits')->count());
+        $this->assertTrue((bool) $v->is_bounce, 'an engagement measurement is not an interaction');
+        $this->assertSame([(int) $before->events, (int) $before->pageviews, $before->ended_at], [(int) $v->events, (int) $v->pageviews, $v->ended_at]);
+        $this->assertSame(['pageview', 'Engagement'], DB::table('events')->orderBy('id')->pluck('name')->all());
+        $this->assertSame(['depth' => '75', 'time' => '30-60s'], DB::table('event_props')->where('event_id', DB::table('events')->where('name', 'Engagement')->value('id'))->pluck('value', 'key')->all());
+
+        $this->hit(['u' => 'https://example.com/next']);
+        $this->assertFalse((bool) DB::table('visits')->value('is_bounce'), 'a later pageview still ends the bounce');
+    }
+
+    public function test_a_repeated_measurement_replaces_the_earlier_one_for_the_same_page_view(): void
+    {
+        $this->site();
+        $props = fn () => DB::table('event_props')->join('events', 'events.id', '=', 'event_props.event_id')->where('events.name', 'Engagement')->orderBy('events.id')->get(['events.id', 'key', 'value'])
+            ->groupBy('id')->map(fn ($rows) => $rows->pluck('value', 'key')->all())->values()->all();
+
+        $this->hit(['u' => 'https://example.com/post']);
+        $this->hit(['n' => 'Engagement', 'u' => 'https://example.com/post', 'i' => 0, 'p' => ['depth' => '0', 'time' => '0-10s']]);
+        $this->hit(['n' => 'Engagement', 'u' => 'https://example.com/post', 'i' => 0, 'p' => ['depth' => '75', 'time' => '1-3m']]);
+
+        $this->assertSame([['depth' => '75', 'time' => '1-3m']], $props(), 'the latest totals replace the first');
+        $this->assertSame(1, DB::table('events')->where('name', 'Engagement')->count());
+
+        // the same page viewed again later in the visit is a new page view with its own measurement
+        $this->hit(['u' => 'https://example.com/other']);
+        $this->hit(['u' => 'https://example.com/post']);
+        $this->hit(['n' => 'Engagement', 'u' => 'https://example.com/post', 'i' => 0, 'p' => ['depth' => '25', 'time' => '0-10s']]);
+
+        $this->assertSame([['depth' => '75', 'time' => '1-3m'], ['depth' => '25', 'time' => '0-10s']], $props());
+    }
+
+    public function test_a_non_interactive_event_never_starts_a_visit(): void
+    {
+        $this->site();
+        $this->hit(['n' => 'Engagement', 'i' => 0, 'p' => ['depth' => '100', 'time' => '3m+']])->assertStatus(202);
+        $this->hit(['n' => 'Engagement', 'interactive' => false])->assertStatus(202);
+
+        $this->assertSame(0, DB::table('visits')->count());
+        $this->assertSame(0, DB::table('events')->count());
+    }
+
+    public function test_a_pageview_is_always_interactive(): void
+    {
+        $this->site();
+        $this->hit(['i' => 0])->assertStatus(202);
+
+        $this->assertSame(1, DB::table('visits')->count());
+        $this->assertSame(1, DB::table('events')->count());
+    }
+
     public function test_inactivity_over_thirty_minutes_starts_a_new_visit(): void
     {
         $this->site();
@@ -127,6 +185,7 @@ class CollectTest extends TestCase
         $this->call('OPTIONS', '/api/event')->assertStatus(204)->assertHeader('Access-Control-Allow-Origin', '*');
         $this->get('/js/script.js')->assertOk()->assertHeader('Access-Control-Allow-Origin', '*');
         $this->get('/js/script.outbound-links.file-downloads.js')->assertOk();
+        $this->get('/js/script.engagement.js')->assertOk();
         $this->get('/js/other.js')->assertHeaderMissing('Access-Control-Allow-Origin');
     }
 
