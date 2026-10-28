@@ -48,6 +48,7 @@ class TeamsTest extends TestCase
         $this->team();
         $this->postJson('/api/teams', ['name' => 'Marketing'])->assertUnprocessable();
         $this->assertCount(1, $this->getJson('/api/teams')->json('data'));
+        $this->assertSame(['example.com', 'second.com'], $this->getJson('/api/teams')->json('owned_sites'));
 
         $other = $this->user('other@example.com');
         $this->actingAs($other);

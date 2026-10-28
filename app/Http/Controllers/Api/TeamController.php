@@ -25,6 +25,8 @@ class TeamController extends Controller
 
         return [
             'invites_enabled' => Invitation::enabled(),
+            // the sites this person owns: the only ones they can share with a team
+            'owned_sites' => $user->sites()->wherePivot('role', 'owner')->where('sites.kind', '!=', 'rollup')->orderBy('domain')->pluck('sites.domain')->values(),
             'data' => $teams->map(fn (Team $t) => [
                 'id' => $t->id, 'name' => $t->name,
                 'members' => $t->members->map(fn ($u) => ['id' => $u->id, 'name' => $u->name, 'email' => $u->email])->values(),
