@@ -255,12 +255,12 @@ class SettingsController extends Controller
             'data' => $site->members()->get()->map(fn ($u) => ['id' => $u->id, 'name' => $u->name, 'email' => $u->email, 'role' => $u->pivot->role]),
             'invites' => Invitation::where('site_id', $site->id)->orderBy('created_at')->get()->map(fn ($i) => ['id' => $i->id, 'email' => $i->email, 'role' => $i->role, 'expires_at' => $i->expires_at->toIso8601String()]),
             'invites_enabled' => Invitation::enabled(),
-            'teams' => $site->teams()->withCount('members')->orderBy('name')->get()->map(fn ($t) => ['id' => $t->id, 'name' => $t->name, 'role' => $t->pivot->role, 'members' => $t->members_count]),
+            'teams' => $site->teams()->withCount('members')->with(['members' => fn ($q) => $q->orderBy('name')->limit(25)])->orderBy('name')->get()->map(fn ($t) => ['id' => $t->id, 'name' => $t->name, 'role' => $t->pivot->role, 'members' => $t->members_count, 'member_names' => $t->members->pluck('name')->values()]),
             // people who administer the whole organization: admins here without being listed above
             'organization_admins' => $site->isRollup() || ! $site->organization ? [] : $site->organization->admins()->orderBy('name')->get()->map(fn ($u) => ['id' => $u->id, 'name' => $u->name, 'email' => $u->email]),
             // only the site's owner decides which of their teams it is shared with
             'available_teams' => ($r->attributes->get('role') === 'owner' || $site->isOrganizationAdmin($r->user())) && ! $site->isRollup() && $site->organization_id
-                ? Team::where('organization_id', $site->organization_id)->whereNotIn('id', $site->teams()->pluck('teams.id'))->orderBy('name')->get(['id', 'name']) : [],
+                ? Team::where('organization_id', $site->organization_id)->whereNotIn('id', $site->teams()->pluck('teams.id'))->withCount('members')->orderBy('name')->get()->map(fn ($t) => ['id' => $t->id, 'name' => $t->name, 'members' => $t->members_count])->values() : [],
         ];
     }
 
