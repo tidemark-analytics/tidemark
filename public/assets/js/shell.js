@@ -32,11 +32,11 @@ export const SITE_NAV = [
 export const GLOBAL_NAV = [
   { id: 'sites', label: 'Sites', icon: 'layout-dashboard', to: '/sites', key: 's' },
 ];
-const ACCOUNT_ICONS = { profile: 'user', security: 'shield-check', keys: 'key', reports: 'mail', teams: 'users', admins: 'shield', users: 'user-plus', updates: 'refresh-cw', billing: 'credit-card' };
+const ACCOUNT_ICONS = { profile: 'user', security: 'shield-check', keys: 'key', reports: 'mail', teams: 'users', organization: 'shield', users: 'user-plus', updates: 'refresh-cw', billing: 'credit-card' };
 /** The tabs of Account settings: [key, label, dot?]. Also drives the sidebar and the palette. */
 export function accountTabs(user) {
   const extra = registry.accountTabs.filter((x) => !x.visible || x.visible(user));
-  return [['profile', 'Profile'], ['security', 'Security'], ['keys', 'API keys'], ['reports', 'Email reports'], ['teams', 'Teams'], ['admins', 'Account admins'], ...extra.map((x) => [x.key, x.label, !!(x.dot && x.dot(user))]),
+  return [['profile', 'Profile'], ['security', 'Security'], ['keys', 'API keys'], ['reports', 'Email reports'], ['organization', 'Organization'], ['teams', 'Teams'], ...extra.map((x) => [x.key, x.label, !!(x.dot && x.dot(user))]),
     ...(user.is_admin && !registry.adminUi ? [['users', 'Users'], ...(user.updater_enabled === false ? [] : [['updates', 'Updates', !!user.update]])] : [])];
 }
 
@@ -100,7 +100,7 @@ export function AccountMenu({ user, align = 'right', btnClass = 'btn ghost avata
   return html`<${Pop} align=${align} ariaLabel="Account menu" btnClass=${btnClass} label=${html`<span class="avatar" aria-hidden="true">${(user.name || '?').slice(0, 1).toUpperCase()}</span>${named && html`<span class="who-name"><b>${user.name}</b><span>${user.email}</span></span>`}${user.update && html`<span class="notif on-avatar" aria-hidden="true"></span><span class="sr-only">Update available</span>`}`}>
     ${(close) => html`<div style="min-width:240px"><div class="who"><b>${user.name}</b><span class="muted">${user.email}</span></div><hr />
       <${Link} to="/sites" class="item" onClick=${close}><span>Your sites</span><${Icon} name="globe" size=${14} /><//>
-      <${Link} to="/settings" class="item" onClick=${close}><span>Account settings${user.update && html`<span class="notif inline" aria-hidden="true"></span><span class="sr-only"> (update available)</span>`}</span><${Icon} name="settings" size=${14} /><//>
+      <${Link} to="/settings" class="item" onClick=${close}><span>Settings${user.update && html`<span class="notif inline" aria-hidden="true"></span><span class="sr-only"> (update available)</span>`}</span><${Icon} name="settings" size=${14} /><//>
       ${user.is_admin && registry.adminUi && html`<a class="item" href=${BASE + registry.adminUi.href} onClick=${close}><span>${registry.adminUi.label}</span><${Icon} name="shield-check" size=${14} /></a>`}
       ${registry.menuItems.filter((m) => !m.help && (!m.visible || m.visible(user))).map((m) => (m.onClick
         ? html`<button class="item" onClick=${() => { close(); m.onClick(); }}><span>${m.label}</span><${Icon} name=${m.icon || 'external-link'} size=${14} /></button>`
@@ -213,7 +213,7 @@ function sectionLabel(path, domain) {
   if (path === '/sites') return 'Sites';
   if (path === '/sites/new') return 'New site';
   if (path === '/sites/rollup') return 'New rollup';
-  if (path.startsWith('/settings')) return 'Account';
+  if (path.startsWith('/settings')) return 'Settings';
   const seg = (path.split('/')[1] || '');
   return seg ? seg.charAt(0).toUpperCase() + seg.slice(1) : 'Sites';
 }
@@ -267,8 +267,8 @@ export function Sidebar({ user, path, sites, side }) {
     : html`<div class="side-grp">Workspace</div>
       <${SideLink} to="/sites" icon="layout-dashboard" label="Sites" on=${path === '/sites' || path === '/sites/new' || path === '/sites/rollup'}>${list.length > 0 && html`<em class="side-count">${list.length}</em>`}<//>
       ${hasRollups && html`<${SideLink} to="/sites?kind=rollups" icon="layers" label="Rollups" on=${false}><em class="side-count">${list.filter((s) => s.rollup).length}</em><//>`}
-      <div class="side-grp">Account</div>
-      ${tabs.map(([k, l, dot]) => html`<${SideLink} to=${tabPath(k)} icon=${ACCOUNT_ICONS[k] || 'settings'} label=${l} on=${accountOn(k)}>${dot && html`<span class="notif inline" aria-hidden="true"></span><span class="sr-only"> (update available)</span>`}<//>`)}
+      <div class="side-grp">Settings</div>
+      ${tabs.map(([k, l, dot]) => html`${k === 'organization' && html`<div class="side-grp">Organization</div>`}<${SideLink} to=${tabPath(k)} icon=${ACCOUNT_ICONS[k] || 'settings'} label=${l} on=${accountOn(k)}>${dot && html`<span class="notif inline" aria-hidden="true"></span><span class="sr-only"> (update available)</span>`}<//>`)}
       ${user.is_admin && registry.adminUi && html`<a class="side-link" title=${registry.adminUi.label} href=${BASE + registry.adminUi.href}><${Icon} name="shield-check" size=${16} /><span>${registry.adminUi.label}</span><${Icon} name="chevron-right" size=${13} class="side-ext" /></a>`}
       <div class="side-grp">Resources</div>
       <${SideExt} href="https://www.tidemarkanalytics.com/docs/" icon="book-open" label="Documentation" />
@@ -324,7 +324,7 @@ export function CommandPalette({ path, sites }) {
     }
     list.forEach((s) => out.push({ group: 'Sites', icon: s.rollup ? 'layers' : 'globe', label: s.domain, hint: s.rollup ? 'Rollup' : '', run: go('/' + s.domain) }));
     out.push({ group: 'Go to', icon: 'layout-dashboard', label: 'All sites', hint: 'g a', run: go('/sites') }, { group: 'Go to', icon: 'plus', label: 'Add a site', run: go('/sites/new') });
-    if (user) accountTabs(user).forEach(([k, l]) => out.push({ group: 'Account', icon: ACCOUNT_ICONS[k] || 'settings', label: l, run: go(k === 'profile' ? '/settings' : '/settings/' + k) }));
+    if (user) accountTabs(user).forEach(([k, l]) => out.push({ group: 'Settings', icon: ACCOUNT_ICONS[k] || 'settings', label: l, run: go(k === 'profile' ? '/settings' : '/settings/' + k) }));
     out.push({ group: 'Preferences', icon: 'sun', label: 'Theme: light', run: () => setTheme('light') }, { group: 'Preferences', icon: 'moon', label: 'Theme: dark', run: () => setTheme('dark') }, { group: 'Preferences', icon: 'monitor', label: 'Theme: match system', run: () => setTheme('system') },
       { group: 'Preferences', icon: 'keyboard', label: 'Keyboard shortcuts', hint: '?', run: openShortcuts }, { group: 'Preferences', icon: 'book-open', label: 'Documentation', run: () => window.open('https://www.tidemarkanalytics.com/docs/', '_blank', 'noopener') });
     return out;

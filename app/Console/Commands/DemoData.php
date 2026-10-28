@@ -7,6 +7,7 @@ use App\Analytics\Support\Sql;
 use App\Models\Funnel;
 use App\Models\FunnelStep;
 use App\Models\Goal;
+use App\Models\Organization;
 use App\Models\Site;
 use App\Models\User;
 use Illuminate\Console\Command;
@@ -24,6 +25,7 @@ class DemoData extends Command
         $site = Site::firstOrCreate(['domain' => $this->option('domain')], ['timezone' => 'America/New_York', 'public' => false, 'track_outbound' => true, 'track_downloads' => true]);
         if (! $site->members()->where('users.id', $user->id)->exists()) {
             $site->members()->attach($user->id, ['role' => 'owner', 'id' => (string) Str::uuid()]);
+            $site->update(['organization_id' => Organization::forOwner($user)->id]);
         }
         foreach ([['event', 'Signup'], ['page', '/pricing'], ['event', 'Outbound Link: Click'], ['event', 'File Download'], ['event', 'Purchase']] as [$type, $value]) {
             Goal::firstOrCreate(['site_id' => $site->id, 'type' => $type, 'value' => $value], ['currency' => $value === 'Purchase' ? 'USD' : null]);

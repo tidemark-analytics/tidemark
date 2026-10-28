@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ApiKey;
 use App\Models\Invitation;
+use App\Models\Organization;
 use App\Models\Site;
 use App\Models\User;
 use App\Support\Totp;
@@ -59,8 +60,10 @@ class AuthController extends Controller
             'name' => 'required|string|max:100',
             'email' => 'required|email|max:255|unique:users,email',
             'password' => ['required', 'confirmed', Password::min(8)],
+            'organization' => 'nullable|string|max:100',
         ]);
-        $user = User::create($data);
+        $user = User::create(collect($data)->except('organization')->all());
+        Organization::forOwner($user, $data['organization'] ?? null);
         event(new Registered($user));
         if (config('tidemark.verify_email')) {
             $user->sendEmailVerificationNotification();
@@ -242,8 +245,8 @@ class AuthController extends Controller
             'email_verified' => $u->hasVerifiedEmail(), 'verification_required' => (bool) config('tidemark.verify_email'),
             'updater_enabled' => (bool) config('tidemark.updater'),
             'can_rollup' => Site::rollupsAllowedFor($u),
-            // accounts this person helps manage, for the account choice when adding a site or a team
-            'administers' => $u->administeredAccounts()->orderBy('name')->get(['users.id', 'users.name'])->map(fn ($o) => ['id' => $o->id, 'name' => $o->name])->values(),
+            // organizations this person owns or administers, for the choice when adding a site or a team
+            'organizations' => Organization::whereIn('id', Organization::idsFor($u))->orderBy('name')->get()->map(fn ($o) => ['id' => $o->id, 'name' => $o->name, 'role' => $o->owner_id === $u->id ? 'owner' : 'admin'])->values(),
         ];
     }
 }

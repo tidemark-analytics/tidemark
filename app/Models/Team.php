@@ -8,16 +8,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Facades\DB;
 
-/** A named group of people an account owner shares sites with in one step. The role (viewer or admin) is set per site, not per team. */
+/** A named group of people an organization shares sites with in one step. The role (viewer or admin) is set per site, not per team. */
 class Team extends Model
 {
     use HasUuids;
 
-    protected $fillable = ['owner_id', 'name'];
+    protected $fillable = ['organization_id', 'name'];
 
-    public function owner(): BelongsTo
+    public function organization(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'owner_id');
+        return $this->belongsTo(Organization::class);
     }
 
     public function members(): BelongsToMany

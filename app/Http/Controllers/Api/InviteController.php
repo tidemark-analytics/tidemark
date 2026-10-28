@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\AccountAdmin;
 use App\Models\Invitation;
 use App\Models\Site;
 use App\Models\User;
@@ -21,7 +20,7 @@ class InviteController extends Controller
         $invite = $this->live($token);
         $has = User::whereRaw('lower(email) = ?', [strtolower($invite->email)])->exists();
 
-        return ['email' => $invite->email, 'role' => $invite->role, 'site' => $invite->site?->domain, 'team' => $invite->team?->name, 'account' => $invite->account_id ? $invite->inviter?->name : null, 'inviter' => $invite->inviter?->name, 'has_account' => $has, 'signed_in_as' => Auth::user()?->email];
+        return ['email' => $invite->email, 'role' => $invite->role, 'site' => $invite->site?->domain, 'team' => $invite->team?->name, 'organization' => $invite->organization?->name, 'inviter' => $invite->inviter?->name, 'has_account' => $has, 'signed_in_as' => Auth::user()?->email];
     }
 
     public function accept(Request $request, string $token)
@@ -41,8 +40,10 @@ class InviteController extends Controller
             $request->session()->regenerate();
         }
         $landing = null;
-        if ($invite->account_id) {
-            AccountAdmin::firstOrCreate(['owner_id' => $invite->account_id, 'user_id' => $user->id]);
+        if ($invite->organization_id) {
+            if ($invite->organization->owner_id !== $user->id && ! $invite->organization->admins()->where('users.id', $user->id)->exists()) {
+                $invite->organization->admins()->attach($user->id, ['id' => (string) Str::uuid()]);
+            }
             $landing = Site::memberOf($user)->orderBy('domain')->value('domain');
         } elseif ($invite->team) {
             if (! $invite->team->members()->where('users.id', $user->id)->exists()) {
@@ -64,7 +65,7 @@ class InviteController extends Controller
     private function live(string $token): Invitation
     {
         $invite = Invitation::live($token);
-        abort_if(! $invite || ! ($invite->site || $invite->team || $invite->account_id), 410, 'This invitation has expired or was already used. Ask for a new one.');
+        abort_if(! $invite || ! ($invite->site || $invite->team || $invite->organization_id), 410, 'This invitation has expired or was already used. Ask for a new one.');
 
         return $invite;
     }

@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Controllers\Api\AccountController;
 use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\AlertController;
 use App\Http\Controllers\Api\AnnotationController;
@@ -11,6 +10,7 @@ use App\Http\Controllers\Api\FaviconController;
 use App\Http\Controllers\Api\InviteController;
 use App\Http\Controllers\Api\McpController;
 use App\Http\Controllers\Api\OpenApiController;
+use App\Http\Controllers\Api\OrganizationController;
 use App\Http\Controllers\Api\PlausibleImportController;
 use App\Http\Controllers\Api\ReportSubscriptionController;
 use App\Http\Controllers\Api\RollupController;
@@ -82,11 +82,17 @@ Route::middleware('api.auth')->group(function () {
     Route::post('/me/keys', [AuthController::class, 'createKey']);
     Route::delete('/me/keys/{id}', [AuthController::class, 'deleteKey']);
 
-    Route::get('/account/admins', [AccountController::class, 'admins']);
-    Route::post('/account/admins', [AccountController::class, 'addAdmin']);
-    Route::delete('/account/admins/{user}', [AccountController::class, 'removeAdmin']);
-    Route::post('/account/invites/{invite}/resend', [AccountController::class, 'resendInvite'])->middleware('throttle:10,1');
-    Route::delete('/account/invites/{invite}', [AccountController::class, 'revokeInvite']);
+    Route::get('/organization', [OrganizationController::class, 'show']);
+    Route::post('/organization', [OrganizationController::class, 'store']);
+    Route::patch('/organization', [OrganizationController::class, 'update']);
+    Route::post('/organization/admins', [OrganizationController::class, 'addAdmin']);
+    Route::delete('/organization/admins/{user}', [OrganizationController::class, 'removeAdmin']);
+    Route::post('/organization/invites/{invite}/resend', [OrganizationController::class, 'resendInvite'])->middleware('throttle:10,1');
+    Route::delete('/organization/invites/{invite}', [OrganizationController::class, 'revokeInvite']);
+    Route::post('/organization/transfer', [OrganizationController::class, 'transfer'])->middleware('throttle:10,1');
+    Route::delete('/organization/transfer', [OrganizationController::class, 'cancelTransfer']);
+    Route::post('/organization/transfers/{organization}/accept', [OrganizationController::class, 'acceptTransfer']);
+    Route::delete('/organization/transfers/{organization}', [OrganizationController::class, 'declineTransfer']);
     Route::get('/teams', [TeamController::class, 'index']);
     Route::post('/teams', [TeamController::class, 'store']);
     Route::patch('/teams/{team}', [TeamController::class, 'update']);

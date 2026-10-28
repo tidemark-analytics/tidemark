@@ -11,14 +11,16 @@ use App\Contracts\EnforcesPiiScrubbing;
 use App\Contracts\Entitlements;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB;
 
 class Site extends Model
 {
     use HasUuids;
 
-    protected $fillable = ['kind', 'rollup_all', 'domain', 'timezone', 'public', 'track_outbound', 'track_downloads', 'track_forms', 'track_engagement', 'brand_name', 'brand_hide_name', 'brand_color', 'brand_logo', 'brand_logo_mime', 'honor_gpc', 'honor_dnt', 'location_precision', 'url_params', 'referrer_domain_only', 'min_group_size', 'pii_scrub', 'bot_filter'];
+    protected $fillable = ['kind', 'rollup_all', 'organization_id', 'domain', 'timezone', 'public', 'track_outbound', 'track_downloads', 'track_forms', 'track_engagement', 'brand_name', 'brand_hide_name', 'brand_color', 'brand_logo', 'brand_logo_mime', 'honor_gpc', 'honor_dnt', 'location_precision', 'url_params', 'referrer_domain_only', 'min_group_size', 'pii_scrub', 'bot_filter'];
 
     protected $hidden = ['brand_logo'];
 
@@ -124,14 +126,13 @@ class Site extends Model
         return $user->is_admin ? $query : $query->memberOf($user);
     }
 
-    /** Sites a user belongs to: directly, through a team, or as an admin of the account that owns them (rollups stay private to their owner). */
+    /** Sites a user belongs to: directly, through a team, or as an admin of the organization they belong to (rollups stay private to their owner). */
     public function scopeMemberOf($query, User $user)
     {
         return $query->where(fn ($q) => $q
             ->whereHas('members', fn ($m) => $m->where('users.id', $user->id))
             ->orWhereHas('teams', fn ($t) => $t->whereHas('members', fn ($m) => $m->where('users.id', $user->id)))
-            ->orWhere(fn ($a) => $a->where('kind', '!=', 'rollup')->whereHas('members', fn ($m) => $m->where('site_user.role', 'owner')
-                ->whereIn('users.id', AccountAdmin::where('user_id', $user->id)->select('owner_id')))));
+            ->orWhere(fn ($a) => $a->where('kind', '!=', 'rollup')->whereIn('organization_id', DB::table('organization_user')->where('user_id', $user->id)->select('organization_id'))));
     }
 
     /** The user who owns this site (and so the account it counts against). */
@@ -140,24 +141,29 @@ class Site extends Model
         return $this->members()->wherePivot('role', 'owner')->value('users.id');
     }
 
-    /** Whether this person is an admin of the account that owns this site. A rollup is private, so it never counts. */
-    public function isAccountAdmin(?User $user): bool
+    public function organization(): BelongsTo
     {
-        if (! $user || $this->isRollup() || ! ($owner = $this->ownerId())) {
+        return $this->belongsTo(Organization::class);
+    }
+
+    /** Whether this person is an admin of the organization this site belongs to. A rollup is private, so it never counts. */
+    public function isOrganizationAdmin(?User $user): bool
+    {
+        if (! $user || $this->isRollup() || ! $this->organization_id) {
             return false;
         }
 
-        return AccountAdmin::where('owner_id', $owner)->where('user_id', $user->id)->exists();
+        return DB::table('organization_user')->where('organization_id', $this->organization_id)->where('user_id', $user->id)->exists();
     }
 
-    /** The strongest of the user's direct role and the roles of the teams they are in. */
+    /** The strongest of the user's direct role, the roles of the teams they are in, and admin when they administer the site's organization. */
     public function memberRole(User $user): ?string
     {
         $roles = [$this->members()->where('users.id', $user->id)->first()?->pivot->role];
         if ($roles[0] !== 'owner') {
             $roles = array_merge($roles, $this->teams()->whereHas('members', fn ($m) => $m->where('users.id', $user->id))->get()->map(fn ($t) => $t->pivot->role)->all());
         }
-        if ($roles[0] !== 'owner' && $this->isAccountAdmin($user)) {
+        if ($roles[0] !== 'owner' && $this->isOrganizationAdmin($user)) {
             $roles[] = 'admin';
         }
         $rank = ['owner' => 3, 'admin' => 2, 'viewer' => 1];

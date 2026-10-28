@@ -412,7 +412,7 @@ function People({ site }) {
   const invites = (res.data && res.data.invites) || [];
   const canInvite = !!(res.data && res.data.invites_enabled);
   const teams = (res.data && res.data.teams) || [];
-  const accountAdmins = (res.data && res.data.account_admins) || [];
+  const orgAdmins = (res.data && res.data.organization_admins) || [];
   const available = (res.data && res.data.available_teams) || [];
   const isOwner = !!site.is_owner;
   const [tf, setTf] = useState({ team_id: '', role: 'viewer' });
@@ -447,11 +447,11 @@ function People({ site }) {
         ${isOwner ? html`<select class="mini-select" value=${t.role} aria-label=${'Role of team ' + t.name} onChange=${(e) => run(() => api(`/sites/${site.domain}/teams/${t.id}`, { method: 'PATCH', body: { role: e.target.value } }))}><option value="viewer" selected=${t.role === 'viewer'}>Viewer</option><option value="admin" selected=${t.role === 'admin'}>Admin</option></select>
           <button class="btn ghost icon sm danger" aria-label=${'Stop sharing with ' + t.name} title="Stop sharing with this team" onClick=${() => run(() => api(`/sites/${site.domain}/teams/${t.id}`, { method: 'DELETE' }))}><${Icon} name="trash-2" size=${15} /></button>`
           : html`<span class="pill">${t.role === 'admin' ? 'Admin' : 'Viewer'}</span><span class="ri-spacer" aria-hidden="true"></span>`}</li>`)}</ul>`}
-      <p class="muted small">${isOwner ? 'A person on several teams, or added directly as well, gets the strongest role they have. Manage teams under Account settings → Teams.' : 'Only the site owner shares it with teams.'}</p>`}
-    ${accountAdmins.length > 0 && html`<h4 class="muted small" style="margin:16px 0 6px">Account admins</h4><ul class="rows" aria-label="Account admins">${accountAdmins.map((u) => html`<li class="rowitem">
+      <p class="muted small">${isOwner ? 'A person on several teams, or added directly as well, gets the strongest role they have. Manage teams under Settings → Teams.' : 'Only the site owner shares it with teams.'}</p>`}
+    ${orgAdmins.length > 0 && html`<h4 class="muted small" style="margin:16px 0 6px">Organization admins</h4><ul class="rows" aria-label="Organization admins">${orgAdmins.map((u) => html`<li class="rowitem">
       <span class="avatar" aria-hidden="true">${(u.name || u.email || '?').slice(0, 1).toUpperCase()}</span>
-      <div class="grow ri-main"><b class="trunc">${u.name}</b><span class="muted trunc">${u.email}</span></div><span class="pill">Account admin</span><span class="ri-spacer" aria-hidden="true"></span></li>`)}</ul>
-      <p class="muted small">Account admins manage every site on this account, so they are admins here without being listed above.</p>`}
+      <div class="grow ri-main"><b class="trunc">${u.name}</b><span class="muted trunc">${u.email}</span></div><span class="pill">Organization admin</span><span class="ri-spacer" aria-hidden="true"></span></li>`)}</ul>
+      <p class="muted small">Organization admins manage every site in the organization, so they are admins here without being listed above.</p>`}
     ${invites.length > 0 && html`<h4 class="muted small" style="margin:16px 0 6px">Waiting to accept</h4><ul class="rows" aria-label="Pending invitations">${invites.map((i) => html`<li class="rowitem">
       <span class="avatar" aria-hidden="true"><${Icon} name="mail" size=${14} /></span>
       <div class="grow ri-main"><b class="trunc">${i.email}</b><span class="muted trunc">${i.role === 'admin' ? 'Admin' : 'Viewer'} · ${left(i.expires_at)}</span></div>
@@ -718,7 +718,7 @@ export function ApiKeys() {
   <//>`;
 }
 
-/** Account settings → Teams. A list of teams; opening one shows its people and the sites it can open (the role is chosen per site). */
+/** Settings → Teams. A list of teams; opening one shows its people and the sites it can open (the role is chosen per site). */
 export function Teams() {
   const { query } = useLocation();
   const res = useApi('/teams', null, []);
@@ -732,27 +732,28 @@ export function Teams() {
 const peopleCount = (t) => t.members.length;
 
 function TeamList({ res, teams }) {
+  const orgCount = new Set(teams.map((t) => t.organization_id)).size;
   const { user } = useContext(UserCtx);
-  const accounts = user.administers || [];
+  const orgs = user.organizations || [];
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState('');
-  const [account, setAccount] = useState('');
+  const [org, setOrg] = useState('');
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
   const create = async (e) => {
     e.preventDefault(); setErr(null); setBusy(true);
-    try { const r = await api('/teams', { method: 'POST', body: { name, ...(account ? { account_id: account } : {}) } }); setName(''); setAdding(false); navigate('/settings/teams?team=' + r.data.id); } catch (x) { setErr(firstError(x)); setBusy(false); }
+    try { const r = await api('/teams', { method: 'POST', body: { name, ...(org ? { organization_id: org } : {}) } }); setName(''); setAdding(false); navigate('/settings/teams?team=' + r.data.id); } catch (x) { setErr(firstError(x)); setBusy(false); }
   };
   return html`<${Section} title="Teams" help="Group people once, then share a site with the whole group as viewers or admins. Adding someone to a team gives them access to every site the team can open.">
     ${!adding && html`<div class="section-actions"><button class="btn primary" onClick=${() => setAdding(true)}><${Icon} name="plus" size=${14} /> New team</button></div>`}
     ${adding && html`<form class="goal-add" onSubmit=${create}>${err && html`<div class="alert">${err}</div>`}
-      ${accounts.length > 0 && html`<${Field} label="Account"><select value=${account} onChange=${(e) => setAccount(e.target.value)}><option value="" selected=${!account}>My account</option>${accounts.map((a) => html`<option value=${a.id} selected=${account === a.id}>${a.name}'s account</option>`)}</select><//>`}
+      ${orgs.length > 1 && html`<${Field} label="Organization"><select value=${org || (orgs.find((o) => o.role === 'owner') || orgs[0]).id} onChange=${(e) => setOrg(e.target.value)}>${orgs.map((o) => html`<option value=${o.id} selected=${(org || (orgs.find((x) => x.role === 'owner') || orgs[0]).id) === o.id}>${o.name}</option>`)}</select><//>`}
       <${Field} label="Team name"><input required autofocus maxlength="80" placeholder="For example Marketing or Client: Acme" value=${name} onInput=${(e) => setName(e.target.value)} /><//>
       <div class="row"><button class="btn primary" disabled=${!name.trim() || busy}>Create team</button><button type="button" class="btn" onClick=${() => { setAdding(false); setErr(null); setName(''); }}>Cancel</button></div></form>`}
     ${res.data && teams.length === 0 && !adding && html`<div class="empty-inline"><${Icon} name="users" size=${18} /><div><b>No teams yet</b><span>Create a team for the people who need the same sites, such as a marketing team or a client's staff, then share your sites with it in one step.</span></div></div>`}
     ${teams.length > 0 && html`<ul class="rows" aria-label="Teams">${teams.map((t) => html`<li class="rowitem pick"><${Link} to=${'/settings/teams?team=' + t.id} class="team-row">
       <span class="avatar" aria-hidden="true"><${Icon} name="users" size=${14} /></span>
-      <div class="grow ri-main"><b class="trunc">${t.name}</b><span class="muted trunc">${t.account ? t.account + '\'s account · ' : ''}${peopleCount(t)} ${peopleCount(t) === 1 ? 'person' : 'people'} · ${t.sites.length ? `${t.sites.length} ${t.sites.length === 1 ? 'site' : 'sites'}` : 'no sites yet'}${t.invites.length ? ` · ${t.invites.length} waiting to accept` : ''}</span></div>
+      <div class="grow ri-main"><b class="trunc">${t.name}</b><span class="muted trunc">${orgCount > 1 ? t.organization + ' · ' : ''}${peopleCount(t)} ${peopleCount(t) === 1 ? 'person' : 'people'} · ${t.sites.length ? `${t.sites.length} ${t.sites.length === 1 ? 'site' : 'sites'}` : 'no sites yet'}${t.invites.length ? ` · ${t.invites.length} waiting to accept` : ''}</span></div>
       <${Icon} name="chevron-right" size=${16} class="muted" /><//></li>`)}</ul>`}
   <//>`;
 }
@@ -765,7 +766,7 @@ function TeamDetail({ team, owned, canInvite, reload }) {
   const [del, setDel] = useState(false);
   const run = async (fn, ok) => { setErr(null); try { await fn(); reload(); if (ok) toast(ok); } catch (x) { setErr(firstError(x)); } };
   const left = (iso) => { const h = Math.max(0, Math.round((new Date(iso) - Date.now()) / 3600000)); return h >= 2 ? `expires in ${h} hours` : 'expires within the hour'; };
-  const available = owned.filter((s) => s.owner_id === team.account_id && !team.sites.some((x) => x.domain === s.domain)).map((s) => s.domain);
+  const available = owned.filter((s) => s.organization_id === team.organization_id && !team.sites.some((x) => x.domain === s.domain)).map((s) => s.domain);
   const add = (e) => { e.preventDefault(); run(async () => { const r = await api(`/teams/${team.id}/members`, { method: 'POST', body: { email } }); setEmail(''); toast(r.invited ? 'Invitation sent' : 'Added to the team'); }); };
   const rename = (e) => { e.preventDefault(); run(() => api('/teams/' + team.id, { method: 'PATCH', body: { name } }), 'Team renamed'); };
   const addSite = (e) => { e.preventDefault(); run(async () => { await api(`/sites/${share.domain}/teams`, { method: 'POST', body: { team_id: team.id, role: share.role } }); setShare({ ...share, domain: '' }); }, 'Shared with the team'); };
@@ -789,8 +790,8 @@ function TeamDetail({ team, owned, canInvite, reload }) {
       ${available.length > 0 ? html`<form class="goal-add" onSubmit=${addSite}><div class="goal-add-row"><select class="grow" aria-label="Site" value=${share.domain} onChange=${(e) => setShare({ ...share, domain: e.target.value })}><option value="">Share a site with this team…</option>${available.map((d) => html`<option value=${d} selected=${share.domain === d}>${d}</option>`)}</select>
         <div class="seg" role="radiogroup" aria-label="Role">${ROLES.map(([k, l]) => html`<button type="button" role="radio" aria-checked=${share.role === k} class=${share.role === k ? 'on' : ''} onClick=${() => setShare({ ...share, role: k })}>${l}</button>`)}</div>
         <button class="btn primary" disabled=${!share.domain}>Share</button></div></form>`
-        : owned.filter((s) => s.owner_id === team.account_id).length === 0 ? html`<div class="empty-inline"><${Icon} name="globe" size=${18} /><div><b>No sites on this account yet</b><span>Add a site to the account, then share it with the team.</span></div></div>` : null}
-      ${team.sites.length === 0 && owned.some((s) => s.owner_id === team.account_id) && html`<div class="empty-inline"><${Icon} name="globe" size=${18} /><div><b>Not shared with any site yet</b><span>Choose a site above to give the team access to it.</span></div></div>`}
+        : owned.filter((s) => s.organization_id === team.organization_id).length === 0 ? html`<div class="empty-inline"><${Icon} name="globe" size=${18} /><div><b>No sites in this organization yet</b><span>Add a site to the organization, then share it with the team.</span></div></div>` : null}
+      ${team.sites.length === 0 && owned.some((s) => s.organization_id === team.organization_id) && html`<div class="empty-inline"><${Icon} name="globe" size=${18} /><div><b>Not shared with any site yet</b><span>Choose a site above to give the team access to it.</span></div></div>`}
       ${team.sites.length > 0 && html`<ul class="rows" aria-label="Sites this team can open">${team.sites.map((s) => html`<li class="rowitem"><span class="ri-ico" aria-hidden="true"><${Icon} name="globe" size=${16} /></span><b class="grow trunc">${s.domain}</b>
         <select class="mini-select" value=${s.role} aria-label=${'Role of ' + team.name + ' on ' + s.domain} onChange=${(e) => run(() => api(`/sites/${s.domain}/teams/${team.id}`, { method: 'PATCH', body: { role: e.target.value } }))}>${ROLES.map(([k, l]) => html`<option value=${k} selected=${s.role === k}>${l}</option>`)}</select>
         <button class="btn ghost icon sm danger" aria-label=${'Stop sharing ' + s.domain} title="Stop sharing this site" onClick=${() => run(() => api(`/sites/${s.domain}/teams/${team.id}`, { method: 'DELETE' }))}><${Icon} name="trash-2" size=${15} /></button></li>`)}</ul>`}
@@ -801,33 +802,69 @@ function TeamDetail({ team, owned, canInvite, reload }) {
     ${del && html`<${Confirm} title=${`Delete the ${team.name} team?`} message="Its members lose the access they only had through this team. Access they have in another way stays." onClose=${() => setDel(false)} onConfirm=${async () => { await api('/teams/' + team.id, { method: 'DELETE' }); navigate('/settings/teams'); }} />`}`;
 }
 
-/** Account settings → Account admins: people who manage the whole account with its owner. */
-export function AccountAdmins() {
+/** Settings → Organization: its name, the admins who manage it with the owner, and handing it to one of them. */
+export function Organization() {
   const { user } = useContext(UserCtx);
-  const res = useApi('/account/admins', null, []);
-  const admins = (res.data && res.data.data) || [];
-  const invites = (res.data && res.data.invites) || [];
-  const canInvite = !!(res.data && res.data.invites_enabled);
-  const accounts = user.administers || [];
+  const res = useApi('/organization', null, []);
+  const d = res.data || {};
+  const org = d.organization;
+  const canInvite = !!d.invites_enabled;
+  const [name, setName] = useState(null);
   const [email, setEmail] = useState('');
+  const [newOrg, setNewOrg] = useState('');
   const [err, setErr] = useState(null);
+  const [transfer, setTransfer] = useState(false);
   const run = async (fn, ok) => { setErr(null); try { await fn(); res.reload(); if (ok) toast(ok); } catch (x) { setErr(firstError(x)); } };
   const left = (iso) => { const h = Math.max(0, Math.round((new Date(iso) - Date.now()) / 3600000)); return h >= 2 ? `expires in ${h} hours` : 'expires within the hour'; };
-  const add = (e) => { e.preventDefault(); run(async () => { const r = await api('/account/admins', { method: 'POST', body: { email } }); setEmail(''); toast(r.invited ? 'Invitation sent' : 'Added as an account admin'); }); };
-  return html`<${Section} title="Account admins" help=${'People who help you manage the whole account. They are admins on every site you own, can add sites to the account and manage its teams. Billing, deleting the account and who else is an admin stay with you.' + (canInvite ? ' Someone without an account gets an e-mail invitation that is valid for 72 hours.' : '')}>
-    <form class="goal-add" onSubmit=${add}><div class="goal-add-row"><input class="grow" type="email" required placeholder=${canInvite ? 'Email address' : 'Email address of an existing user'} aria-label="Email" value=${email} onInput=${(e) => setEmail(e.target.value)} /><button class="btn primary" disabled=${!email}>${canInvite ? 'Add or invite' : 'Add person'}</button></div></form>
-    ${err && html`<div class="alert">${err}</div>`}
-    ${res.data && admins.length + invites.length === 0 && html`<div class="empty-inline"><${Icon} name="shield" size=${18} /><div><b>Only you manage this account</b><span>Add a colleague to give them the same view of every site, without sharing each one.</span></div></div>`}
-    ${admins.length + invites.length > 0 && html`<ul class="rows" aria-label="Account admins">
-      ${admins.map((u) => html`<li class="rowitem"><span class="avatar" aria-hidden="true">${(u.name || u.email || '?').slice(0, 1).toUpperCase()}</span><div class="grow ri-main"><b class="trunc">${u.name}</b><span class="muted trunc">${u.email}</span></div>
-        <button class="btn ghost icon sm danger" aria-label=${'Remove ' + u.name + ' as an account admin'} title="Remove as account admin" onClick=${() => run(() => api('/account/admins/' + u.id, { method: 'DELETE' }))}><${Icon} name="trash-2" size=${15} /></button></li>`)}
-      ${invites.map((i) => html`<li class="rowitem"><span class="avatar" aria-hidden="true"><${Icon} name="mail" size=${14} /></span><div class="grow ri-main"><b class="trunc">${i.email}</b><span class="muted trunc">Waiting to accept · ${left(i.expires_at)}</span></div>
-        <button class="btn ghost sm" disabled=${!canInvite} onClick=${() => run(() => api(`/account/invites/${i.id}/resend`, { method: 'POST' }), 'Invitation sent again')}>Resend</button>
-        <button class="btn ghost icon sm danger" aria-label=${'Cancel invitation for ' + i.email} title="Cancel invitation" onClick=${() => run(() => api(`/account/invites/${i.id}`, { method: 'DELETE' }))}><${Icon} name="trash-2" size=${15} /></button></li>`)}</ul>`}
-  <//>
-  ${accounts.length > 0 && html`<${Section} title="Accounts you help manage" help="You are an account admin here: you see and change every site on these accounts, add sites to them and manage their teams.">
-    <ul class="rows" aria-label="Accounts you help manage">${accounts.map((a) => html`<li class="rowitem"><span class="avatar" aria-hidden="true">${(a.name || '?').slice(0, 1).toUpperCase()}</span><div class="grow ri-main"><b class="trunc">${a.name}'s account</b></div></li>`)}</ul>
-  <//>`}`;
+  const add = (e) => { e.preventDefault(); run(async () => { const r = await api('/organization/admins', { method: 'POST', body: { email } }); setEmail(''); toast(r.invited ? 'Invitation sent' : 'Added as an admin'); }); };
+  if (res.loading && !res.data) return html`<${Loading} />`;
+  const offers = d.incoming_transfers || [];
+  const memberOf = d.member_of || [];
+  return html`${err && html`<div class="alert" role="alert">${err}</div>`}
+    ${offers.map((o) => html`<div class="notice"><${Icon} name="info" size=${16} /><div><b>${o.from} wants to make you the owner of ${o.name}.</b> You would hold its plan and billing and decide who its admins are; ${o.from} stays on as an admin. This offer ${left(o.expires_at)}.
+      <div class="row" style="margin-top:8px"><button class="btn primary sm" onClick=${() => run(async () => { await api(`/organization/transfers/${o.id}/accept`, { method: 'POST' }); const me = await api('/me'); window.location.reload(); }, 'You are the owner now')}>Accept ownership</button>
+      <button class="btn sm" onClick=${() => run(() => api(`/organization/transfers/${o.id}`, { method: 'DELETE' }), 'Offer declined')}>Decline</button></div></div></div>`)}
+    ${!org && html`<${Section} title="Organization" help="You are not the owner of an organization yet. Sites, teams and admins belong to an organization, and its owner holds the plan. Create one to add sites of your own.">
+      <form class="goal-add-row" onSubmit=${(e) => { e.preventDefault(); run(async () => { await api('/organization', { method: 'POST', body: { name: newOrg } }); const me = await api('/me'); window.location.reload(); }); }}><input class="grow" required maxlength="100" placeholder="Organization name" aria-label="Organization name" value=${newOrg} onInput=${(e) => setNewOrg(e.target.value)} /><button class="btn primary" disabled=${!newOrg.trim()}>Create organization</button></form>
+    <//>`}
+    ${org && html`<${Section} title="Organization name" help="Shown to the people you invite and to anyone you give access to. You are its owner.">
+      <form class="goal-add-row" onSubmit=${(e) => { e.preventDefault(); run(() => api('/organization', { method: 'PATCH', body: { name: name === null ? org.name : name } }), 'Name saved'); }}><input class="grow" required maxlength="100" aria-label="Organization name" value=${name === null ? org.name : name} onInput=${(e) => setName(e.target.value)} /><button class="btn" disabled=${name === null || !name.trim() || name.trim() === org.name}>Save</button></form>
+    <//>
+    <${Section} title="Admins" help=${'Admins help you run the organization. They can see and change every site in it, add and delete sites, and manage its teams. Billing, the organization itself and who else is an admin stay with you, the owner.' + (canInvite ? ' Someone without an account gets an e-mail invitation that is valid for 72 hours.' : '')}>
+      <form class="goal-add" onSubmit=${add}><div class="goal-add-row"><input class="grow" type="email" required placeholder=${canInvite ? 'Email address' : 'Email address of an existing user'} aria-label="Email" value=${email} onInput=${(e) => setEmail(e.target.value)} /><button class="btn primary" disabled=${!email}>${canInvite ? 'Add or invite' : 'Add person'}</button></div></form>
+      ${org.admins.length + org.invites.length === 0 && html`<div class="empty-inline"><${Icon} name="shield" size=${18} /><div><b>Only you manage this organization</b><span>Add a colleague to give them the same view of every site, without sharing each one.</span></div></div>`}
+      ${org.admins.length + org.invites.length > 0 && html`<ul class="rows" aria-label="Organization admins">
+        ${org.admins.map((u) => html`<li class="rowitem"><span class="avatar" aria-hidden="true">${(u.name || u.email || '?').slice(0, 1).toUpperCase()}</span><div class="grow ri-main"><b class="trunc">${u.name}</b><span class="muted trunc">${u.email}${org.transfer && org.transfer.to.id === u.id ? ' · ownership offered' : ''}</span></div>
+          <button class="btn ghost icon sm danger" aria-label=${'Remove ' + u.name + ' as an admin'} title="Remove as admin" onClick=${() => run(() => api('/organization/admins/' + u.id, { method: 'DELETE' }))}><${Icon} name="trash-2" size=${15} /></button></li>`)}
+        ${org.invites.map((i) => html`<li class="rowitem"><span class="avatar" aria-hidden="true"><${Icon} name="mail" size=${14} /></span><div class="grow ri-main"><b class="trunc">${i.email}</b><span class="muted trunc">Waiting to accept · ${left(i.expires_at)}</span></div>
+          <button class="btn ghost sm" disabled=${!canInvite} onClick=${() => run(() => api(`/organization/invites/${i.id}/resend`, { method: 'POST' }), 'Invitation sent again')}>Resend</button>
+          <button class="btn ghost icon sm danger" aria-label=${'Cancel invitation for ' + i.email} title="Cancel invitation" onClick=${() => run(() => api(`/organization/invites/${i.id}`, { method: 'DELETE' }))}><${Icon} name="trash-2" size=${15} /></button></li>`)}</ul>`}
+    <//>
+    <${Section} title="Transfer ownership" danger help="Hand the organization to one of its admins. They have to accept, and you stay on as an admin. They then hold the plan and billing and decide who the admins are.">
+      ${org.transfer ? html`<div class="notice"><${Icon} name="info" size=${16} /><div>Waiting for <b>${org.transfer.to.name}</b> to accept. The offer ${left(org.transfer.expires_at)}.</div></div>
+        <div class="section-actions"><button class="btn" onClick=${() => run(() => api('/organization/transfer', { method: 'DELETE' }), 'Offer cancelled')}>Cancel the offer</button></div>`
+        : org.admins.length === 0 ? html`<p class="muted small">Add an admin above first: ownership can only go to one of the organization's admins.</p>`
+        : html`<div class="section-actions"><button class="btn danger" onClick=${() => setTransfer(true)}>Transfer ownership…</button></div>`}
+    <//>
+    ${transfer && html`<${TransferDialog} org=${org} onClose=${() => setTransfer(false)} onDone=${() => { setTransfer(false); res.reload(); toast('Offer sent'); }} />`}`}
+    ${memberOf.length > 0 && html`<${Section} title="Organizations you help manage" help="You are an admin of these: you see and change every site in them, add sites and manage their teams. The owner keeps billing and the admin list.">
+      <ul class="rows" aria-label="Organizations you help manage">${memberOf.map((o) => html`<li class="rowitem"><span class="avatar" aria-hidden="true">${(o.name || '?').slice(0, 1).toUpperCase()}</span><div class="grow ri-main"><b class="trunc">${o.name}</b><span class="muted trunc">Owner: ${o.owner}</span></div></li>`)}</ul>
+    <//>`}`;
+}
+
+function TransferDialog({ org, onClose, onDone }) {
+  const [to, setTo] = useState(org.admins[0].id);
+  const [confirm, setConfirm] = useState('');
+  const [err, setErr] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const send = async (e) => { e.preventDefault(); setErr(null); setBusy(true); try { await api('/organization/transfer', { method: 'POST', body: { user_id: to, confirm } }); onDone(); } catch (x) { setErr(firstError(x)); setBusy(false); } };
+  return html`<${Modal} title="Transfer ownership" onClose=${onClose} footer=${html`<button class="btn" onClick=${onClose}>Cancel</button><button class="btn destructive" form="transfer-form" disabled=${busy || confirm.trim().toLowerCase() !== org.name.toLowerCase()}>${busy ? 'Sending…' : 'Send the offer'}</button>`}>
+    <form id="transfer-form" class="stack" onSubmit=${send}>
+      ${err && html`<div class="alert" role="alert">${err}</div>`}
+      <p style="line-height:1.55;color:var(--muted-foreground)">Nothing changes until they accept. After that they own <b>${org.name}</b> and hold its plan and billing; you stay on as an admin and can be removed by them.</p>
+      <${Field} label="New owner"><select value=${to} onChange=${(e) => setTo(e.target.value)}>${org.admins.map((u) => html`<option value=${u.id} selected=${to === u.id}>${u.name} (${u.email})</option>`)}</select><//>
+      <${Field} label=${`Type ${org.name} to confirm`}><input autocomplete="off" value=${confirm} onInput=${(e) => setConfirm(e.target.value)} /><//>
+    </form><//>`;
 }
 
 export function Users() {
@@ -949,6 +986,6 @@ export function AccountSettings({ tab }) {
   if (registry.adminUi && user.is_admin && ['users', 'updates', 'customers'].includes(tab)) { window.location.replace(registry.adminUi.href + (tab === 'customers' ? '' : '/' + tab)); return null; }
   const moved = { preferences: 'profile' }; // older links still land in the right place
   const t = [tab, moved[tab]].find((k) => tabs.some((x) => x[0] === k)) || 'profile';
-  const Body = { profile: Profile, reports: EmailReports, security: Security, keys: ApiKeys, teams: Teams, admins: AccountAdmins, users: Users, updates: Updates, ...Object.fromEntries(extra.map((x) => [x.key, x.component])) }[t];
-  return html`<${SettingsShell} title="Account settings" back=${['/sites', 'Your sites']} scope="Account" dup tabs=${tabs} tab=${t} base="/settings"><${Body} /><//>`;
+  const Body = { profile: Profile, reports: EmailReports, security: Security, keys: ApiKeys, teams: Teams, organization: Organization, users: Users, updates: Updates, ...Object.fromEntries(extra.map((x) => [x.key, x.component])) }[t];
+  return html`<${SettingsShell} title="Settings" back=${['/sites', 'Your sites']} scope="Sites" dup tabs=${tabs} tab=${t} base="/settings"><${Body} /><//>`;
 }

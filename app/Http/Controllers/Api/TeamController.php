@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Mail\TeamMail;
 use App\Models\Invitation;
+use App\Models\Organization;
 use App\Models\Site;
 use App\Models\Team;
 use App\Models\User;
@@ -14,26 +15,24 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
-/** Teams: named groups of people the account owner shares sites with in one step (the role is chosen per site, in the site's sharing settings). */
+/** Teams: named groups of people an organization shares sites with in one step (the role is chosen per site, in the site's sharing settings). */
 class TeamController extends Controller
 {
     public function index(Request $r)
     {
         $user = $r->user();
-        $accounts = $this->accountIds($user);
-        $teamIds = Team::whereIn('owner_id', $accounts)->pluck('id');
+        $orgs = Organization::idsFor($user);
+        $teamIds = Team::whereIn('organization_id', $orgs)->pluck('id');
         Invitation::where('expires_at', '<', now())->whereIn('team_id', $teamIds)->delete();
-        $teams = Team::whereIn('id', $teamIds)->with(['owner', 'members' => fn ($q) => $q->orderBy('name'), 'sites'])->orderBy('name')->get();
+        $teams = Team::whereIn('id', $teamIds)->with(['organization', 'members' => fn ($q) => $q->orderBy('name'), 'sites'])->orderBy('name')->get();
         $invites = Invitation::whereIn('team_id', $teamIds)->orderBy('created_at')->get()->groupBy('team_id');
 
         return [
             'invites_enabled' => Invitation::enabled(),
-            // the sites this person can share with a team: their own and those of the accounts they help manage
-            'owned_sites' => Site::real()->whereHas('members', fn ($m) => $m->where('site_user.role', 'owner')->whereIn('users.id', $accounts))
-                ->with(['members' => fn ($m) => $m->wherePivot('role', 'owner')])->orderBy('domain')->get()
-                ->map(fn ($s) => ['domain' => $s->domain, 'owner_id' => $s->members->first()?->id])->values(),
+            // the sites of the organizations this person owns or administers: the ones they can share with a team
+            'owned_sites' => Site::real()->whereIn('organization_id', $orgs)->orderBy('domain')->get(['domain', 'organization_id'])->map(fn ($s) => ['domain' => $s->domain, 'organization_id' => $s->organization_id])->values(),
             'data' => $teams->map(fn (Team $t) => [
-                'id' => $t->id, 'name' => $t->name, 'account_id' => $t->owner_id, 'account' => $t->owner_id === $user->id ? null : $t->owner?->name,
+                'id' => $t->id, 'name' => $t->name, 'organization_id' => $t->organization_id, 'organization' => $t->organization?->name,
                 'members' => $t->members->map(fn ($u) => ['id' => $u->id, 'name' => $u->name, 'email' => $u->email])->values(),
                 'invites' => ($invites[$t->id] ?? collect())->map(fn ($i) => ['id' => $i->id, 'email' => $i->email, 'expires_at' => $i->expires_at->toIso8601String()])->values(),
                 'sites' => $t->sites->sortBy('domain')->map(fn ($s) => ['domain' => $s->domain, 'role' => $s->pivot->role])->values(),
@@ -43,10 +42,10 @@ class TeamController extends Controller
 
     public function store(Request $r)
     {
-        $owner = $r->input('account_id', $r->user()->id);
-        abort_unless(in_array($owner, $this->accountIds($r->user()), true), 403, 'You are not an admin of that account.');
-        $data = $this->validated($r, null, $owner);
-        $team = Team::create(['owner_id' => $owner, 'name' => $data['name']]);
+        $org = $r->input('organization_id', fn () => Organization::forOwner($r->user())->id);
+        abort_unless(in_array($org, Organization::idsFor($r->user()), true), 403, 'You are not part of that organization.');
+        $data = $this->validated($r, null, $org);
+        $team = Team::create(['organization_id' => $org, 'name' => $data['name']]);
 
         return response()->json(['data' => ['id' => $team->id, 'name' => $team->name]], 201);
     }
@@ -54,7 +53,7 @@ class TeamController extends Controller
     public function update(Request $r, string $team)
     {
         $t = $this->mine($r, $team);
-        $t->update(['name' => $this->validated($r, $t, $t->owner_id)['name']]);
+        $t->update(['name' => $this->validated($r, $t, $t->organization_id)['name']]);
 
         return ['ok' => true];
     }
@@ -124,19 +123,13 @@ class TeamController extends Controller
         return ['ok' => true];
     }
 
-    /** The owner's id, then the ids of the accounts this person helps manage: teams of any of them are theirs to manage. */
-    private function accountIds(User $user): array
-    {
-        return [$user->id, ...$user->administeredAccounts()->pluck('users.id')->all()];
-    }
-
     private function mine(Request $r, string $team): Team
     {
-        return Team::whereIn('owner_id', $this->accountIds($r->user()))->findOrFail($team);
+        return Team::whereIn('organization_id', Organization::idsFor($r->user()))->findOrFail($team);
     }
 
-    private function validated(Request $r, ?Team $existing, string $owner): array
+    private function validated(Request $r, ?Team $existing, string $organization): array
     {
-        return $r->validate(['name' => ['required', 'string', 'max:80', Rule::unique('teams', 'name')->where('owner_id', $owner)->ignore($existing?->id)]], ['name.unique' => 'There is already a team with that name.']);
+        return $r->validate(['name' => ['required', 'string', 'max:80', Rule::unique('teams', 'name')->where('organization_id', $organization)->ignore($existing?->id)]], ['name.unique' => 'There is already a team with that name.']);
     }
 }

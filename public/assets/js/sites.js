@@ -76,22 +76,22 @@ export function NewSite() {
   const { query } = useLocation();
   const importing = query.import === 'plausible';
   const { user } = useContext(UserCtx);
-  const accounts = (user && user.administers) || [];
-  const [account, setAccount] = useState('');
+  const orgs = (user && user.organizations) || [];
+  const [org, setOrg] = useState('');
   const [domain, setDomain] = useState('');
   const [timezone, setTimezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
   const submit = async (e) => {
     e.preventDefault(); setBusy(true); setErr(null);
-    try { const r = await api('/sites', { method: 'POST', body: { domain, timezone, ...(account ? { account } : {}) } }); navigate(importing ? `/${r.data.domain}/settings/data` : `/${r.data.domain}/installation`); }
+    try { const r = await api('/sites', { method: 'POST', body: { domain, timezone, ...(org ? { organization: org } : {}) } }); navigate(importing ? `/${r.data.domain}/settings/data` : `/${r.data.domain}/installation`); }
     catch (x) { setErr((x.errors && x.errors.domain && x.errors.domain[0]) || x.message); setBusy(false); }
   };
   return html`<main class="main narrow"><header class="page-head"><div class="grow"><${Breadcrumb} items=${[{ label: 'Sites', to: '/sites' }, { label: 'New site' }]} /><h1 style="margin-top:8px">${importing ? 'Add a site and import from Plausible' : 'Add a site'}</h1><div class="sub">Tell Tidemark which domain you want to measure.${importing ? ' You will pick the Plausible export on the next page.' : ''}</div></div></header>
     <form onSubmit=${submit}><${SettingCard} title="Site details" help="You can change the timezone later in the site's settings."
       footer=${html`<span class="help">No cookies, no personal data: Tidemark counts visits only.</span><div class="row"><${Link} to="/sites" class="btn ghost">Cancel<//><button class="btn primary" disabled=${busy || !domain}>${busy ? 'Adding…' : 'Add site'}</button></div>`}>
       ${err && html`<div class="alert" role="alert"><${Icon} name="circle-alert" size=${16} /><div>${err}</div></div>`}
-      ${accounts.length > 0 && html`<${Field} label="Account" help="Who owns the site. Its plan and limits apply to the account you choose."><select value=${account} onChange=${(e) => setAccount(e.target.value)}><option value="" selected=${!account}>My account</option>${accounts.map((a) => html`<option value=${a.id} selected=${account === a.id}>${a.name}'s account</option>`)}</select><//>`}
+      ${orgs.length > 1 && html`<${Field} label="Organization" help="Who the site belongs to. The owner's plan and limits apply."><select value=${org || (orgs.find((o) => o.role === 'owner') || orgs[0]).id} onChange=${(e) => setOrg(e.target.value)}>${orgs.map((o) => html`<option value=${o.id} selected=${(org || (orgs.find((x) => x.role === 'owner') || orgs[0]).id) === o.id}>${o.name}</option>`)}</select><//>`}
       <${Field} label="Domain" help="Just the domain: no https:// and no path."><input required autofocus placeholder="example.com" value=${domain} onInput=${(e) => setDomain(e.target.value)} autocapitalize="off" spellcheck="false" /><//>
       <${Field} label="Reporting timezone" help="Days start and end at midnight in this timezone."><select value=${timezone} onChange=${(e) => setTimezone(e.target.value)}>${zones().map((z) => html`<option value=${z} selected=${z === timezone}>${z}</option>`)}</select><//>
     <//></form></main>`;

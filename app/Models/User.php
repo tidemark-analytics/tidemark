@@ -41,22 +41,16 @@ class User extends Authenticatable
         return $this->belongsToMany(Team::class, 'team_user')->withTimestamps();
     }
 
-    /** Accounts (their owners) this person helps manage. */
-    public function administeredAccounts(): BelongsToMany
+    /** Organizations this person owns. */
+    public function ownedOrganizations(): HasMany
     {
-        return $this->belongsToMany(self::class, 'account_admins', 'user_id', 'owner_id')->withTimestamps();
+        return $this->hasMany(Organization::class, 'owner_id');
     }
 
-    /** People who help manage this person's account. */
-    public function accountAdmins(): BelongsToMany
+    /** Organizations this person is an admin of (they do not own them). */
+    public function administeredOrganizations(): BelongsToMany
     {
-        return $this->belongsToMany(self::class, 'account_admins', 'owner_id', 'user_id')->withTimestamps();
-    }
-
-    /** Teams this person owns (they manage the members and what each team can open). */
-    public function ownedTeams(): HasMany
-    {
-        return $this->hasMany(Team::class, 'owner_id');
+        return $this->belongsToMany(Organization::class, 'organization_user')->withTimestamps();
     }
 
     public function apiKeys(): HasMany

@@ -9,9 +9,9 @@ use App\Contracts\Entitlements;
 use App\Contracts\LimitsSiteList;
 use App\Events\SiteCreated;
 use App\Http\Controllers\Controller;
-use App\Models\AccountAdmin;
 use App\Models\FunnelStep;
 use App\Models\Goal;
+use App\Models\Organization;
 use App\Models\Site;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -51,7 +51,7 @@ class SiteController extends Controller
 
     public function store(Request $request)
     {
-        $data = $request->validate(['domain' => 'required|string|max:200', 'timezone' => 'nullable|string|max:64', 'account' => 'nullable|string']);
+        $data = $request->validate(['domain' => 'required|string|max:200', 'timezone' => 'nullable|string|max:64', 'organization' => 'nullable|string']);
         $domain = self::normalizeDomain($data['domain']);
         if (! preg_match('/^(localhost|[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+)(:\d+)?$/', $domain)) {
             throw ValidationException::withMessages(['domain' => 'Enter just the domain, e.g. example.com (no “https://”, no path).']);
@@ -67,20 +67,22 @@ class SiteController extends Controller
         if (config('tidemark.verify_email') && ! $user->hasVerifiedEmail()) {
             return response()->json(['error' => 'email_unverified', 'message' => 'Verify your email address before adding a site. We sent you a link.'], 403);
         }
-        // an account admin adds the site to the account they help manage: the owner owns it, so the owner's plan and limits apply
-        $owner = $user;
-        if (! empty($data['account']) && $data['account'] !== $user->id) {
-            $owner = User::whereKey($data['account'])->whereIn('id', AccountAdmin::where('user_id', $user->id)->select('owner_id'))->first();
-            if (! $owner) {
-                throw ValidationException::withMessages(['account' => 'You are not an admin of that account.']);
+        // the site belongs to an organization: the person's own by default, or one they are an admin of (its owner's plan and limits apply)
+        if (! empty($data['organization'])) {
+            $org = Organization::whereKey($data['organization'])->whereIn('id', Organization::idsFor($user))->first();
+            if (! $org) {
+                throw ValidationException::withMessages(['organization' => 'You are not part of that organization.']);
             }
+        } else {
+            $org = Organization::forOwner($user);
         }
+        $owner = $org->owner_id === $user->id ? $user : User::findOrFail($org->owner_id);
         $allowed = app(Entitlements::class)->canCreateSite($owner);
         if ($allowed !== true) {
             throw ValidationException::withMessages(['domain' => $allowed]);
         }
 
-        $site = Site::create(['domain' => $domain, 'timezone' => $tz]);
+        $site = Site::create(['domain' => $domain, 'timezone' => $tz, 'organization_id' => $org->id]);
         $site->members()->attach($owner->id, ['role' => 'owner', 'id' => (string) Str::uuid()]);
         SiteCreated::dispatch($site, $owner);
 
@@ -173,7 +175,7 @@ class SiteController extends Controller
         return $site->only(['id', 'domain', 'timezone', 'public', 'track_outbound', 'track_downloads', 'track_forms', 'track_engagement', 'honor_gpc', 'honor_dnt', 'location_precision', 'url_params', 'referrer_domain_only', 'min_group_size', ...(Site::piiScrubEnforced() ? [] : ['pii_scrub']), 'bot_filter']) + ['rollup' => $site->isRollup() ? ['all' => $site->rollup_all, 'sites' => $site->rollupMembers()->orderBy('domain')->get(['sites.id', 'sites.domain'])->map->only(['id', 'domain'])->all(), 'count' => count($site->memberSiteIds())] : null] + [
             'role' => $role,
             'can_manage' => in_array($role, ['owner', 'admin'], true),
-            'is_owner' => $role === 'owner' || $site->isAccountAdmin($user),
+            'is_owner' => $role === 'owner' || $site->isOrganizationAdmin($user),
             'script' => $site->scriptName(),
             'has_data' => $first !== null,
             'first_visit_at' => $first?->toIso8601String(),
