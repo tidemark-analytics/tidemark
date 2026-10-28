@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Contracts\Entitlements;
+use App\Contracts\ScopesToOrganizations;
 use App\Events\SiteMoved;
 use App\Http\Controllers\Controller;
 use App\Models\Organization;
@@ -48,8 +49,11 @@ class SiteMoveController extends Controller
             throw ValidationException::withMessages(['organization' => $why]);
         }
         $ownerChanges = $from->owner_id !== $to->owner_id;
-        if ($ownerChanges && ($why = app(Entitlements::class)->canCreateSite(User::findOrFail($to->owner_id))) !== true) {
-            throw ValidationException::withMessages(['organization' => $why]); // the new owner's plan has to have room for it
+        $e = app(Entitlements::class);
+        // the destination's plan has to have room for it: its own plan where organizations have one, otherwise its owner's
+        $room = $e instanceof ScopesToOrganizations ? $e->canCreateSiteIn($to) : ($ownerChanges ? $e->canCreateSite(User::findOrFail($to->owner_id)) : true);
+        if ($room !== true) {
+            throw ValidationException::withMessages(['organization' => $room]);
         }
 
         DB::transaction(function () use ($site, $to, $ownerChanges) {
@@ -89,6 +93,7 @@ class SiteMoveController extends Controller
             'gains_access' => $gained->map(fn ($u) => $u->name)->values(),
             'direct_people_kept' => count(array_filter($direct, fn ($id) => $id !== $from->owner_id)),
             'owner_changes' => $from->owner_id !== $to->owner_id,
+            'warnings' => ($e = app(Entitlements::class)) instanceof ScopesToOrganizations ? $e->moveWarnings($site, $to) : [],
             'new_owner' => $to->owner?->name,
         ];
     }
