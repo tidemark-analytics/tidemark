@@ -24,6 +24,19 @@ Simple, privacy-first web analytics that runs on **ordinary PHP shared hosting**
 - Works on SQLite, MySQL/MariaDB and PostgreSQL
 - Designed to scale out later: swappable event sink, separate analytics database connection, stateless app tier
 
+## Don't want to run it yourself? Tidemark Cloud
+
+The same open-source Tidemark, hosted for you at [tidemarkanalytics.com](https://www.tidemarkanalytics.com): no server, no updates, nothing to install. Sign up, paste one line into your site's `<head>`, and your dashboard is ready.
+
+- **Free to start:** 1 site, 10,000 events a month and 6 months of history, with every report, filter, goal and shared link.
+- **Pro, $7 a month ($70 a year):** unlimited sites, 250,000 events a month, 5 years of history, funnels, revenue, segments, journeys, rollups, alerts and webhooks, and your own logo and color on public dashboards. Need more events? Add packs of 250,000 for $5 whenever you like.
+- **Still private by design:** no cookies and no stored IP addresses, and direct support from inside the app.
+- **Switching?** Import your history from Plausible's CSV export.
+
+[**Try the live demo**](https://app.tidemarkanalytics.com/tidemark) · [**See pricing**](https://www.tidemarkanalytics.com/cloud/) · [**Start free**](https://app.tidemarkanalytics.com/register?utm_source=github&utm_medium=readme&utm_campaign=readme-cloud)
+
+Prefer to host it yourself? Everything below is for you, and it is free under the MIT license.
+
 ## Install on shared hosting (no SSH)
 
 1. Download the latest `tidemark-x.y.z.zip` from [Releases](https://github.com/tidemark-analytics/tidemark/releases/latest) (dependencies are bundled), or build it yourself: `scripts/build-release.sh 0.8.0` → `dist/tidemark-0.8.0.zip`.
@@ -117,8 +130,7 @@ Logo (pictorial mark: pier pilings with a tide line across them), palette, typog
 
 | Variable | Default | Notes |
 |---|---|---|
-| `TIDEMARK_MODE` | `self-hosted` | `cloud` opens registration and enables plan limits |
-| `TIDEMARK_REGISTRATION` | `false` (`true` in cloud) | Allow sign-ups |
+| `TIDEMARK_REGISTRATION` | `false` | Allow sign-ups |
 | `TIDEMARK_INGEST` | `sync` | `queue` buffers writes; drained by `schedule:run` or a worker |
 | `TIDEMARK_ANALYTICS_DB` | *(app DB)* | Separate connection for `visits`, `events` and `event_props` |
 | `TIDEMARK_IGNORE_IP`, `TIDEMARK_HOSTNAMES` | – | Comma-separated lists |
@@ -144,7 +156,7 @@ GET /api/v1/stats/breakdown?site_id=example.com&period=30d&property=visit:source
 
 Filters use `filters=visit:country==DE;event:page==/blog/*`. The dashboard's own JSON endpoints live under `/api/sites/{domain}/stats/…`.
 
-## Architecture & the cloud question
+## Architecture
 
 ```
  browser ──► POST /api/event ──► Collector ──► EventSink ──► analytics DB (visits, events, event_props)
@@ -156,16 +168,9 @@ Filters use `filters=visit:country==DE;event:page==/blog/*`. The dashboard's own
 
 - **Visits, not sessions.** A visit is one row, stitched in the sink: hits from the same visitor within 30 minutes of inactivity extend it (entry/exit page, pageviews, bounce, duration). Reports read visits for most numbers and events for pageviews and goals.
 - **Two logical databases.** Hot, append-only tables go through `TIDEMARK_ANALYTICS_DB`, everything else through the default connection. Tables are keyed by `site_id` and indexed on time, so they partition and shard naturally.
-- **Stateless app tier.** Sessions and cache can move to Redis/DB; any number of PHP workers can serve a cell.
+- **Stateless app tier.** Sessions and cache can move to Redis/DB; any number of PHP workers can serve requests.
 - **Swappable seams.** `EventSink` (writes) and `Stats\Stats` (reads) are the only places that know about the storage engine — a ClickHouse implementation can replace them without touching controllers or the UI.
 - **Privacy by construction.** Visitor ids are `hash(site, ip, user-agent, daily salt)`; raw IPs and user agents are never stored, and because the salt changes every day a visitor cannot be followed from one day to the next.
-
-**Decision for the hosted version: multi-tenant "cells", not an installation per customer.**
-Per-customer installs look attractive for privacy, but at analytics price points they multiply operational cost (upgrades, migrations, monitoring, backups, support) linearly with customers, make free tiers impossible and prevent any shared capacity planning. Privacy is better achieved by what the product *stores* (no IPs, no cookies, rotating salts) plus strict tenant scoping on every query than by where the PHP files live. So:
-
-1. Run the same codebase as a **cell** (`TIDEMARK_MODE=cloud`): app servers + a metadata DB + one or more analytics DBs. New cells (e.g. EU, US) give data-residency; customers are pinned to a cell.
-2. Scale reads/writes by enabling `TIDEMARK_INGEST=queue`, moving the analytics connection to a dedicated (replicated) server, then swapping in a columnar sink when a cell outgrows MySQL/Postgres.
-3. Offer **dedicated, single-tenant deployments** as an enterprise/compliance tier — the self-hosted build is exactly that, so it costs nothing extra to support.
 
 ## Project name
 
