@@ -28,7 +28,7 @@ class SiteAccess
         $role = $site->roleOf($user);
 
         $allowed = match ($ability) {
-            'owner' => $role === 'owner',
+            'owner' => $role === 'owner' || $site->isAccountAdmin($user), // an account admin does what the owner does on the account's sites
             'manage' => in_array($role, ['owner', 'admin'], true),
             default => $role !== null || $site->public,
         };

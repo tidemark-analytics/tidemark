@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\AccountController;
 use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\AlertController;
 use App\Http\Controllers\Api\AnnotationController;
@@ -81,6 +82,11 @@ Route::middleware('api.auth')->group(function () {
     Route::post('/me/keys', [AuthController::class, 'createKey']);
     Route::delete('/me/keys/{id}', [AuthController::class, 'deleteKey']);
 
+    Route::get('/account/admins', [AccountController::class, 'admins']);
+    Route::post('/account/admins', [AccountController::class, 'addAdmin']);
+    Route::delete('/account/admins/{user}', [AccountController::class, 'removeAdmin']);
+    Route::post('/account/invites/{invite}/resend', [AccountController::class, 'resendInvite'])->middleware('throttle:10,1');
+    Route::delete('/account/invites/{invite}', [AccountController::class, 'revokeInvite']);
     Route::get('/teams', [TeamController::class, 'index']);
     Route::post('/teams', [TeamController::class, 'store']);
     Route::patch('/teams/{team}', [TeamController::class, 'update']);

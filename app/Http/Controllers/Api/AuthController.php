@@ -242,6 +242,8 @@ class AuthController extends Controller
             'email_verified' => $u->hasVerifiedEmail(), 'verification_required' => (bool) config('tidemark.verify_email'),
             'updater_enabled' => (bool) config('tidemark.updater'),
             'can_rollup' => Site::rollupsAllowedFor($u),
+            // accounts this person helps manage, for the account choice when adding a site or a team
+            'administers' => $u->administeredAccounts()->orderBy('name')->get(['users.id', 'users.name'])->map(fn ($o) => ['id' => $o->id, 'name' => $o->name])->values(),
         ];
     }
 }

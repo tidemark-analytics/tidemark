@@ -15,7 +15,7 @@ class Invitation extends Model
 {
     use HasUuids;
 
-    protected $fillable = ['email', 'token_hash', 'invited_by', 'site_id', 'team_id', 'role', 'expires_at'];
+    protected $fillable = ['email', 'token_hash', 'invited_by', 'site_id', 'team_id', 'account_id', 'role', 'expires_at'];
 
     protected function casts(): array
     {
@@ -74,6 +74,20 @@ class Invitation extends Model
         $invite = static::create([
             'email' => $email, 'token_hash' => static::hash($token), 'invited_by' => $inviter->id,
             'team_id' => $team->id, 'role' => 'viewer', 'expires_at' => now()->addHours((int) config('tidemark.invite_hours')),
+        ]);
+        $invite->plainToken = $token;
+
+        return $invite;
+    }
+
+    /** Same, for helping to manage an account (the inviter's own). */
+    public static function issueForAccount(string $email, User $inviter): self
+    {
+        static::where('email', $email)->where('account_id', $inviter->id)->delete();
+        $token = Str::random(40);
+        $invite = static::create([
+            'email' => $email, 'token_hash' => static::hash($token), 'invited_by' => $inviter->id,
+            'account_id' => $inviter->id, 'role' => 'admin', 'expires_at' => now()->addHours((int) config('tidemark.invite_hours')),
         ]);
         $invite->plainToken = $token;
 

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\AccountAdmin;
 use App\Models\ReportSubscription;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -49,6 +50,7 @@ class AdminController extends Controller
         $u = User::findOrFail($user);
         $u->sites()->detach();
         $u->teams()->detach();
+        AccountAdmin::where('user_id', $u->id)->orWhere('owner_id', $u->id)->delete();
         $u->ownedTeams()->each(fn ($t) => $t->erase());
         $u->apiKeys()->delete();
         ReportSubscription::where('user_id', $u->id)->delete();

@@ -41,6 +41,18 @@ class User extends Authenticatable
         return $this->belongsToMany(Team::class, 'team_user')->withTimestamps();
     }
 
+    /** Accounts (their owners) this person helps manage. */
+    public function administeredAccounts(): BelongsToMany
+    {
+        return $this->belongsToMany(self::class, 'account_admins', 'user_id', 'owner_id')->withTimestamps();
+    }
+
+    /** People who help manage this person's account. */
+    public function accountAdmins(): BelongsToMany
+    {
+        return $this->belongsToMany(self::class, 'account_admins', 'owner_id', 'user_id')->withTimestamps();
+    }
+
     /** Teams this person owns (they manage the members and what each team can open). */
     public function ownedTeams(): HasMany
     {

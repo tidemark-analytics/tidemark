@@ -32,11 +32,11 @@ export const SITE_NAV = [
 export const GLOBAL_NAV = [
   { id: 'sites', label: 'Sites', icon: 'layout-dashboard', to: '/sites', key: 's' },
 ];
-const ACCOUNT_ICONS = { profile: 'user', security: 'shield-check', keys: 'key', reports: 'mail', teams: 'users', users: 'user-plus', updates: 'refresh-cw', billing: 'credit-card' };
+const ACCOUNT_ICONS = { profile: 'user', security: 'shield-check', keys: 'key', reports: 'mail', teams: 'users', admins: 'shield', users: 'user-plus', updates: 'refresh-cw', billing: 'credit-card' };
 /** The tabs of Account settings: [key, label, dot?]. Also drives the sidebar and the palette. */
 export function accountTabs(user) {
   const extra = registry.accountTabs.filter((x) => !x.visible || x.visible(user));
-  return [['profile', 'Profile'], ['security', 'Security'], ['keys', 'API keys'], ['reports', 'Email reports'], ['teams', 'Teams'], ...extra.map((x) => [x.key, x.label, !!(x.dot && x.dot(user))]),
+  return [['profile', 'Profile'], ['security', 'Security'], ['keys', 'API keys'], ['reports', 'Email reports'], ['teams', 'Teams'], ['admins', 'Account admins'], ...extra.map((x) => [x.key, x.label, !!(x.dot && x.dot(user))]),
     ...(user.is_admin && !registry.adminUi ? [['users', 'Users'], ...(user.updater_enabled === false ? [] : [['updates', 'Updates', !!user.update]])] : [])];
 }
 

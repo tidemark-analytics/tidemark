@@ -124,12 +124,30 @@ class Site extends Model
         return $user->is_admin ? $query : $query->memberOf($user);
     }
 
-    /** Sites a user belongs to, directly or through a team, whatever their global role. */
+    /** Sites a user belongs to: directly, through a team, or as an admin of the account that owns them (rollups stay private to their owner). */
     public function scopeMemberOf($query, User $user)
     {
         return $query->where(fn ($q) => $q
             ->whereHas('members', fn ($m) => $m->where('users.id', $user->id))
-            ->orWhereHas('teams', fn ($t) => $t->whereHas('members', fn ($m) => $m->where('users.id', $user->id))));
+            ->orWhereHas('teams', fn ($t) => $t->whereHas('members', fn ($m) => $m->where('users.id', $user->id)))
+            ->orWhere(fn ($a) => $a->where('kind', '!=', 'rollup')->whereHas('members', fn ($m) => $m->where('site_user.role', 'owner')
+                ->whereIn('users.id', AccountAdmin::where('user_id', $user->id)->select('owner_id')))));
+    }
+
+    /** The user who owns this site (and so the account it counts against). */
+    public function ownerId(): ?string
+    {
+        return $this->members()->wherePivot('role', 'owner')->value('users.id');
+    }
+
+    /** Whether this person is an admin of the account that owns this site. A rollup is private, so it never counts. */
+    public function isAccountAdmin(?User $user): bool
+    {
+        if (! $user || $this->isRollup() || ! ($owner = $this->ownerId())) {
+            return false;
+        }
+
+        return AccountAdmin::where('owner_id', $owner)->where('user_id', $user->id)->exists();
     }
 
     /** The strongest of the user's direct role and the roles of the teams they are in. */
@@ -138,6 +156,9 @@ class Site extends Model
         $roles = [$this->members()->where('users.id', $user->id)->first()?->pivot->role];
         if ($roles[0] !== 'owner') {
             $roles = array_merge($roles, $this->teams()->whereHas('members', fn ($m) => $m->where('users.id', $user->id))->get()->map(fn ($t) => $t->pivot->role)->all());
+        }
+        if ($roles[0] !== 'owner' && $this->isAccountAdmin($user)) {
+            $roles[] = 'admin';
         }
         $rank = ['owner' => 3, 'admin' => 2, 'viewer' => 1];
         $roles = array_filter($roles);

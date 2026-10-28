@@ -128,7 +128,7 @@ Add an **`Engagement`** goal (turning the setting on creates it), then open it u
 - **Filters** — click any row, or use *Filter*: *is*, *is not*, *contains*, *does not contain*, wildcards (`/blog/*`), several values per filter. Filtering by a **goal** switches the dashboard into conversion mode.
 - **Periods** — today, realtime, 24 hours, 7/28/30/91 days, month, 6/12 months, year, all time, custom; keyboard shortcuts for all of them (`D R W T Q M S L Y A C`, `X` compare, `F` filter, `←/→` step through days, months or years).
 - **Sharing** — make a dashboard public, or create private shared links with an optional password.
-- **Goals, shields, people** — conversion goals, block rules (IP, country, page, hostname allow-list), owner/admin/viewer roles per site, and teams: group people once and share a site with the whole team as viewers or admins.
+- **Goals, shields, people** — conversion goals, block rules (IP, country, page, hostname allow-list), owner/admin/viewer roles per site, teams (group people once and share a site with the whole team as viewers or admins) and account admins (colleagues who manage every site on the account with you).
 - **CSV export**, a **Stats API**, API keys and two-factor sign-in.
 
 ## Brand
