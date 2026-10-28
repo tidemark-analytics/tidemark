@@ -6,7 +6,7 @@
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border:1px solid #dde6e8;border-radius:12px;">
 <tr><td style="padding:28px 28px 8px;">
   <img src="{{ url('/assets/logo/tidemark-email.png') }}" alt="{{ config('app.name') }}" width="140" height="19" style="display:block;border:0;height:19px;width:140px;margin:0 0 18px;">
-  <h1 style="margin:8px 0 0;font-size:20px;line-height:1.4;">@if ($invited){{ $inviter->name }} invited you to the {{ $team->name }} team@else{{ $inviter->name }} added you to the {{ $team->name }} team@endif</h1>
+  <h1 style="margin:8px 0 0;font-size:20px;line-height:1.4;">@if ($invited){{ $inviter->name }} invited you to the {{ $team->name }} team @else{{ $inviter->name }} added you to the {{ $team->name }} team @endif</h1>
   <p style="margin:12px 0 0;font-size:15px;line-height:1.5;">Being on the team gives you access to the sites it is shared with.</p>
 </td></tr>
 <tr><td style="padding:16px 28px 8px;"><a href="{{ $url }}" style="display:inline-block;background:#0f6f78;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:10px 18px;border-radius:8px;">{{ $invited ? 'Accept the invitation' : 'Open your sites' }}</a></td></tr>
