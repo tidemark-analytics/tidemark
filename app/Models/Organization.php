@@ -67,6 +67,40 @@ class Organization extends Model
         return static::where('owner_id', $user->id)->where('personal', false)->count();
     }
 
+    public function isOwnedBy(User $user): bool
+    {
+        return $this->owner_id === $user->id;
+    }
+
+    public function isAdministeredBy(User $user): bool
+    {
+        return $this->admins()->where('users.id', $user->id)->exists();
+    }
+
+    /**
+     * Whether this person may move a site out of $this and into $to: true, or the reason it is refused.
+     * They must run both organizations (owner or admin). Taking a site out is the sensitive half, so unless both organizations have the
+     * same owner, only the source's owner may do it: an admin cannot walk a site out of the owner's organization into one with another owner.
+     */
+    public function mayMoveSiteTo(self $to, User $user): true|string
+    {
+        if ($this->id === $to->id) {
+            return 'The site is already in this organization.';
+        }
+        $runs = fn (self $o) => $o->isOwnedBy($user) || $o->isAdministeredBy($user);
+        if (! $runs($to)) {
+            return 'You need to be an owner or admin of the organization you move it to.';
+        }
+        if (! $runs($this)) {
+            return 'You need to be an owner or admin of the organization it is in.';
+        }
+        if ($this->owner_id !== $to->owner_id && ! $this->isOwnedBy($user)) {
+            return 'Only the owner of '.$this->name.' can move a site to an organization with a different owner.';
+        }
+
+        return true;
+    }
+
     /** Ids of every organization this person owns or administers. */
     public static function idsFor(User $user): array
     {

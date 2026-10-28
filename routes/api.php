@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\RollupController;
 use App\Http\Controllers\Api\SegmentController;
 use App\Http\Controllers\Api\SettingsController as S;
 use App\Http\Controllers\Api\SiteController;
+use App\Http\Controllers\Api\SiteMoveController;
 use App\Http\Controllers\Api\StatsApiController;
 use App\Http\Controllers\Api\StatsController;
 use App\Http\Controllers\Api\TeamController;
@@ -169,6 +170,8 @@ Route::middleware('api.auth')->group(function () {
         Route::post('/teams', [S::class, 'addTeam']);
         Route::patch('/teams/{team}', [S::class, 'updateTeam']);
         Route::delete('/teams/{team}', [S::class, 'removeTeam']);
+        Route::get('/move', [SiteMoveController::class, 'show']);
+        Route::post('/move', [SiteMoveController::class, 'move']);
     });
     Route::middleware('site:owner')->delete('/sites/{site}', [SiteController::class, 'destroy']);
 

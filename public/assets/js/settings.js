@@ -164,7 +164,7 @@ function Tracking({ site, reload }) {
 const Conversions = ({ site }) => html`<${Goals} site=${site} /><${Funnels} site=${site} /><${EventDocs} site=${site} />`;
 
 /** Who can see the site, and how it looks to them. */
-const Access = ({ site, reload }) => html`${!site.rollup && html`<${People} site=${site} />`}<${Visibility} site=${site} reload=${reload} /><${Branding} site=${site} reload=${reload} />`;
+const Access = ({ site, reload }) => html`${!site.rollup && html`<${People} site=${site} />`}<${Visibility} site=${site} reload=${reload} /><${Branding} site=${site} reload=${reload} />${!site.rollup && site.is_owner && html`<${MoveSite} site=${site} reload=${reload} />`}`;
 
 function DataTab({ site, reload }) {
   const [tz, setTz] = useState(site.timezone);
@@ -185,6 +185,37 @@ function DataTab({ site, reload }) {
       <div class="dz-row"><div><b>Delete site</b><span class="muted">Removes the site and all its data permanently.</span></div><button class="btn danger" onClick=${() => setConfirm('delete')}>Delete site</button></div><//>`}
     ${confirm === 'reset' && html`<${TypedConfirm} title="Reset statistics?" phrase=${site.domain} message=${`All collected data for ${site.domain} will be deleted. This can't be undone.`} confirmLabel="Reset statistics" onClose=${() => setConfirm(null)} onConfirm=${async () => { await api(`/sites/${site.domain}/reset`, { method: 'POST' }); toast('Statistics reset'); reload(); }} />`}
     ${confirm === 'delete' && html`<${TypedConfirm} title=${`Delete ${site.domain}?`} phrase=${site.domain} message="The site and all of its data will be permanently deleted." confirmLabel="Delete site" onClose=${() => setConfirm(null)} onConfirm=${async () => { await api(`/sites/${site.domain}`, { method: 'DELETE' }); navigate('/sites'); }} />`}`;
+}
+
+
+const names = (list) => (list.length > 3 ? list.slice(0, 3).join(', ') + ` and ${list.length - 3} more` : list.join(', '));
+
+/** Site settings → Sharing and access → Move to another organization. Shows who gains and loses access before anything happens. */
+function MoveSite({ site, reload }) {
+  const { user } = useContext(UserCtx);
+  const scope = useScope(user);
+  const res = useApi(`/sites/${site.domain}/move`, null, [site.domain, site.organization_id]);
+  const [to, setTo] = useState('');
+  const [confirm, setConfirm] = useState(false);
+  const d = res.data;
+  if (!d) return res.error ? null : html`<${Section} title="Move to another organization"><${Loading} /><//>`;
+  const dest = d.destinations.find((x) => x.id === to);
+  const i = dest && dest.impact;
+  const label = (o) => (o.personal ? 'Personal' : o.name);
+  const lines = i ? [
+    i.owner_changes && `${i.new_owner} becomes the owner, so the site counts against their plan from now on.`,
+    i.gains_access.length > 0 && `${names(i.gains_access)} gain${i.gains_access.length === 1 ? 's' : ''} access as organization admins.`,
+    i.loses_access.length > 0 && `${names(i.loses_access)} lose${i.loses_access.length === 1 ? 's' : ''} the access they had through ${label(d.organization)}.`,
+    i.teams.length > 0 && `Shared with ${names(i.teams.map((t) => `${t.name} (${t.members} ${t.members === 1 ? 'person' : 'people'})`))}: unshared, because teams belong to an organization.`,
+    i.direct_people_kept > 0 && `The ${i.direct_people_kept} ${i.direct_people_kept === 1 ? 'person' : 'people'} you added to this site directly keep their access.`,
+    'Statistics, goals, shared links and alerts move with it.',
+  ].filter(Boolean) : [];
+  return html`<${Section} title="Move to another organization" help=${`This site is in ${label(d.organization)}. Moving it keeps its data and the people you added to it directly; access that came from the organization (its admins and teams) changes.`}>
+    ${d.destinations.length === 0 ? html`<div class="empty-inline"><${Icon} name="shield" size=${18} /><div><b>Nowhere to move it</b><span>You can move a site between organizations you own or administer. Moving it out of an organization with a different owner takes that organization's owner.</span></div></div>`
+      : html`<form class="goal-add-row" onSubmit=${(e) => { e.preventDefault(); setConfirm(true); }}><select class="grow" aria-label="Destination organization" value=${to} onChange=${(e) => setTo(e.target.value)}><option value="">Move to…</option>${d.destinations.map((o) => html`<option value=${o.id} selected=${to === o.id}>${label(o)}</option>`)}</select><button class="btn" disabled=${!to}>Review move</button></form>
+        ${dest && html`<ul class="muted small" style="margin:0;padding-left:18px;display:grid;gap:4px">${lines.map((l) => html`<li>${l}</li>`)}</ul>`}`}
+  <//>
+  ${confirm && dest && html`<${Confirm} title=${`Move ${site.domain} to ${label(dest)}?`} confirmLabel="Move site" destructive=${false} message=${lines.join(' ')} onClose=${() => setConfirm(false)} onConfirm=${async () => { await api(`/sites/${site.domain}/move`, { method: 'POST', body: { organization: dest.id } }); scope.set(dest.id); setTo(''); reload(); res.reload(); toast(`Moved to ${label(dest)}`); }} />`}`;
 }
 
 /** Leave small groups out of what public dashboards and shared links list. */
