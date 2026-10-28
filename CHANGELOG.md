@@ -4,6 +4,14 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [0.35.1] - 2026-10-28
+
+### Changed
+- Rollups belong to an organization instead of travelling with a person. A rollup adds up the sites of the organization it is made in (choose the organization in the switcher first), is owned by that organization's owner like its sites, and can be seen and changed by the owner and admins (still never shared with teams). Existing rollups move into their owner's Personal organization. A rollup can't move to another organization; deleting an organization deletes its rollups, and transferring it moves them. For extensions: `AllowsRollupsIn`, an optional companion to `AllowsRollups` that decides per organization.
+
+### Fixed
+- The Sites and Rollups counts in the sidebar now count only the organization chosen in the switcher, not every site you can open.
+
 ## [0.35.0] - 2026-10-28
 
 ### Added

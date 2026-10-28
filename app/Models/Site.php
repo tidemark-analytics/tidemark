@@ -7,6 +7,7 @@ use App\Contracts\AllowsBranding;
 use App\Contracts\AllowsConversionReports;
 use App\Contracts\AllowsExploration;
 use App\Contracts\AllowsRollups;
+use App\Contracts\AllowsRollupsIn;
 use App\Contracts\EnforcesPiiScrubbing;
 use App\Contracts\Entitlements;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -73,6 +74,15 @@ class Site extends Model
         if (! $this->isRollup()) {
             return [$this->id];
         }
+        // a rollup in an organization adds up that organization's sites, whoever made it
+        if ($this->organization_id) {
+            $inOrganization = Site::real()->where('organization_id', $this->organization_id);
+            if (! $this->rollup_all) {
+                $inOrganization->whereIn('id', $this->rollupMembers()->pluck('sites.id'));
+            }
+
+            return $inOrganization->pluck('id')->all();
+        }
         $ownerId = $this->members()->wherePivot('role', 'owner')->value('users.id');
         if (! $ownerId) {
             return [];
@@ -88,9 +98,12 @@ class Site extends Model
     }
 
     /** Whether this person may create rollups (always true unless an extension limits it). */
-    public static function rollupsAllowedFor(User $user): bool
+    public static function rollupsAllowedFor(User $user, ?Organization $organization = null): bool
     {
         $entitlements = app(Entitlements::class);
+        if ($organization && $entitlements instanceof AllowsRollupsIn) {
+            return $entitlements->allowsRollupsIn($organization);
+        }
 
         return ! ($entitlements instanceof AllowsRollups) || $entitlements->allowsRollups($user);
     }
@@ -126,13 +139,13 @@ class Site extends Model
         return $user->is_admin ? $query : $query->memberOf($user);
     }
 
-    /** Sites a user belongs to: directly, through a team, or as an admin of the organization they belong to (rollups stay private to their owner). */
+    /** Sites a user belongs to: directly, through a team, or as an admin of the organization they belong to (a rollup follows its organization like a site does). */
     public function scopeMemberOf($query, User $user)
     {
         return $query->where(fn ($q) => $q
             ->whereHas('members', fn ($m) => $m->where('users.id', $user->id))
             ->orWhereHas('teams', fn ($t) => $t->whereHas('members', fn ($m) => $m->where('users.id', $user->id)))
-            ->orWhere(fn ($a) => $a->where('kind', '!=', 'rollup')->whereIn('organization_id', DB::table('organization_user')->where('user_id', $user->id)->select('organization_id'))));
+            ->orWhereIn('organization_id', DB::table('organization_user')->where('user_id', $user->id)->select('organization_id')));
     }
 
     /** The user who owns this site (and so the account it counts against). */
@@ -146,10 +159,10 @@ class Site extends Model
         return $this->belongsTo(Organization::class);
     }
 
-    /** Whether this person is an admin of the organization this site belongs to. A rollup is private, so it never counts. */
+    /** Whether this person is an admin of the organization this site (or rollup) belongs to. */
     public function isOrganizationAdmin(?User $user): bool
     {
-        if (! $user || $this->isRollup() || ! $this->organization_id) {
+        if (! $user || ! $this->organization_id) {
             return false;
         }
 

@@ -54,7 +54,8 @@ export function SitesPage() {
   const realSites = all.filter((s) => !s.rollup && s.role).length;
   const rollups = list.filter((s) => s.rollup), sites = list.filter((s) => !s.rollup);
   const groups = rollups.length && sites.length ? [['Rollups', rollups], ['Sites', sites]] : [['', list]];
-  const canRollup = realSites >= 2 && (!user || user.can_rollup !== false);
+  const myOrg = scope.org && (user && user.organizations || []).find((o) => o.id === scope.org.id);
+  const canRollup = !scope.shared && !!myOrg && realSites >= 2 && myOrg.can_rollup !== false;
   return html`<main class="main"><header class="page-head"><div class="grow"><h1>${kind === 'rollups' ? 'Rollups' : 'Sites'}</h1>${res.data && total > 0 && html`<div class="sub"><b>${fmtShort(real.reduce((n, s) => n + s.visitors, 0))}</b> visitors across ${real.length} ${real.length === 1 ? 'site' : 'sites'} in the last 24 hours</div>`}</div>
     <div class="row wrap">${total > 3 && html`<div class="searchbox"><${Icon} name="search" size=${14} /><input placeholder="Search sites" aria-label="Search sites" value=${q} onInput=${(e) => setQ(e.target.value)} /></div>`}
       ${total > 1 && html`<select aria-label="Sort" value=${sort} onChange=${(e) => setSort(e.target.value)} style="width:auto"><option value="visitors" selected=${sort === 'visitors'}>Most visitors</option><option value="name" selected=${sort === 'name'}>Name</option></select>`}
@@ -127,22 +128,25 @@ export function Installation({ domain }) {
 export function NewRollup() {
   useDocTitle('Create a rollup');
   const { user } = useContext(UserCtx) || {};
-  const sites = useApi('/rollups/candidates', null, []);
+  const scope = useScope(user);
+  const orgId = scope.shared ? null : scope.org && scope.org.id;
+  const org = orgId && (user && user.organizations || []).find((o) => o.id === orgId);
+  const sites = useApi('/rollups/candidates' + (orgId ? '?organization=' + orgId : ''), null, [orgId]);
   const [name, setName] = useState('');
   const [all, setAll] = useState(true);
   const [chosen, setChosen] = useState([]);
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
   const list = (sites.data && sites.data.data) || [];
-  const allowed = !user || user.can_rollup !== false;
+  const allowed = !org || org.can_rollup !== false;
   const submit = async (e) => {
     e.preventDefault(); setBusy(true); setErr(null);
-    try { const r = await api('/rollups', { method: 'POST', body: { name, all, sites: all ? undefined : chosen } }); navigate('/' + r.data.domain); }
+    try { const r = await api('/rollups', { method: 'POST', body: { name, organization: orgId || undefined, all, sites: all ? undefined : chosen } }); navigate('/' + r.data.domain); }
     catch (x) { setErr((x.errors && Object.values(x.errors)[0][0]) || x.message); setBusy(false); }
   };
-  return html`<main class="main narrow"><header class="page-head"><div class="grow"><${Breadcrumb} items=${[{ label: 'Sites', to: '/sites' }, { label: 'New rollup' }]} /><h1 style="margin-top:8px">Create a rollup</h1><div class="sub">One dashboard that adds up several of your sites. Your sites keep their own dashboards and data.</div></div></header>
-    <form onSubmit=${submit}><${SettingCard} title="Rollup" help="Imported data is left out, and a revenue goal adds up only amounts sent in its own currency. The rollup's timezone starts as the one most of your sites use."
-      footer=${html`<span class="help">${all ? 'Includes every site you own.' : `${chosen.length} ${chosen.length === 1 ? 'site' : 'sites'} selected.`}</span><div class="row"><${Link} to="/sites" class="btn ghost">Cancel<//><button class="btn primary" disabled=${busy || !name || !allowed || (!all && !chosen.length)}>${busy ? 'Creating…' : 'Create rollup'}</button></div>`}>
+  return html`<main class="main narrow"><header class="page-head"><div class="grow"><${Breadcrumb} items=${[{ label: 'Sites', to: '/sites' }, { label: 'New rollup' }]} /><h1 style="margin-top:8px">Create a rollup</h1><div class="sub">One dashboard that adds up several sites of ${org && !org.personal ? org.name : 'your Personal organization'}. The sites keep their own dashboards and data.</div></div></header>
+    <form onSubmit=${submit}><${SettingCard} title="Rollup" help="Imported data is left out, and a revenue goal adds up only amounts sent in its own currency. The rollup's timezone starts as the one most of its sites use."
+      footer=${html`<span class="help">${all ? 'Includes every site in the organization, now and later.' : `${chosen.length} ${chosen.length === 1 ? 'site' : 'sites'} selected.`}</span><div class="row"><${Link} to="/sites" class="btn ghost">Cancel<//><button class="btn primary" disabled=${busy || !name || !allowed || (!all && !chosen.length)}>${busy ? 'Creating…' : 'Create rollup'}</button></div>`}>
       ${!allowed && html`<div class="notice"><${Icon} name="info" size=${16} /><div>Rollups are included with Pro. <${Link} to="/settings">Open your account settings<//> to upgrade.</div></div>`}
       ${err && html`<div class="alert" role="alert"><${Icon} name="circle-alert" size=${16} /><div>${err}</div></div>`}
       <${Field} label="Name" help="Letters, numbers and hyphens, like all-sites. It becomes the dashboard's address."><input required autofocus placeholder="all-sites" value=${name} onInput=${(e) => setName(e.target.value)} autocapitalize="off" spellcheck="false" maxlength="63" /><//>
