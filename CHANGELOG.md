@@ -4,7 +4,7 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
-## [0.36.0] - 2026-10-29
+## [0.35.3] - 2026-10-29
 
 ### Added
 - Two-factor sign-in has more ways in. Besides an authenticator app you can turn on **email codes** (a one-time code sent to your account address, needs outgoing email) and **passkeys** (fingerprint, face, screen lock or a security key; any number per account). At sign-in the page offers whichever methods you have set up.
