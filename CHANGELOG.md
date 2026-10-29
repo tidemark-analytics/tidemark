@@ -4,11 +4,21 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [0.36.0] - 2026-10-29
+
 ### Added
 - Two-factor sign-in has more ways in. Besides an authenticator app you can turn on **email codes** (a one-time code sent to your account address, needs outgoing email) and **passkeys** (fingerprint, face, screen lock or a security key; any number per account). At sign-in the page offers whichever methods you have set up.
 - **Recovery codes.** Turning on the first method gives you ten one-time codes to use if you lose your phone or key, shown once. You can make a new set (which replaces the old one) from Settings → Security.
 - Setting up an authenticator app now shows a **QR code** to scan, with the key and an "Open in an authenticator app" button as fallbacks.
 - Settings → Security lists each method with its status; removing one asks for your password. The `two_factor` field in `/api/me` is on when any method is. New endpoints: `GET /api/me/two-factor`, `/api/me/two-factor/email`, `/api/me/two-factor/recovery-codes`, `/api/me/passkeys` and `/api/auth/two-factor/{email,passkey}`; `POST /api/auth/login` takes a `method` (`totp`, `email`, `passkey` or `recovery`).
+
+### Changed
+- A site's settings sections (Tracking, Conversions, Alerts, Sharing and access, Data) now sit under **Settings** in the sidebar instead of a second list on the page. On phones, and with the sidebar collapsed, the list stays at the top of the page.
+- The top bar is lighter on phones: the menu, the site or page you are on, Find and your account. The organization switcher and the live visitor count moved to the top of the menu.
+
+### Fixed
+- Phone menu: the organization dropdown opens in place instead of being cut off, and a long menu scrolls instead of squashing its headings.
+- Report rows, the Journeys toggle and the footer links on shared dashboards are easier to tap on phones. A few corner radii now follow the design scale, and avatars are easier to read in dark mode.
 
 ## [0.35.2] - 2026-10-29
 
