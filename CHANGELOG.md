@@ -4,6 +4,11 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [0.36.1] - 2026-10-29
+
+### Added
+- `TIDEMARK_RESERVED_NAMES` (comma-separated) lists extra first path segments that cannot be used as a site domain or rollup name and are never shown as a dashboard, for example the pages of a website served on the same address. Empty by default.
+
 ## [0.36.0] - 2026-10-29
 
 ### Added

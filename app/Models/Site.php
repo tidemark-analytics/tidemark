@@ -22,6 +22,15 @@ class Site extends Model
 {
     use HasUuids;
 
+    /** First path segments the app itself answers to; a rollup cannot take one of these names. */
+    private const RESERVED = ['sites', 'settings', 'login', 'register', 'share', 'install', 'api', 'js', 'assets', 'up', 'storage', 'build', 'rollups', 'admin'];
+
+    /** The built-in reserved names plus config('tidemark.reserved_names'), e.g. the pages of a marketing site on the same host. */
+    public static function reservedNames(): array
+    {
+        return array_values(array_unique([...self::RESERVED, ...array_map('strtolower', (array) config('tidemark.reserved_names', []))]));
+    }
+
     protected $fillable = ['kind', 'rollup_all', 'organization_id', 'domain', 'timezone', 'public', 'track_outbound', 'track_downloads', 'track_forms', 'track_engagement', 'brand_name', 'brand_hide_name', 'brand_color', 'brand_logo', 'brand_logo_mime', 'honor_gpc', 'honor_dnt', 'location_precision', 'url_params', 'referrer_domain_only', 'min_group_size', 'pii_scrub', 'bot_filter'];
 
     protected $hidden = ['brand_logo'];

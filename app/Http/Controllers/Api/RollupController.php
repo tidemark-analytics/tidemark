@@ -16,8 +16,6 @@ use Illuminate\Validation\ValidationException;
  */
 class RollupController extends Controller
 {
-    private const RESERVED = ['sites', 'settings', 'login', 'register', 'share', 'install', 'api', 'js', 'assets', 'up', 'storage', 'build', 'rollups', 'admin'];
-
     /** The sites an organization's rollup could add up: the ones the organization holds, for someone who owns or administers it. */
     public function candidates(Request $r)
     {
@@ -38,7 +36,7 @@ class RollupController extends Controller
         if (! preg_match('/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/', $name)) {
             throw ValidationException::withMessages(['name' => 'Use letters, numbers and hyphens only, for example all-sites.']);
         }
-        if (in_array($name, self::RESERVED, true) || Site::where('domain', $name)->exists()) {
+        if (in_array($name, Site::reservedNames(), true) || Site::where('domain', $name)->exists()) {
             throw ValidationException::withMessages(['name' => 'That name is already taken.']);
         }
         $all = (bool) ($data['all'] ?? false);
