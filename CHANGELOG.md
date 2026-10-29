@@ -4,6 +4,12 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [0.35.2] - 2026-10-29
+
+### Fixed
+- Phone layout. Controls follow one touch scale below 720px wide (and on touch screens): buttons, inputs and selects are 44px, small buttons and the top bar 40px, menu rows 44px, so mixed rows line up and dropdown options are easy to hit. The top bar drops the logo on phones, shows only the organization's icon on a site page so the site name fits, and opens its switchers across the full width. People and team rows with controls wrap them under the name, and the add-person form stacks. Desktop layouts are unchanged.
+- The rollup form says "All the sites in this organization" instead of "All the sites I own".
+
 ## [0.35.1] - 2026-10-28
 
 ### Changed
