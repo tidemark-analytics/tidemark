@@ -3,6 +3,7 @@
 use App\Http\Controllers\CampaignRedirectController;
 use App\Http\Controllers\InstallController;
 use App\Http\Controllers\ReportUnsubscribeController;
+use App\Models\Site;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
@@ -36,5 +37,5 @@ Route::middleware('installed')->group(function () {
     Route::view('/sites/{any?}', 'app')->where('any', '.*');
     Route::view('/settings/{any?}', 'app')->where('any', '.*');
     Route::view('/share/{any}', 'app')->where('any', '.*');
-    Route::view('/{domain}/{any?}', 'app')->where('domain', '(?!(api|js|assets|install|up|storage|build|admin)$)[^/]+')->where('any', '.*');
+    Route::view('/{domain}/{any?}', 'app')->where('domain', '(?!('.implode('|', array_map(fn ($n) => preg_quote($n, '/'), Site::reservedNames())).')$)[^/]+')->where('any', '.*');
 });
