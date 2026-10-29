@@ -179,8 +179,6 @@ class AuthController extends Controller
         return ['ok' => true];
     }
 
-    // ---- API keys
-
     public function keys(Request $request)
     {
         return ['data' => $request->user()->apiKeys()->latest()->get()];

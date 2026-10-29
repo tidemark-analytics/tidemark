@@ -20,8 +20,6 @@ class TwoFactorController extends Controller
         return $this->state($request->user());
     }
 
-    // ---- authenticator app
-
     public function setup(Request $request)
     {
         $user = $request->user();
@@ -53,8 +51,6 @@ class TwoFactorController extends Controller
         return $this->state($user);
     }
 
-    // ---- e-mailed codes
-
     public function emailSetup(Request $request)
     {
         abort_unless(AuthController::mailConfigured(), 422, 'This installation cannot send e-mail yet.');
@@ -84,8 +80,6 @@ class TwoFactorController extends Controller
 
         return $this->state($user);
     }
-
-    // ---- passkeys
 
     public function passkeyOptions(Request $request)
     {
@@ -118,8 +112,6 @@ class TwoFactorController extends Controller
         return $this->state($user);
     }
 
-    // ---- recovery codes
-
     public function recoveryCodes(Request $request)
     {
         $user = $this->confirmPassword($request);
@@ -129,8 +121,6 @@ class TwoFactorController extends Controller
 
         return $this->state($user) + ['recovery_codes' => $codes];
     }
-
-    // ---- sign-in helpers (not signed in yet: the password stands in for the session)
 
     public function loginEmailCode(Request $request)
     {

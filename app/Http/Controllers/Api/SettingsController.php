@@ -28,7 +28,6 @@ use Illuminate\Validation\ValidationException;
 /** Per-site settings: goals, shared links, shields and people. */
 class SettingsController extends Controller
 {
-    // ---- goals -------------------------------------------------------------------------------------------
     public function goals(Request $r)
     {
         return ['data' => $r->attributes->get('site')->goals()->orderBy('created_at')->get()];
@@ -93,7 +92,6 @@ class SettingsController extends Controller
         return ['ok' => true];
     }
 
-    // ---- funnels -----------------------------------------------------------------------------------------
     public function funnels(Request $r)
     {
         $funnels = $r->attributes->get('site')->funnels()->with('steps')->orderBy('created_at')->get();
@@ -152,7 +150,6 @@ class SettingsController extends Controller
         return $funnel->load('steps');
     }
 
-    // ---- shared links ------------------------------------------------------------------------------------
     public function sharedLinks(Request $r)
     {
         return ['data' => $r->attributes->get('site')->sharedLinks()->orderBy('created_at')->get()];
@@ -192,7 +189,6 @@ class SettingsController extends Controller
         return ['ok' => true];
     }
 
-    // ---- shields (block lists) ---------------------------------------------------------------------------
     /** How many values were masked in the last 30 days, by kind (never the values). */
     public function piiMasks(Request $request)
     {
@@ -245,7 +241,6 @@ class SettingsController extends Controller
         return ['ok' => true];
     }
 
-    // ---- people ------------------------------------------------------------------------------------------
     public function people(Request $r)
     {
         $site = $r->attributes->get('site');
