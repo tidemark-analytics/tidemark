@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::create('data_deletions', function (Blueprint $table) {
             $table->id();
             $table->uuid('site_id');
-            $table->unsignedBigInteger('user_id')->nullable();
+            $table->uuid('user_id')->nullable();
             $table->string('user_name', 120)->nullable(); // kept so the log still reads right after an account is removed
             $table->json('filters');
             $table->date('date_from')->nullable();
