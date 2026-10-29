@@ -114,7 +114,6 @@ class Filters
         return null;
     }
 
-    // ---------------------------------------------------------------------------------------------------------
     /** Constrain a query over `visits as v`. Event-level rules become EXISTS subqueries. */
     public function applyToVisits(Builder $q): Builder
     {

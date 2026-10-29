@@ -40,7 +40,6 @@ class Stats
         return count($this->ids) === 1 ? $q->where($column, $this->ids[0]) : $q->whereIn($column, $this->ids);
     }
 
-    // ------------------------------------------------------------------------------------------------ builders
     /** Unique visitors in the period under the filters. */
     public function visitorCount(Period $p, Filters $f): int
     {
@@ -129,7 +128,6 @@ class Stats
         ];
     }
 
-    // ------------------------------------------------------------------------------------------------ top stats
     /** @return array<string,int|float> */
     public function topStats(Period $p, Filters $f): array
     {
@@ -188,7 +186,6 @@ class Stats
         return $native && $native->lt($imported) ? $native : $imported;
     }
 
-    // ------------------------------------------------------------------------------------------------ time series
     /** @return array{labels:array<int,string>, plot:array<string,array<int,int|float>>} */
     public function timeseries(Period $p, Filters $f): array
     {
@@ -263,7 +260,6 @@ class Stats
         return ['labels' => $labels, 'plot' => $plot];
     }
 
-    // ------------------------------------------------------------------------------------------------ breakdowns
     /**
      * @param  array{limit?:int,page?:int,search?:?string}  $o
      * @return array{results:array<int,array<string,mixed>>, has_more:bool}
@@ -483,7 +479,6 @@ class Stats
         return $out;
     }
 
-    // ------------------------------------------------------------------------------------------------ goals & props
     /** @return array<int,array<string,mixed>> */
     public function goals(Period $p, Filters $f): array
     {
@@ -723,7 +718,6 @@ class Stats
         return $this->eventsQ($p, $f)->join('event_props as pp', 'pp.event_id', '=', 'e.id');
     }
 
-    // ------------------------------------------------------------------------------------------------ site list
     /** Visitors in the last 24 hours, the 24 hours before, and an hourly sparkline. */
     public function last24h(): array
     {

@@ -57,8 +57,6 @@ class SecondFactor
         };
     }
 
-    // ---- e-mailed codes
-
     public static function sendEmailCode(User $user): void
     {
         $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
@@ -97,8 +95,6 @@ class SecondFactor
     {
         return hash_hmac('sha256', $code, (string) config('app.key'));
     }
-
-    // ---- recovery codes
 
     /** Makes a fresh set when the person has none yet; returns the codes in plain text (shown once), or null when they already had some. */
     public static function ensureRecoveryCodes(User $user): ?array
@@ -148,8 +144,6 @@ class SecondFactor
             $user->forceFill(['two_factor_recovery_codes' => null])->save();
         }
     }
-
-    // ---- passkeys
 
     public static function registrationOptions(User $user): array
     {

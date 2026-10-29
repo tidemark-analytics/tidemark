@@ -113,7 +113,6 @@ class OrganizationController extends Controller
         return ['ok' => true];
     }
 
-    // ---- admins ------------------------------------------------------------------------------------------
     /** Someone with an account becomes an admin at once (and is told by e-mail); an unknown address gets an invitation when those are enabled. */
     public function addAdmin(Request $r, string $organization)
     {
@@ -179,7 +178,6 @@ class OrganizationController extends Controller
         return ['ok' => true];
     }
 
-    // ---- ownership ---------------------------------------------------------------------------------------
     /** The owner offers the organization to one of its admins. Nothing changes until that person accepts, within the invitation window. */
     public function transfer(Request $r, string $organization)
     {

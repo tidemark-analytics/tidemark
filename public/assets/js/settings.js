@@ -1,6 +1,6 @@
 // Site settings (General, Visibility, Branding, Goals, People, Shields) and account settings (Preferences, Security, API keys, Users).
 import { html, useState, useEffect, useRef, useApi, api, navigate, Link, Icon, toast, copy, toggleTheme, setTheme, currentTheme, UserCtx, useContext, useDocTitle, useLocation, ago, countryName, flag, BASE } from './lib.js';
-import { Loading, Empty, ErrorBox, Field, Confirm, TypedConfirm, Modal, Toggle, CodeBlock, Breadcrumb, Badge, Avatar } from './ui.js';
+import { Loading, Empty, Section, ErrorBox, Field, Confirm, TypedConfirm, Modal, Toggle, CodeBlock, Breadcrumb, Badge, Avatar } from './ui.js';
 import { squareImage } from './image.js';
 import { Snippet } from './dashboard.js';
 import { useScope } from './org.js';
@@ -23,12 +23,6 @@ function SettingsShell({ title, back, tabs, tab, base, children, scope, dup }) {
     <div class=${'settings' + (dup ? ' dup' : '')}><nav class="subnav" aria-label="Settings sections">${tabs.map(([k, l, dot]) => html`<${Link} to=${base + (k === tabs[0][0] ? '' : '/' + k)} class=${k === tab ? 'active' : ''} aria-current=${k === tab ? 'page' : undefined}>${l}${dot && html`<span class="notif inline" aria-hidden="true"></span><span class="sr-only"> (update available)</span>`}<//>`)}</nav>
       <div class="stack" aria-label=${label}>${children}</div></div></main>`;
 }
-/** The body of a section a plan doesn't include: blurred and out of reach, with a lock and a way to upgrade (Cloud only; self-hosted installs are never locked). */
-const ProLock = ({ children, note }) => html`<div class="prolock"><div class="prolock-body" inert aria-hidden="true">${children}</div>
-  <div class="prolock-over" role="note"><span class="prolock-ico" aria-hidden="true"><${Icon} name="lock" size=${22} /></span><b>Upgrade to unlock</b>
-    <p>To access this feature, <${Link} to="/settings/billing">upgrade your plan<//>.${note ? ' ' + note : ''}</p></div></div>`;
-/** A setting card: title, description, body and an optional footer (helper text left, Save right). */
-const Section = ({ title, help, children, danger, locked, lockNote, footer }) => html`<section class=${'card setting ' + (danger ? 'danger-zone' : '')}><div class="setting-h"><h2>${title}</h2>${help && html`<p>${help}</p>`}</div>${children && html`<div class="setting-b">${locked ? html`<${ProLock} note=${lockNote}>${children}<//>` : children}</div>`}${footer && !locked && html`<div class="setting-f">${footer}</div>`}</section>`;
 const SaveFooter = ({ help, dirty, onSave, busy, label = 'Save' }) => html`<span class="help">${dirty ? 'You have unsaved changes.' : help}</span><button class="btn primary sm" type="button" disabled=${!dirty || busy} onClick=${onSave}>${label}</button>`;
 
 // ----------------------------------------------------------------------------------------- site settings
