@@ -147,7 +147,7 @@ function OrgSwitcher({ user }) {
   const pick = (id) => { setOpen(false); scope.set(id); if (location.pathname !== '/sites' && !location.pathname.startsWith('/settings')) navigate('/sites'); };
   const label = scope.shared ? 'Shared with me' : scope.org.personal ? 'Personal' : scope.org.name;
   const tile = (name, url) => html`<${Avatar} name=${name} url=${url} size="sm" shape="org" />`;
-  return html`<div class="pop-wrap" ref=${wrap}>
+  return html`<div class="pop-wrap org-sw" ref=${wrap}>
     <button class=${'crumb-btn' + (open ? ' open' : '')} aria-haspopup="menu" aria-expanded=${open} aria-label=${'Switch organization, current: ' + label} onClick=${() => setOpen(!open)}>
       ${tile(scope.shared ? 'S' : scope.org.name, scope.shared ? null : scope.org.logo_url)}<span class="trunc">${label}</span><${Icon} name="chevrons-up-down" size=${14} class="chev" />
     </button>
@@ -294,7 +294,7 @@ export function AppBar({ user, path, sites, side }) {
   return html`<header class="topbar"><div class="topbar-in">
     <button class="btn ghost icon side-toggle" aria-label="Open navigation" aria-expanded=${side.open} aria-controls="app-side" onClick=${() => side.setOpen(!side.open)}><${Icon} name="menu" size=${18} /></button>
     <${Link} to="/sites" class="brand-mark" aria-label="Tidemark, all sites"><${Logo} size=${24} /><//>
-    <nav class="crumbs" aria-label="Breadcrumb">
+    <nav class=${'crumbs' + (domain ? ' on-site' : '')} aria-label="Breadcrumb">
       <span class="crumb-sep" aria-hidden="true">/</span>
       <${OrgSwitcher} user=${user} /><span class="crumb-sep" aria-hidden="true">/</span>
       ${domain ? html`<${SiteSwitcher} list=${sites.list} current=${current} domain=${domain} recents=${recents} user=${user} scopeId=${scope.id} /><span class="crumb-sep s2" aria-hidden="true">/</span><span class="crumb-cur muted sec" aria-current="page">${sectionLabel(path, domain)}</span>`

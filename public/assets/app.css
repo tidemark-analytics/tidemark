@@ -1077,17 +1077,23 @@ button.fact:hover { border-color: var(--muted-foreground); background: var(--mut
 }
 
 /* ---- touch targets -------------------------------------------------------------------------------------------- */
-@media (pointer: coarse) {
+@media (pointer: coarse), (max-width: 720px) {
+  /* touch scale: controls 44px (small ones and the top bar 40px), menu rows 44px, so a row of mixed controls lines up */
   .btn, .toolbar .btn, input, select { min-height: 44px; }
   input[type="checkbox"], input[type="radio"] { min-height: 16px; }
   .btn.icon, .toolbar .btn.icon { min-width: 44px; }
-  .btn.sm { min-height: 36px; }
-  .pop .item, .filter-groups .item { min-height: 44px; }
+  .btn.sm, .mini-select, .rowitem select, .rowitem input:not([type="checkbox"]):not([type="radio"]) { min-height: 40px; }
+  .btn.sm.icon { min-width: 40px; }
+  .pop .item, .pop a.item, .filter-groups .item, .cmd-item, .palette-item, .side-back { min-height: 44px; }
   .mrow { min-height: 44px; }
   .tabs button, .card-h .tabs button { height: 40px; }
   .subnav a { height: 44px; }
   .side-link { height: 44px; }
-  .live-pill { height: 36px; }
+  .seg button { height: 38px; }
+  .seg.view button { width: 40px; }
+  .crumb-btn, .find, .live-pill { height: 40px; }
+  .swatch { width: 34px; height: 34px; }
+  .breadcrumb a { display: inline-block; padding: 8px 0; margin: -8px 0; }
   .pop .kbd, .pop kbd { display: none; }
 }
 
@@ -1123,6 +1129,13 @@ button.fact:hover { border-color: var(--muted-foreground); background: var(--mut
   .kpi .v { font-size: 24px; }
   .crumb-btn .trunc { max-width: none; }
   .crumbs .pop-wrap { min-width: 0; }
+  .has-side .brand-mark, .has-side .crumbs > .crumb-sep:first-child { display: none; }
+  .crumbs .pop-wrap { flex: 0 1 auto; }
+  .topbar .switch-pop { position: fixed; top: calc(var(--topbar-h) + 6px); left: 8px; right: 8px; width: auto; max-width: none; }
+  .crumbs .crumb-btn .trunc { min-width: 0; }
+  .crumbs.on-site .org-sw .crumb-btn { padding: 0 4px; }
+  .crumbs.on-site .org-sw .trunc { display: none; } /* on a site the bar needs the room for the site's name */
+  .crumbs.on-site .pop-wrap:not(.org-sw) { flex: 1 1 0; }
   .crumbs .s2, .crumbs .sec { display: none; }
   .live-pill .muted { display: none; }
   .live-pill { padding: 0 8px; }
@@ -1149,6 +1162,13 @@ button.fact:hover { border-color: var(--muted-foreground); background: var(--mut
   .mlist:has(.r > :nth-child(4)) .mrow { padding-top: 6px; padding-bottom: 6px; }
   .mlist:has(.r > :nth-child(4)) .l { flex: 1 1 100%; }
   .mlist:has(.r > :nth-child(4)) .r { flex: 1 1 100%; justify-content: flex-end; }
+}
+@media (max-width: 560px) {
+  /* a row with controls puts them under the name instead of squeezing the name to nothing */
+  .rowitem:has(> .pill, > .mini-select, > .btn:not(.icon)) { flex-wrap: wrap; justify-content: flex-end; row-gap: 6px; }
+  .rowitem:has(> .pill, > .mini-select, > .btn:not(.icon)) > .ri-main { flex: 1 1 calc(100% - 44px); }
+  .access-add .goal-add-row > .pop-wrap { flex: 1 1 100%; }
+  .access-add .goal-add-row > .btn { flex: 1; }
 }
 @media (max-width: 380px) { .mlist:has(.r > :nth-child(5)) .r > :nth-child(4) { display: none; } }
 
@@ -1337,3 +1357,9 @@ table.t tr.click:hover .cell-l .t { color: var(--brand-ink); }
 /* banner variants: a danger banner for things like a failed payment */
 .banner.danger { background: var(--destructive-soft); color: var(--destructive); border-bottom-color: color-mix(in srgb, var(--destructive) 30%, transparent); }
 .banner .banner-in { display: inline-flex; align-items: center; gap: 8px; }
+
+/* touch scale for controls defined after the main narrow-screen block (see "touch scale" above) */
+@media (pointer: coarse), (max-width: 720px) {
+  .viewall { height: 36px; }
+  .theme-seg button { height: 40px; }
+}
