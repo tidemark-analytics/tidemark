@@ -94,6 +94,9 @@ return [
         'refunds' => env('TIDEMARK_REFUNDS_URL'),
     ],
 
+    // Extra first path segments that are not site dashboards or rollup names (e.g. the pages of a marketing site on the same host).
+    'reserved_names' => array_filter(array_map('trim', explode(',', env('TIDEMARK_RESERVED_NAMES', '')))),
+
     // JavaScript modules an extension package adds to the dashboard (see public/assets/js/extensions.js).
     'extensions' => [],
 

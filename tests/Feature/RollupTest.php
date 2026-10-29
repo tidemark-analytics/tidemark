@@ -66,6 +66,16 @@ class RollupTest extends TestCase
         }
     }
 
+    public function test_configured_reserved_names_cannot_be_taken(): void
+    {
+        config(['tidemark.reserved_names' => ['Blog', 'docs']]);
+
+        foreach (['blog', 'docs'] as $name) {
+            $this->postJson('/api/rollups', ['name' => $name, 'all' => true])->assertStatus(422);
+        }
+        $this->postJson('/api/sites', ['domain' => 'docs'])->assertStatus(422);
+    }
+
     public function test_a_rollup_adds_up_the_sites_it_includes(): void
     {
         $a = $this->site('a.example.com');

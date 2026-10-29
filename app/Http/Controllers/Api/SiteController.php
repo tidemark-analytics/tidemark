@@ -66,7 +66,7 @@ class SiteController extends Controller
         if (! preg_match('/^(localhost|[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+)(:\d+)?$/', $domain)) {
             throw ValidationException::withMessages(['domain' => 'Enter just the domain, e.g. example.com (no “https://”, no path).']);
         }
-        if (in_array($domain, ['sites', 'settings', 'login', 'register', 'share', 'install', 'api', 'js', 'assets', 'up', 'admin'], true) || Site::where('domain', $domain)->exists()) {
+        if (in_array($domain, Site::reservedNames(), true) || Site::where('domain', $domain)->exists()) {
             throw ValidationException::withMessages(['domain' => 'This domain is already being tracked.']);
         }
         $tz = $data['timezone'] ?? 'UTC';
