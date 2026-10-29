@@ -28,6 +28,16 @@ export const SITE_NAV = [
 export const GLOBAL_NAV = [
   { id: 'sites', label: 'Sites', icon: 'layout-dashboard', to: '/sites', key: 's' },
 ];
+/** The tabs of a site's (or rollup's) settings: [key, label]. The sidebar nests them under Settings and the settings page uses the same list. */
+export const siteSettingsTabs = (rollup) => (rollup
+  ? [['sites', 'Sites'], ['conversions', 'Conversions'], ['access', 'Sharing'], ['data', 'Data']]
+  : [['tracking', 'Tracking'], ['conversions', 'Conversions'], ['alerts', 'Alerts'], ['access', 'Sharing and access'], ['data', 'Data']]);
+/** The tab a settings URL means. A few sections moved between tabs; older links and bookmarks still land in the right place. */
+export function siteSettingsTab(rollup, tab) {
+  const tabs = siteSettingsTabs(rollup);
+  const moved = { general: rollup ? 'data' : 'tracking', shields: 'tracking', goals: 'conversions', funnels: 'conversions', visibility: 'access', branding: 'access', people: 'access' };
+  return [tab, moved[tab]].find((k) => tabs.some((x) => x[0] === k)) || tabs[0][0];
+}
 export const ACCOUNT_ICONS = { profile: 'user', security: 'shield-check', keys: 'key', reports: 'mail', teams: 'users', organization: 'shield', users: 'user-plus', updates: 'refresh-cw', billing: 'credit-card' };
 /** The tabs of Account settings: [key, label, dot?]. Also drives the sidebar and the palette. */
 export function accountTabs(user) {

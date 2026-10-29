@@ -42,7 +42,7 @@ function HelpMenu({ user }) {
 }
 
 /** Organization switcher: the organizations you belong to (Personal first), sites shared with you one by one, and a way to create one. */
-function OrgSwitcher({ user }) {
+export function OrgSwitcher({ user }) {
   const { setUser } = useContext(UserCtx);
   const scope = useScope(user);
   const [open, setOpen] = useState(false);
@@ -165,7 +165,7 @@ function LiveSheet({ domain, count, onClose }) {
   <//>`;
 }
 
-function LivePill({ domain }) {
+export function LivePill({ domain }) {
   const res = useApi(`/sites/${domain}/stats/current-visitors`, {}, [domain], { poll: 30000 });
   const [open, setOpen] = useState(false);
   const n = res.data ? res.data.visitors : null;

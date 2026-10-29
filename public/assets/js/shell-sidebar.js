@@ -3,8 +3,8 @@ import { html, Link, Icon, BASE, scopeQuery } from './lib.js';
 import { FavTile } from './ui.js';
 import { useScope } from './org.js';
 import { registry, badgeOf, useBadgeCounts, useBadgePolling } from './extensions.js';
-import { ACCOUNT_ICONS, SITE_NAV, accountTabs, siteFromPath } from './shell-nav.js';
-import { BadgeCount } from './shell-bar.js';
+import { ACCOUNT_ICONS, SITE_NAV, accountTabs, siteFromPath, siteSettingsTabs, siteSettingsTab } from './shell-nav.js';
+import { BadgeCount, OrgSwitcher, LivePill } from './shell-bar.js';
 
 const SideLink = ({ to, icon, label, on, children, ...rest }) => html`<${Link} to=${to} class=${'side-link ' + (on ? 'on' : '')} title=${label} aria-current=${on ? 'page' : undefined} ...${rest}><${Icon} name=${icon} size=${16} /><span>${label}</span>${children}<//>`;
 /** A menu entry's count in the sidebar: a pill, and a dot when the sidebar is collapsed. */
@@ -32,7 +32,15 @@ export function Sidebar({ user, path, sites, side }) {
   const body = domain
     ? html`<${Link} to="/sites" class="side-back" title="All sites"><${Icon} name="chevron-left" size=${15} /><span>All sites</span><//>
       <div class="side-site-head"><${FavTile} name=${domain} rollup=${current && current.rollup} /><b>${domain}</b></div>
-      ${SITE_NAV.filter((i) => !i.manage || canManage).map((i) => html`<${SideLink} to=${'/' + domain + i.route + (i.scoped ? scopeQuery() : '')} icon=${i.icon} label=${i.label} on=${itemOn(i)} />`)}`
+      ${SITE_NAV.filter((i) => !i.manage || canManage).map((i) => {
+        const nested = i.id === 'settings' && itemOn(i);
+        const link = html`<${SideLink} to=${'/' + domain + i.route + (i.scoped ? scopeQuery() : '')} icon=${i.icon} label=${i.label} on=${itemOn(i) && !nested} data-open=${nested ? '' : undefined} />`;
+        if (!nested) return link;
+        const rollup = !!(current && current.rollup);
+        const active = siteSettingsTab(rollup, path.split('/')[3]);
+        const tabs = siteSettingsTabs(rollup);
+        return html`${link}<div class="side-sub" role="group" aria-label="Settings sections">${tabs.map(([k, l]) => html`<${SideLink} to=${'/' + domain + '/settings' + (k === tabs[0][0] ? '' : '/' + k)} icon="" label=${l} on=${active === k} />`)}</div>`;
+      })}`
     : html`<div class="side-grp">Workspace</div>
       <${SideLink} to="/sites" icon="layout-dashboard" label="Sites" on=${path === '/sites' || path === '/sites/new' || path === '/sites/rollup'}>${list.some((s) => !s.rollup) && html`<em class="side-count">${list.filter((s) => !s.rollup).length}</em>`}<//>
       ${hasRollups && html`<${SideLink} to="/sites?kind=rollups" icon="layers" label="Rollups" on=${false}><em class="side-count">${list.filter((s) => s.rollup).length}</em><//>`}
@@ -46,7 +54,9 @@ export function Sidebar({ user, path, sites, side }) {
         : html`<${SideExt} href=${m.href} icon=${m.icon || 'external-link'} label=${m.label} external=${!!m.external}><${SideBadge} m=${m} /><//>`))}
       <${SideExt} href="https://discord.gg/sCkHD3PPZh" icon="users" label="Community" />`;
   return html`<aside class="side" id="app-side" aria-label="Main">
-    <nav class="side-scroll" aria-label=${domain ? 'Site' : 'Workspace'}>${body}</nav>
+    <nav class="side-scroll" aria-label=${domain ? 'Site' : 'Workspace'}>
+      <div class="side-ctx"><${OrgSwitcher} user=${user} />${domain && html`<${LivePill} domain=${domain} />`}</div>
+      ${body}</nav>
     <div class="side-foot"><button class="side-collapse" onClick=${side.toggleCollapsed} aria-pressed=${side.collapsed} aria-label=${side.collapsed ? 'Expand sidebar' : 'Collapse sidebar'}><${Icon} name="panel-left" size=${16} /><span>Collapse</span></button></div>
   </aside><div class="side-scrim" onClick=${() => side.setOpen(false)} aria-hidden="true"></div>`;
 }
