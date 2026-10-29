@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BrandingController;
 use App\Http\Controllers\Api\CampaignLinkController;
 use App\Http\Controllers\Api\DataController;
+use App\Http\Controllers\Api\DataDeletionController;
 use App\Http\Controllers\Api\FaviconController;
 use App\Http\Controllers\Api\ImageController;
 use App\Http\Controllers\Api\InviteController;
@@ -147,6 +148,9 @@ Route::middleware('api.auth')->group(function () {
         Route::post('/branding/logo', [BrandingController::class, 'uploadLogo']);
         Route::delete('/branding/logo', [BrandingController::class, 'deleteLogo']);
         Route::post('/reset', [SiteController::class, 'reset']);
+        Route::post('/data/preview', [DataDeletionController::class, 'preview']);
+        Route::post('/data/delete', [DataDeletionController::class, 'destroy']);
+        Route::get('/data/deletions', [DataDeletionController::class, 'history']);
         Route::get('/campaign-links', [CampaignLinkController::class, 'index']);
         Route::post('/campaign-links', [CampaignLinkController::class, 'store']);
         Route::patch('/campaign-links/{link}', [CampaignLinkController::class, 'update']);

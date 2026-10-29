@@ -147,6 +147,58 @@ const Conversions = ({ site }) => html`<${Goals} site=${site} /><${Funnels} site
 /** Who can see the site, and how it looks to them. */
 const Access = ({ site, reload }) => html`${!site.rollup && html`<${People} site=${site} />`}<${Visibility} site=${site} reload=${reload} /><${Branding} site=${site} reload=${reload} />${!site.rollup && site.is_owner && html`<${MoveSite} site=${site} reload=${reload} />`}`;
 
+const DELETE_DIMS = [['page', 'Page'], ['country', 'Country (two letters)'], ['source', 'Source'], ['utm_campaign', 'Campaign'], ['utm_source', 'UTM source'], ['utm_medium', 'UTM medium'], ['browser', 'Browser'], ['os', 'Operating system'], ['device', 'Device'], ['goal', 'Goal or event'], ['prop', 'Event property']];
+const dimLabel = (d) => (d.startsWith('prop:') ? `Property ${d.slice(5)}` : (DELETE_DIMS.find((x) => x[0] === d) || [d, d])[1]);
+const describeFilter = ([op, dim, values]) => `${dimLabel(dim)} ${op === 'contains' ? 'contains' : 'is'} ${values.join(', ')}`;
+
+/** Site settings → Data → Delete by filter. Previews how many visits match, then deletes them whole after a typed confirmation. */
+function DeleteByFilter({ site }) {
+  const blank = { dim: 'page', op: 'is', value: '', key: '' };
+  const [rows, setRows] = useState([blank]);
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const [found, setFound] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [confirm, setConfirm] = useState(false);
+  const history = useApi(`/sites/${site.domain}/data/deletions`, null, [site.domain]);
+  const body = () => ({
+    filters: rows.filter((r) => r.value.trim() && (r.dim !== 'prop' || r.key.trim())).map((r) => [r.op, r.dim === 'prop' ? 'prop:' + r.key.trim() : r.dim, [r.value.trim()]]),
+    from: from || undefined, to: to || undefined,
+  });
+  const edit = (i, patch) => { setRows(rows.map((r, j) => (j === i ? { ...r, ...patch } : r))); setFound(null); };
+  const preview = async () => {
+    setBusy(true);
+    try { setFound(await api(`/sites/${site.domain}/data/preview`, { method: 'POST', body: body() })); } catch (x) { setFound(null); toast(firstError(x), 'err'); }
+    setBusy(false);
+  };
+  const remove = async () => {
+    const r = await api(`/sites/${site.domain}/data/delete`, { method: 'POST', body: { ...body(), confirm_visits: found.visits } });
+    toast(`Deleted ${r.visits.toLocaleString()} ${r.visits === 1 ? 'visit' : 'visits'}`);
+    setFound(null); history.reload();
+  };
+  return html`<${Section} title="Delete by filter" help="Remove collected visits that match conditions you choose, for example a page that leaked something or a day of test traffic. Everything in a matching visit goes with it, so reports stay consistent. Imported history is not touched."
+    footer=${html`<span class="help">${found ? `${found.visits.toLocaleString()} ${found.visits === 1 ? 'visit' : 'visits'} and ${found.events.toLocaleString()} ${found.events === 1 ? 'event' : 'events'} match.` : 'Preview first: nothing is deleted until you confirm.'}</span>
+      <div class="row"><button class="btn sm" disabled=${busy} onClick=${preview}>Preview</button>${found && found.visits > 0 && html`<button class="btn danger sm" onClick=${() => setConfirm(true)}>Delete…</button>`}</div>`}>
+    <div class="stack sm">${rows.map((r, i) => html`<div class="row wrap" key=${i}>
+      <select aria-label="Condition" value=${r.dim} onChange=${(e) => edit(i, { dim: e.target.value })} style="width:auto">${DELETE_DIMS.map(([k, l]) => html`<option value=${k} selected=${r.dim === k}>${l}</option>`)}</select>
+      ${r.dim === 'prop' && html`<input aria-label="Property name" placeholder="Property name" value=${r.key} onInput=${(e) => edit(i, { key: e.target.value })} style="width:150px" />`}
+      <select aria-label="Match" value=${r.op} onChange=${(e) => edit(i, { op: e.target.value })} style="width:auto"><option value="is" selected=${r.op === 'is'}>is</option><option value="contains" selected=${r.op === 'contains'}>contains</option></select>
+      <input class="grow" aria-label="Value" placeholder=${r.dim === 'page' ? '/path or /blog/*' : 'Value'} value=${r.value} onInput=${(e) => edit(i, { value: e.target.value })} style="min-width:160px" />
+      ${rows.length > 1 && html`<button class="btn ghost icon sm" aria-label="Remove condition" onClick=${() => { setRows(rows.filter((_, j) => j !== i)); setFound(null); }}><${Icon} name="x" size=${14} /></button>`}</div>`)}
+      <div><button class="btn ghost sm" onClick=${() => { setRows([...rows, blank]); setFound(null); }}><${Icon} name="plus" size=${14} /> Add condition</button></div></div>
+    <div class="row wrap"><label class="row"><span class="muted small">From</span><input type="date" value=${from} onInput=${(e) => { setFrom(e.target.value); setFound(null); }} aria-label="From date" style="width:auto" /></label>
+      <label class="row"><span class="muted small">To</span><input type="date" value=${to} onInput=${(e) => { setTo(e.target.value); setFound(null); }} aria-label="To date" style="width:auto" /></label>
+      <span class="muted small">Dates use the site's timezone (${site.timezone}).</span></div>
+    ${history.data && history.data.data.length > 0 && html`<div class="stack sm"><b>Recent deletions</b>
+      <table class="t stack-sm"><thead><tr><th>When</th><th>Who</th><th>What</th><th class="right">Visits</th><th class="right">Events</th></tr></thead>
+        <tbody>${history.data.data.map((d) => html`<tr><td data-label="When" class="nowrap">${new Date(d.at).toLocaleString()}</td><td data-label="Who">${d.by}</td>
+          <td data-label="What">${[...d.filters.map(describeFilter), d.date_from || d.date_to ? `Dates ${d.date_from || '…'} to ${d.date_to || '…'}` : null].filter(Boolean).join('; ')}</td>
+          <td data-label="Visits" class="right num">${d.visits.toLocaleString()}</td><td data-label="Events" class="right num">${d.events.toLocaleString()}</td></tr>`)}</tbody></table></div>`}
+    ${confirm && html`<${TypedConfirm} title="Delete matching visits?" phrase=${site.domain} confirmLabel="Delete visits" onClose=${() => setConfirm(false)} onConfirm=${remove}
+      message=${`${found.visits.toLocaleString()} ${found.visits === 1 ? 'visit' : 'visits'} and ${found.events.toLocaleString()} ${found.events === 1 ? 'event' : 'events'} will be permanently deleted from ${site.domain}. This can't be undone.`} />`}
+  <//>`;
+}
+
 function DataTab({ site, reload }) {
   const [tz, setTz] = useState(site.timezone);
   const [confirm, setConfirm] = useState(null);
@@ -160,6 +212,7 @@ function DataTab({ site, reload }) {
     ${confirm === 'delete' && html`<${TypedConfirm} title=${`Delete ${site.domain}?`} phrase=${site.domain} message="The rollup and its goals will be deleted. The sites it adds up are not affected." confirmLabel="Delete rollup" onClose=${() => setConfirm(null)} onConfirm=${async () => { await api(`/sites/${site.domain}`, { method: 'DELETE' }); navigate('/sites'); }} />`}`;
   return html`${tzCard}
     ${site.can_manage && html`<${MoveData} site=${site} reload=${reload} />`}
+    ${site.can_manage && html`<${DeleteByFilter} site=${site} />`}
     ${site.can_manage && html`<${ImportPlausible} site=${site} reload=${reload} />`}
     ${site.is_owner && html`<${Section} danger title="Danger zone" help="These actions cannot be undone.">
       <div class="dz-row"><div><b>Reset statistics</b><span class="muted">Deletes all collected data but keeps the site.</span></div><button class="btn danger" onClick=${() => setConfirm('reset')}>Reset statistics</button></div>
