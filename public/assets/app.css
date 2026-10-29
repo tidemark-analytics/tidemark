@@ -873,6 +873,14 @@ button.fact:hover { border-color: var(--muted-foreground); background: var(--mut
 .goal-add { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--muted); }
 .goal-add-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .goal-add-row .grow { min-width: 200px; }
+.qr-wrap { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+.qr-wrap .grow { min-width: 220px; display: flex; flex-direction: column; gap: 8px; }
+.qr-wrap .grow > .btn { align-self: flex-start; }
+.qr { flex: none; border-radius: var(--radius-md); border: 1px solid var(--border); display: block; }
+.recovery-codes { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 6px; font-family: var(--mono); font-size: 13px; }
+.recovery-codes span { background: var(--background); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 6px 10px; text-align: center; user-select: all; }
+.muted.warn { color: var(--warning); }
+.tf { display: flex; flex-direction: column; gap: 10px; }
 /* Controls that sit side by side in a form row are always the same height (36px, the default), whatever size class they carry: an input next to
    a .btn.sm or a .mini-select would otherwise look off by 4px. For one-off rows elsewhere, keep the default sizes (no .sm, no .mini-select). */
 .goal-add-row > :is(input, select, .btn) { height: 36px; }
@@ -1167,6 +1175,13 @@ button.fact:hover { border-color: var(--muted-foreground); background: var(--mut
   /* a row with controls puts them under the name instead of squeezing the name to nothing */
   .rowitem:has(> .pill, > .mini-select, > .btn:not(.icon)) { flex-wrap: wrap; justify-content: flex-end; row-gap: 6px; }
   .rowitem:has(> .pill, > .mini-select, > .btn:not(.icon)) > .ri-main { flex: 1 1 calc(100% - 44px); }
+  .tf .rowitem > .btn { flex: 1 1 100%; }
+  .tf .goal-add .row { flex-wrap: wrap; }
+  .tf .goal-add .row > .btn { flex: 1 1 auto; }
+  .qr-wrap { flex-direction: column; align-items: stretch; }
+  .qr-wrap .qr { align-self: center; }
+  .qr-wrap .grow { min-width: 0; }
+  .qr-wrap .grow > .btn { align-self: stretch; }
   .access-add .goal-add-row > .pop-wrap { flex: 1 1 100%; }
   .access-add .goal-add-row > .btn { flex: 1; }
 }

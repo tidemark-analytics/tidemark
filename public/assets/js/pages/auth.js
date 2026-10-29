@@ -1,6 +1,7 @@
 import { html, useState, useEffect, api, navigate, Link, toast, useLocation, Icon } from '../lib.js';
 import { Field } from '../ui.js';
 import { Lockup } from '../logo.js';
+import { passkeysSupported, usePasskey } from '../webauthn.js';
 
 
 function AuthShell({ title, sub, children }) {
@@ -17,30 +18,72 @@ function LegalLinks() {
   return html`<nav class="legal-links" aria-label="Legal">${items.map(([k, label]) => html`<a href=${l[k]} target="_blank" rel="noopener">${label}</a>`)}</nav>`;
 }
 
+const METHOD_LABEL = { passkey: 'Use a passkey', totp: 'Use your authenticator app', email: 'Email me a code', recovery: 'Use a recovery code' };
+const METHOD_HELP = {
+  totp: 'Enter the 6-digit code from your authenticator app.',
+  email: 'Enter the 6-digit code we emailed to you. It expires in 10 minutes.',
+  recovery: 'Enter one of your recovery codes. Each works once.',
+};
+
 export function Login({ setUser }) {
   const [f, setF] = useState({ email: '', password: '', code: '' });
-  const [needCode, setNeedCode] = useState(false);
+  const [methods, setMethods] = useState(null); // set once the password was accepted and a second step is needed
+  const [method, setMethod] = useState('totp');
   const [canReset, setCanReset] = useState(false);
   useEffect(() => { api('/config').then((c) => setCanReset(!!c.password_reset)).catch(() => {}); }, []);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState('');
+  const fail = (x) => { setErr(x.name === 'NotAllowedError' ? 'The passkey request was cancelled or not allowed.' : (x.errors && Object.values(x.errors)[0][0]) || x.message); setBusy(false); };
+  const finish = (r) => { setUser(r.user); navigate('/sites'); };
+  const credentials = { email: f.email, password: f.password };
+
+  const choose = async (m) => {
+    setMethod(m); setErr(''); setNote(''); setF((v) => ({ ...v, code: '' }));
+    if (m === 'email') await sendEmail();
+    if (m === 'passkey') await passkey();
+  };
+  const sendEmail = async (again) => {
+    setBusy(true);
+    try { await api('/auth/two-factor/email', { method: 'POST', body: credentials }); setNote(again ? 'A new code is on its way to your email.' : 'We emailed you a code.'); setBusy(false); } catch (x) { fail(x); }
+  };
+  const passkey = async () => {
+    setBusy(true); setErr('');
+    try {
+      const options = await api('/auth/two-factor/passkey', { method: 'POST', body: credentials });
+      finish(await api('/auth/login', { method: 'POST', body: { ...credentials, method: 'passkey', passkey: await usePasskey(options) } }));
+    } catch (x) { fail(x); }
+  };
   const submit = async (e) => {
     e.preventDefault(); setBusy(true); setErr('');
     try {
-      const r = await api('/auth/login', { method: 'POST', body: f });
-      if (r._status === 202) { setNeedCode(true); setBusy(false); return; }
-      setUser(r.user); navigate('/sites');
-    } catch (x) { setErr((x.errors && Object.values(x.errors)[0][0]) || x.message); setBusy(false); }
+      if (methods && method === 'passkey') return await passkey();
+      const r = await api('/auth/login', { method: 'POST', body: methods ? { ...f, method } : f });
+      if (r._status === 202) {
+        const usable = (r.methods || ['totp']).filter((m) => m !== 'passkey' || passkeysSupported());
+        const first = usable[0];
+        setMethods(usable); setMethod(first); setBusy(false);
+        if (first === 'passkey') await passkey(); // the browser asks straight away; the other methods stay one click away
+        else if (first === 'email') await sendEmail();
+        return;
+      }
+      finish(r);
+    } catch (x) { fail(x); }
   };
-  return html`<${AuthShell} title="Welcome back" sub="Sign in to your analytics.">
+  const others = (methods || []).filter((m) => m !== method);
+  return html`<${AuthShell} title="Welcome back" sub=${methods ? 'One more step to sign in.' : 'Sign in to your analytics.'}>
     <form class="stack" onSubmit=${submit}>
       ${err && html`<div class="alert" role="alert"><${Icon} name="circle-alert" size=${16} /><div>${err}</div></div>`}
-      <${Field} label="Email"><input type="email" required autofocus autocomplete="username" value=${f.email} onInput=${(e) => setF({ ...f, email: e.target.value })} /><//>
-      <${Field} label="Password"><input type="password" required autocomplete="current-password" value=${f.password} onInput=${(e) => setF({ ...f, password: e.target.value })} /><//>
-      ${needCode && html`<${Field} label="Authentication code" help="Enter the 6-digit code from your authenticator app."><input inputmode="numeric" autocomplete="one-time-code" autofocus value=${f.code} onInput=${(e) => setF({ ...f, code: e.target.value })} /><//>`}
-      <button class="btn primary" disabled=${busy}>${busy ? 'Signing in…' : 'Sign in'}</button>
-      ${canReset && html`<div class="auth-links"><${Link} to="/forgot-password">Forgot your password?<//></div>`}
-      ${window.SD.registration && html`<div class="auth-links">New here? <${Link} to="/register">Create an account<//></div>`}
+      ${note && html`<div class="notice good"><${Icon} name="circle-check" size=${16} /><div>${note}</div></div>`}
+      <${Field} label="Email"><input type="email" required autofocus=${!methods} autocomplete="username" readonly=${!!methods} value=${f.email} onInput=${(e) => setF({ ...f, email: e.target.value })} /><//>
+      ${!methods && html`<${Field} label="Password"><input type="password" required autocomplete="current-password" value=${f.password} onInput=${(e) => setF({ ...f, password: e.target.value })} /><//>`}
+      ${methods && method !== 'passkey' && html`<${Field} label=${method === 'recovery' ? 'Recovery code' : 'Authentication code'} help=${METHOD_HELP[method]}><input inputmode=${method === 'recovery' ? 'text' : 'numeric'} autocomplete="one-time-code" autofocus required autocapitalize="off" spellcheck="false" value=${f.code} onInput=${(e) => setF({ ...f, code: e.target.value })} /><//>`}
+      ${methods && method === 'passkey' && html`<p class="help">Use the passkey on this device, or a security key, to finish signing in.</p>`}
+      <button class="btn primary" disabled=${busy}>${busy ? (method === 'passkey' && methods ? 'Waiting for your passkey…' : 'Signing in…') : methods && method === 'passkey' ? 'Use passkey' : 'Sign in'}</button>
+      ${methods && method === 'email' && html`<div class="auth-links"><a href="#" onClick=${(e) => { e.preventDefault(); if (!busy) sendEmail(true); }}>Send a new code</a></div>`}
+      ${others.length > 0 && html`<div class="auth-links">${others.map((m, i) => html`${i > 0 ? ' · ' : ''}<a href="#" onClick=${(e) => { e.preventDefault(); choose(m); }}>${METHOD_LABEL[m]}</a>`)}</div>`}
+      ${!methods && canReset && html`<div class="auth-links"><${Link} to="/forgot-password">Forgot your password?<//></div>`}
+      ${!methods && window.SD.registration && html`<div class="auth-links">New here? <${Link} to="/register">Create an account<//></div>`}
     </form><//>`;
 }
 

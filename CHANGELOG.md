@@ -4,6 +4,12 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Added
+- Two-factor sign-in has more ways in. Besides an authenticator app you can turn on **email codes** (a one-time code sent to your account address, needs outgoing email) and **passkeys** (fingerprint, face, screen lock or a security key; any number per account). At sign-in the page offers whichever methods you have set up.
+- **Recovery codes.** Turning on the first method gives you ten one-time codes to use if you lose your phone or key, shown once. You can make a new set (which replaces the old one) from Settings → Security.
+- Setting up an authenticator app now shows a **QR code** to scan, with the key and an "Open in an authenticator app" button as fallbacks.
+- Settings → Security lists each method with its status; removing one asks for your password. The `two_factor` field in `/api/me` is on when any method is. New endpoints: `GET /api/me/two-factor`, `/api/me/two-factor/email`, `/api/me/two-factor/recovery-codes`, `/api/me/passkeys` and `/api/auth/two-factor/{email,passkey}`; `POST /api/auth/login` takes a `method` (`totp`, `email`, `passkey` or `recovery`).
+
 ## [0.35.2] - 2026-10-29
 
 ### Fixed
