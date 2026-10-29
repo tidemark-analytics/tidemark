@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AlertController;
 use App\Http\Controllers\Api\AnnotationController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BrandingController;
+use App\Http\Controllers\Api\CampaignLinkController;
 use App\Http\Controllers\Api\DataController;
 use App\Http\Controllers\Api\FaviconController;
 use App\Http\Controllers\Api\ImageController;
@@ -146,6 +147,10 @@ Route::middleware('api.auth')->group(function () {
         Route::post('/branding/logo', [BrandingController::class, 'uploadLogo']);
         Route::delete('/branding/logo', [BrandingController::class, 'deleteLogo']);
         Route::post('/reset', [SiteController::class, 'reset']);
+        Route::get('/campaign-links', [CampaignLinkController::class, 'index']);
+        Route::post('/campaign-links', [CampaignLinkController::class, 'store']);
+        Route::patch('/campaign-links/{link}', [CampaignLinkController::class, 'update']);
+        Route::delete('/campaign-links/{link}', [CampaignLinkController::class, 'destroy']);
         Route::get('/export/data', [DataController::class, 'export']);
         Route::post('/import', [DataController::class, 'import']);
         Route::post('/import/plausible/start', [PlausibleImportController::class, 'start']);
