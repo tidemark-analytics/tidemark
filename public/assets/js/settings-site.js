@@ -7,6 +7,7 @@ import { brandTheme } from './brand.js';
 import { importPlausible, removeImported } from './data-import.js';
 import { SaveFooter, SettingsShell, firstError, zones } from './settings-common.js';
 import { Alerts } from './settings-alerts.js';
+import { Campaigns } from './settings-campaigns.js';
 import { siteSettingsTabs, siteSettingsTab } from './shell-nav.js';
 
 // Reads an export file in the browser (gzip or plain) and sends it in small batches, so file size never hits a server limit.
@@ -600,6 +601,6 @@ export function SiteSettings({ domain, tab }) {
   if (!s.can_manage) return html`<main class="main"><${Empty} title="No access" icon="lock">Only site owners and admins can change settings.<//></main>`;
   const tabs = siteSettingsTabs(s.rollup);
   const t = siteSettingsTab(s.rollup, tab);
-  const Body = { tracking: Tracking, conversions: Conversions, alerts: Alerts, access: Access, data: DataTab, sites: RollupSites }[t];
+  const Body = { tracking: Tracking, conversions: Conversions, alerts: Alerts, campaigns: Campaigns, access: Access, data: DataTab, sites: RollupSites }[t];
   return html`<${SettingsShell} title=${`${domain} settings`} back=${[`/${domain}`, 'Dashboard']} dup tabs=${tabs} tab=${t} base=${`/${domain}/settings`}><${Body} site=${s} reload=${res.reload} /><//>`;
 }

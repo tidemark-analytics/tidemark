@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AlertController;
 use App\Http\Controllers\Api\AnnotationController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BrandingController;
+use App\Http\Controllers\Api\CampaignLinkController;
 use App\Http\Controllers\Api\DataController;
 use App\Http\Controllers\Api\DataDeletionController;
 use App\Http\Controllers\Api\FaviconController;
@@ -150,6 +151,10 @@ Route::middleware('api.auth')->group(function () {
         Route::post('/data/preview', [DataDeletionController::class, 'preview']);
         Route::post('/data/delete', [DataDeletionController::class, 'destroy']);
         Route::get('/data/deletions', [DataDeletionController::class, 'history']);
+        Route::get('/campaign-links', [CampaignLinkController::class, 'index']);
+        Route::post('/campaign-links', [CampaignLinkController::class, 'store']);
+        Route::patch('/campaign-links/{link}', [CampaignLinkController::class, 'update']);
+        Route::delete('/campaign-links/{link}', [CampaignLinkController::class, 'destroy']);
         Route::get('/export/data', [DataController::class, 'export']);
         Route::post('/import', [DataController::class, 'import']);
         Route::post('/import/plausible/start', [PlausibleImportController::class, 'start']);

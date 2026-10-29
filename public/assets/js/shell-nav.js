@@ -31,7 +31,7 @@ export const GLOBAL_NAV = [
 /** The tabs of a site's (or rollup's) settings: [key, label]. The sidebar nests them under Settings and the settings page uses the same list. */
 export const siteSettingsTabs = (rollup) => (rollup
   ? [['sites', 'Sites'], ['conversions', 'Conversions'], ['access', 'Sharing'], ['data', 'Data']]
-  : [['tracking', 'Tracking'], ['conversions', 'Conversions'], ['alerts', 'Alerts'], ['access', 'Sharing and access'], ['data', 'Data']]);
+  : [['tracking', 'Tracking'], ['conversions', 'Conversions'], ['alerts', 'Alerts'], ['campaigns', 'Campaigns'], ['access', 'Sharing and access'], ['data', 'Data']]);
 /** The tab a settings URL means. A few sections moved between tabs; older links and bookmarks still land in the right place. */
 export function siteSettingsTab(rollup, tab) {
   const tabs = siteSettingsTabs(rollup);
