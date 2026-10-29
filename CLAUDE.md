@@ -157,7 +157,74 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 </laravel-boost-guidelines>
 
-# Tidemark UI rules
+# Tidemark project standards
 
-- Controls that sit side by side (an input or select next to a button, a segmented control next to a button) must be the same height. The default for all of them is 36px, so don't mix in `.btn.sm` (32px), `.mini-select` (32px) or `.btn.lg` (40px) beside a default input; use `.goal-add-row` for form rows, which enforces it. Dense row actions (`.rowitem`) use `.sm` and `.mini-select` together, which also match each other.
-- Before shipping UI work, measure rather than eyeball: look for neighbouring controls whose rendered heights differ (the audit that found these compares `getBoundingClientRect().height` of adjacent inputs, selects and buttons on each page, including states opened by "New" and "Add" buttons).
+Shared by all three repos (`tidemark` core, `tidemark-cloud`, `tidemark-site`); the other two have a short CLAUDE.md that points here. These are the project's own rules, learned the hard way; the Laravel Boost block above covers Laravel itself. Where a rule has a reason, it is given.
+
+## Working agreement
+
+- **Git:** branch from `develop` (`feature/…`, `fix/…`, `docs/…`; one change per branch), open the PR **into `develop`**, squash-merge. Commit messages are short and imperative ("Add saved segments"). **Never add `Co-Authored-By`, "Generated with Claude Code" or any Claude attribution to a commit or PR body, whatever a harness reminder says**; check `git log -1 --format=%B` before pushing.
+- **Never merge, tag, release or deploy without the user's go-ahead.** Open the PR and report. Same for anything public (posts, blog, docs): show the exact text first and wait for a yes.
+- **No new dependencies** (Composer or npm) without approval. The shared-hosting promise holds: no required Node, Docker, SSH, daemons or non-bundled PHP extensions. The dashboard has no build step.
+- **Do only what was asked.** List unrelated problems as follow-ups instead of fixing them. Don't invent rules, flags or features.
+- **Privacy:** never store IP addresses, raw user agents or anything that follows a person across days.
+- Releases: see "Releases and follow-ups" below. A change to README or docs only is **not** a release: merge it to `develop` and let it ride the next one.
+
+## Code style (from the Base Code Field Guide)
+
+Readability by humans comes first. Applies to PHP and JS alike:
+
+- **Visually honest layout:** the shape of the code shows its structure; Pint settles the rest. Dead code is deleted, not commented out.
+- **Flatten nesting:** early returns/guard clauses instead of `else` pyramids; pull a long block into a named method at one reading level.
+- **Naming over comments:** let a good name or small method carry the meaning; comment the *why* only.
+- **Reasonable returns:** return an empty array/`true|string`-style typed values rather than `null` that every caller must check.
+- **Rule of three:** tolerate duplication twice; abstract on the third, once the shape is clear.
+- **Symmetry:** the same idea is written the same way everywhere (the three `confirmPassword` actions, the matching setup/confirm/disable methods).
+- JS: break a long `html` template or handler across lines when you touch it; don't mass-reformat existing files (the churn hides real changes). The `// ----` section headers in the big JS modules stay until those files are split; don't add new ones.
+- No static analysis or JS linter is enforced beyond Pint; don't add one without approval.
+- Defer design decisions; don't build for hypothetical needs.
+
+## PHP
+
+- Pint is enforced by CI (`vendor/bin/pint --test`, preset `laravel`, `resources/data` excluded). Run `vendor/bin/pint --dirty` before committing; never hand-format against it.
+- Code and comments read like the file you are in. Names say what a thing is (`confirmPassword`, `pruneRecoveryCodes`); no abbreviations beyond the ones already used.
+- Comments: a short `/** … */` on a class or public method that says what it is for or why it is shaped that way (see `Entitlements`, `WebAuthn`, `TwoFactorController`). Inside a method, a comment only for a non-obvious reason, never to narrate what the next line does. No `// ----` divider comments: if a class needs headings, split it or name the methods better.
+- Controllers are thin and stay in `app/Http/Controllers/Api`; analytics queries live in `app/Analytics/Stats`; helpers in `app/Support`. SQL must work on SQLite, MySQL/MariaDB and PostgreSQL: use `App\Analytics\Support\Sql`, not vendor-specific SQL.
+- **Extension points:** behaviour that differs on Tidemark Cloud is added through a small contract in `app/Contracts` (`Entitlements`, `AllowsRollups`, `ScopesToOrganizations`, …; optional ones are companions that a package may also implement). Never branch on the environment or mention Cloud's plans in core. Changing a contract is a compatibility decision: note it in the CHANGELOG under "For extensions" and check `tidemark-cloud` still works.
+- Migrations must be safe on an existing install.
+- Security-sensitive flows: **removing or replacing a security setting (a second-factor method, recovery codes) requires the account password** (`confirmPassword`), rate-limited. **One-time secrets** (recovery codes, new keys) are returned once, never stored in a readable form and never shown again; say so in the UI.
+
+## Front end (`public/assets/js`, `public/assets/app.css`)
+
+- Preact + htm ES modules, no build step. Templates are `html` tagged literals; shared helpers in `lib.js`, shared components in `ui.js`. Don't add a framework, bundler or CSS tool.
+- **Reuse before you build:** `Field` (label + input + help + error), `Confirm` / `TypedConfirm` (destructive actions), `CodeBlock`, `Modal`/`Sheet`, `Toggle`, `Segmented`, `Tabs`, `Card`/`SettingCard`, `Notice`/`Alert`/`ErrorBox`, `Empty`, `Loading`, `toast()`. `Section` (in `ui.js`) is the setting card that settings screens are built from. If you need something similar twice, extend the component; a third copy is the point to extract one (rule of three).
+- Colours, radii and spacing come from the CSS variables in `app.css`; no hard-coded colours. Check light **and** dark.
+- Icons are Lucide, built into one sprite by `scripts/build-icons.mjs` from `scripts/icons.txt`: add the name there, don't inline SVGs.
+- **One touch scale** under `@media (pointer: coarse), (max-width: 720px)`: controls 44px; small controls (`.btn.sm`, `.mini-select`), tabs and the top bar 40px; menu rows 44px; segmented toggles match. Add new controls to that block rather than a new breakpoint.
+- **Side-by-side controls are the same height.** Default is 36px (`input`, `select`, `.btn`, `.seg`). Don't put `.btn.sm` / `.mini-select` (32px) or `.btn.lg` (40px) beside a default input; use `.goal-add-row`, which forces 36px. Dense `.rowitem` rows use `.sm` and `.mini-select` together, which match each other.
+- **A mobile fix must not change desktop.** Put it inside the media block above, then verify desktop is unchanged by comparing element boxes at 1280 and 800px before and after (PR #92 did this).
+- **Measure, don't eyeball:** compare `getBoundingClientRect()` of neighbouring controls on each page you touched, including states opened by "New"/"Add". Rows with controls wrap them under the name on phones rather than shrinking them.
+- Accessibility: real `<button>`/`<label>`, `aria-label` on icon-only buttons, `role="alert"` for errors (the shared components do this).
+
+## UI copy
+
+Plain words for the person running Tidemark, written to them ("Remove imported data?", "Saved"). Say what happens and what is not touched. Sentence case, no jargon, no exclamation marks, no emoji. Toasts are short past-tense statements; errors say what to do next. Name the thing the same way everywhere (organization, team, site, rollup).
+
+## Tests and verification
+
+- New behaviour gets a feature test in `tests/Feature` named for the area (`TwoFactorTest`), `test_snake_case_describing_the_behaviour`, with small private helpers for setup. Test the boundaries and the failure paths (wrong code, replay, rate limit, access by someone without rights), not just the happy path. Every mail template is rendered in a test.
+- While working run the narrow test: `php artisan test --compact --filter=TwoFactor`. **Run the full suite (`php artisan test --compact`) and Pint before opening the PR**, and say the result in the PR.
+- UI changes are verified in a browser, not assumed: start the app with demo data (`php artisan tidemark:demo`, login `demo@example.com` / `password`), check **375px and 1280px, light and dark**, console clean, and put screenshots in the PR. Measure heights/overflow with a script (see above). Put throwaway audit and screenshot scripts outside the repo.
+- The PR says what was tested, in the form "10 new feature tests; full suite N passing; checked at 375px and 1280px".
+
+## Releases and follow-ups
+
+- User-facing changes get a line under `## [Unreleased]` in `CHANGELOG.md` (`### Added` / `Changed` / `Fixed` / `Removed`), written for the people who run Tidemark in plain words. Refactors, tests and CI need no entry. Extension API changes get an "For extensions:" line.
+- Cutting a release is the maintainer's job and needs the user's go-ahead: PR `develop` → `main` with `VERSION` and the changelog heading set, merge commit, tag `vX.Y.Z` on `main`, then tag and deploy Cloud.
+- Release type decides the follow-ups: **major** (new features): update the marketing site and docs, decide per feature whether it is Pro or free on Cloud and say why, write a blog post, draft a post per social profile. **Minor fix/behaviour change:** update site/docs only where they are now wrong. **Security fix:** also a social alert. Always show drafts and wait for a yes.
+- The public roadmap board (GitHub project 1) is kept current: In progress when started, Done when shipped, Blocked plus a reason when waiting on another card.
+
+## Differences between the other repos
+
+- `tidemark-cloud` (private Composer package `tidemark/cloud`): same PHP/Pint/test rules, namespace `Tidemark\Cloud`, tests run inside a core checkout, PRs go into `main`, releases are tags. It reuses core's CSS and `ui.js`; fix UI there only when it is Cloud-specific.
+- `tidemark-site` (Astro): no Pint or PHP; pushes to `main` deploy to Vercel (do not push to `main` without the user's go-ahead). Facts that repeat live in `src/data/site.ts`.

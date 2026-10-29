@@ -39,7 +39,6 @@ class AlertController extends Controller
         return ['id' => $x->id, 'name' => $x->name, 'kind' => $x->kind, 'url' => $x->displayUrl(), 'last_status' => $x->last_status, 'last_error' => $x->last_error, 'last_at' => $x->last_at?->utc()->format('Y-m-d H:i:s')];
     }
 
-    // ------------------------------------------------------------------------------------------------ rules
     /** Alerts come with some plans only; whoever lost access can still switch rules off and delete them. */
     private function requireAlerts(Request $r): void
     {
@@ -147,7 +146,6 @@ class AlertController extends Controller
         };
     }
 
-    // ------------------------------------------------------------------------------------------------ webhooks
     public function storeWebhook(Request $r)
     {
         $this->requireAlerts($r);

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Contracts\AllowsAlerts;
 use App\Contracts\AllowsBranding;
+use App\Contracts\AllowsCampaignLinks;
 use App\Contracts\AllowsConversionReports;
 use App\Contracts\AllowsExploration;
 use App\Contracts\AllowsRollups;
@@ -225,6 +226,14 @@ class Site extends Model
         $entitlements = app(Entitlements::class);
 
         return ! ($entitlements instanceof AllowsExploration) || $entitlements->allowsJourneys($this);
+    }
+
+    /** Whether this site may create campaign links and tracking pixels (always true unless an extension limits it). */
+    public function campaignLinksAllowed(): bool
+    {
+        $entitlements = app(Entitlements::class);
+
+        return ! ($entitlements instanceof AllowsCampaignLinks) || $entitlements->allowsCampaignLinks($this);
     }
 
     /** Whether this site may use alert rules and webhooks (always true unless an extension limits it). */

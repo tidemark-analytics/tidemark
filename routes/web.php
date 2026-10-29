@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\CampaignRedirectController;
 use App\Http\Controllers\InstallController;
 use App\Http\Controllers\ReportUnsubscribeController;
 use Illuminate\Support\Facades\Auth;
@@ -7,6 +8,10 @@ use Illuminate\Support\Facades\Route;
 
 // Browser installer (shared hosting)
 Route::get('/install', [InstallController::class, 'show']);
+
+// Campaign links: `/l/abc` counts a click and forwards, `/p/abc.gif` counts a view
+Route::get('/l/{slug}', [CampaignRedirectController::class, 'link'])->where('slug', '[a-z0-9]{4,16}');
+Route::get('/p/{slug}.gif', [CampaignRedirectController::class, 'pixel'])->where('slug', '[a-z0-9]{4,16}');
 Route::post('/install', [InstallController::class, 'store']);
 
 // Unsubscribe link in the e-mail reports (the POST is also the one-click unsubscribe of mail apps, so it has no CSRF token)
