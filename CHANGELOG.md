@@ -4,6 +4,8 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [0.36.0] - 2026-10-29
+
 ### Added
 - **Delete by filter** in Site settings → Data. Choose conditions (a page, country, source, campaign, browser, event or event property, and an optional date range), preview how many visits and events match, then delete them after typing the site's domain. A matching visit goes whole, with everything recorded during it, so reports stay consistent; imported history is not touched. Owners and admins can use it, and each deletion is logged with who ran it. New endpoints: `POST /api/sites/{site}/data/preview`, `POST /api/sites/{site}/data/delete` and `GET /api/sites/{site}/data/deletions`.
 - **Campaign links** in Site settings → Campaigns. A link builder adds UTM values to any page of your site so visits from a campaign show up under Sources and Campaigns, and can turn the result into a **short link** (`/l/abc`) that counts a click and forwards, or a **tracking pixel** (`/p/abc.gif`) for newsletters that counts a view. Each keeps only a daily total (no cookies, no addresses), and opens are approximate because mail apps may preload or block images. A short link can only point at a page on your own site. On Cloud, creating campaign links is part of Pro; links that already exist keep forwarding. For extensions: `AllowsCampaignLinks`, an optional companion to `Entitlements`. New endpoints: `GET`/`POST /api/sites/{site}/campaign-links` and `PATCH`/`DELETE /api/sites/{site}/campaign-links/{id}`.
@@ -11,6 +13,14 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 - **Recovery codes.** Turning on the first method gives you ten one-time codes to use if you lose your phone or key, shown once. You can make a new set (which replaces the old one) from Settings → Security.
 - Setting up an authenticator app now shows a **QR code** to scan, with the key and an "Open in an authenticator app" button as fallbacks.
 - Settings → Security lists each method with its status; removing one asks for your password. The `two_factor` field in `/api/me` is on when any method is. New endpoints: `GET /api/me/two-factor`, `/api/me/two-factor/email`, `/api/me/two-factor/recovery-codes`, `/api/me/passkeys` and `/api/auth/two-factor/{email,passkey}`; `POST /api/auth/login` takes a `method` (`totp`, `email`, `passkey` or `recovery`).
+
+### Changed
+- A site's settings sections (Tracking, Conversions, Alerts, Campaigns, Sharing and access, Data) now sit under **Settings** in the sidebar instead of a second list on the page. On phones, and with the sidebar collapsed, the list stays at the top of the page.
+- The top bar is lighter on phones: the menu, the site or page you are on, Find and your account. The organization switcher and the live visitor count moved to the top of the menu.
+
+### Fixed
+- Phone menu: the organization dropdown opens in place instead of being cut off, and a long menu scrolls instead of squashing its headings.
+- Report rows, the Journeys toggle and the footer links on shared dashboards are easier to tap on phones. A few corner radii now follow the design scale, and avatars are easier to read in dark mode.
 
 ## [0.35.2] - 2026-10-29
 
