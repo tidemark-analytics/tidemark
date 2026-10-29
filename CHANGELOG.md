@@ -5,6 +5,7 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 ## [Unreleased]
 
 ### Added
+- **Delete by filter** in Site settings → Data. Choose conditions (a page, country, source, campaign, browser, event or event property, and an optional date range), preview how many visits and events match, then delete them after typing the site's domain. A matching visit goes whole, with everything recorded during it, so reports stay consistent; imported history is not touched. Owners and admins can use it, and each deletion is logged with who ran it. New endpoints: `POST /api/sites/{site}/data/preview`, `POST /api/sites/{site}/data/delete` and `GET /api/sites/{site}/data/deletions`.
 - Two-factor sign-in has more ways in. Besides an authenticator app you can turn on **email codes** (a one-time code sent to your account address, needs outgoing email) and **passkeys** (fingerprint, face, screen lock or a security key; any number per account). At sign-in the page offers whichever methods you have set up.
 - **Recovery codes.** Turning on the first method gives you ten one-time codes to use if you lose your phone or key, shown once. You can make a new set (which replaces the old one) from Settings → Security.
 - Setting up an authenticator app now shows a **QR code** to scan, with the key and an "Open in an authenticator app" button as fallbacks.
