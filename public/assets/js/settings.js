@@ -425,7 +425,7 @@ function RollupSites({ site, reload }) {
   const members = site.rollup.sites.map((x) => x.domain);
   const count = all ? list.length || site.rollup.count : chosen.length;
   const toggle = (d, on) => setChosen(on ? [...chosen, d] : chosen.filter((x) => x !== d));
-  const OPTIONS = [[true, 'All the sites I own', 'layers', 'Includes the sites you add later.'], [false, 'Only the sites I choose', 'funnel', 'Pick exactly which sites to add up.']];
+  const OPTIONS = [[true, 'All the sites in this organization', 'layers', 'Includes the sites added later.'], [false, 'Only the sites I choose', 'funnel', 'Pick exactly which sites to add up.']];
   return html`<${Section} title="Sites in this rollup" footer=${html`<${SaveFooter} help=${`${count} ${count === 1 ? 'site' : 'sites'} in this rollup.`} dirty=${dirty && (all || chosen.length > 0)} onSave=${save} label="Save changes" />`} help="A rollup adds up the visits of several of your sites on one dashboard. Your sites themselves are never changed.">
     ${err && html`<div class="alert">${err}</div>`}
     <div class="opt-cards" role="radiogroup" aria-label="Which sites">${OPTIONS.map(([v, t, i, d]) => html`<button type="button" role="radio" aria-checked=${all === v} class=${'opt-card' + (all === v ? ' on' : '')} onClick=${() => { setAll(v); if (!v && !chosen.length) setChosen(list.map((x) => x.domain)); }}>
