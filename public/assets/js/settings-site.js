@@ -7,6 +7,7 @@ import { brandTheme } from './brand.js';
 import { importPlausible, removeImported } from './data-import.js';
 import { SaveFooter, SettingsShell, firstError, zones } from './settings-common.js';
 import { Alerts } from './settings-alerts.js';
+import { siteSettingsTabs, siteSettingsTab } from './shell-nav.js';
 
 // Reads an export file in the browser (gzip or plain) and sends it in small batches, so file size never hits a server limit.
 async function* exportLines(file) {
@@ -544,10 +545,8 @@ export function SiteSettings({ domain, tab }) {
   if (res.error) return html`<main class="main"><${ErrorBox} error=${res.error} /></main>`;
   if (!s) return html`<main class="main"><${Loading} /></main>`;
   if (!s.can_manage) return html`<main class="main"><${Empty} title="No access" icon="lock">Only site owners and admins can change settings.<//></main>`;
-  // a few sections moved between tabs; older links and bookmarks still land in the right place
-  const tabs = s.rollup ? [['sites', 'Sites'], ['conversions', 'Conversions'], ['access', 'Sharing'], ['data', 'Data']] : [['tracking', 'Tracking'], ['conversions', 'Conversions'], ['alerts', 'Alerts'], ['access', 'Sharing and access'], ['data', 'Data']];
-  const moved = { general: s.rollup ? 'data' : 'tracking', shields: 'tracking', goals: 'conversions', funnels: 'conversions', visibility: 'access', branding: 'access', people: 'access' };
-  const t = [tab, moved[tab]].find((k) => tabs.some((x) => x[0] === k)) || tabs[0][0];
+  const tabs = siteSettingsTabs(s.rollup);
+  const t = siteSettingsTab(s.rollup, tab);
   const Body = { tracking: Tracking, conversions: Conversions, alerts: Alerts, access: Access, data: DataTab, sites: RollupSites }[t];
-  return html`<${SettingsShell} title=${`${domain} settings`} back=${[`/${domain}`, 'Dashboard']} tabs=${tabs} tab=${t} base=${`/${domain}/settings`}><${Body} site=${s} reload=${res.reload} /><//>`;
+  return html`<${SettingsShell} title=${`${domain} settings`} back=${[`/${domain}`, 'Dashboard']} dup tabs=${tabs} tab=${t} base=${`/${domain}/settings`}><${Body} site=${s} reload=${res.reload} /><//>`;
 }
