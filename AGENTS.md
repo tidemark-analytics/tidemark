@@ -180,13 +180,15 @@ Readability by humans comes first. Applies to PHP and JS alike:
 - **Reasonable returns:** return an empty array/`true|string`-style typed values rather than `null` that every caller must check.
 - **Rule of three:** tolerate duplication twice; abstract on the third, once the shape is clear.
 - **Symmetry:** the same idea is written the same way everywhere (the three `confirmPassword` actions, the matching setup/confirm/disable methods).
+- JS: break a long `html` template or handler across lines when you touch it; don't mass-reformat existing files (the churn hides real changes). The `// ----` section headers in the big JS modules stay until those files are split; don't add new ones.
+- No static analysis or JS linter is enforced beyond Pint; don't add one without approval.
 - Defer design decisions; don't build for hypothetical needs.
 
 ## PHP
 
 - Pint is enforced by CI (`vendor/bin/pint --test`, preset `laravel`, `resources/data` excluded). Run `vendor/bin/pint --dirty` before committing; never hand-format against it.
 - Code and comments read like the file you are in. Names say what a thing is (`confirmPassword`, `pruneRecoveryCodes`); no abbreviations beyond the ones already used.
-- Comments: a short `/** … */` on a class or public method that says what it is for or why it is shaped that way (see `Entitlements`, `WebAuthn`, `TwoFactorController`). Inside a method, a comment only for a non-obvious reason, never to narrate what the next line does. `// ---- group` dividers are used in long controllers.
+- Comments: a short `/** … */` on a class or public method that says what it is for or why it is shaped that way (see `Entitlements`, `WebAuthn`, `TwoFactorController`). Inside a method, a comment only for a non-obvious reason, never to narrate what the next line does. No `// ----` divider comments: if a class needs headings, split it or name the methods better.
 - Controllers are thin and stay in `app/Http/Controllers/Api`; analytics queries live in `app/Analytics/Stats`; helpers in `app/Support`. SQL must work on SQLite, MySQL/MariaDB and PostgreSQL: use `App\Analytics\Support\Sql`, not vendor-specific SQL.
 - **Extension points:** behaviour that differs on Tidemark Cloud is added through a small contract in `app/Contracts` (`Entitlements`, `AllowsRollups`, `ScopesToOrganizations`, …; optional ones are companions that a package may also implement). Never branch on the environment or mention Cloud's plans in core. Changing a contract is a compatibility decision: note it in the CHANGELOG under "For extensions" and check `tidemark-cloud` still works.
 - Migrations must be safe on an existing install.
@@ -195,7 +197,7 @@ Readability by humans comes first. Applies to PHP and JS alike:
 ## Front end (`public/assets/js`, `public/assets/app.css`)
 
 - Preact + htm ES modules, no build step. Templates are `html` tagged literals; shared helpers in `lib.js`, shared components in `ui.js`. Don't add a framework, bundler or CSS tool.
-- **Reuse before you build:** `Field` (label + input + help + error), `Confirm` / `TypedConfirm` (destructive actions), `CodeBlock`, `Modal`/`Sheet`, `Toggle`, `Segmented`, `Tabs`, `Card`/`SettingCard`, `Notice`/`Alert`/`ErrorBox`, `Empty`, `Loading`, `toast()`. In `settings.js`, settings screens are composed of `Section`. If you need something similar twice, extend the component; a third copy is the point to extract one (rule of three).
+- **Reuse before you build:** `Field` (label + input + help + error), `Confirm` / `TypedConfirm` (destructive actions), `CodeBlock`, `Modal`/`Sheet`, `Toggle`, `Segmented`, `Tabs`, `Card`/`SettingCard`, `Notice`/`Alert`/`ErrorBox`, `Empty`, `Loading`, `toast()`. `Section` (in `ui.js`) is the setting card that settings screens are built from. If you need something similar twice, extend the component; a third copy is the point to extract one (rule of three).
 - Colours, radii and spacing come from the CSS variables in `app.css`; no hard-coded colours. Check light **and** dark.
 - Icons are Lucide, built into one sprite by `scripts/build-icons.mjs` from `scripts/icons.txt`: add the name there, don't inline SVGs.
 - **One touch scale** under `@media (pointer: coarse), (max-width: 720px)`: controls 44px; small controls (`.btn.sm`, `.mini-select`), tabs and the top bar 40px; menu rows 44px; segmented toggles match. Add new controls to that block rather than a new breakpoint.
