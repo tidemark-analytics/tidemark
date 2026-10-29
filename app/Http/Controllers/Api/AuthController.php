@@ -8,7 +8,7 @@ use App\Models\Invitation;
 use App\Models\Organization;
 use App\Models\Site;
 use App\Models\User;
-use App\Support\Totp;
+use App\Support\SecondFactor;
 use App\Updates\Updater;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Auth\Events\Registered;
@@ -26,7 +26,7 @@ class AuthController extends Controller
 {
     public function login(Request $request)
     {
-        $data = $request->validate(['email' => 'required|email', 'password' => 'required|string', 'code' => 'nullable|string']);
+        $data = $request->validate(['email' => 'required|email', 'password' => 'required|string', 'code' => 'nullable|string', 'method' => 'nullable|string|in:totp,email,recovery,passkey', 'passkey' => 'nullable|array']);
         $key = 'login:'.strtolower($data['email']).'|'.$request->ip();
         if (RateLimiter::tooManyAttempts($key, 8)) {
             throw ValidationException::withMessages(['email' => 'Too many attempts. Try again in a minute.']);
@@ -38,10 +38,10 @@ class AuthController extends Controller
             throw ValidationException::withMessages(['email' => 'These credentials do not match our records.']);
         }
         if ($user->hasTwoFactor()) {
-            if (empty($data['code'])) {
-                return response()->json(['two_factor' => true], 202);
+            if (empty($data['code']) && empty($data['passkey'])) {
+                return response()->json(['two_factor' => true, 'methods' => SecondFactor::methods($user)], 202);
             }
-            if (! Totp::verify($user->two_factor_secret, $data['code'])) {
+            if (! SecondFactor::verify($user, $data['method'] ?? null, $data['code'] ?? null, $data['passkey'] ?? null)) {
                 RateLimiter::hit($key, 60);
                 throw ValidationException::withMessages(['code' => 'Invalid authentication code.']);
             }
@@ -175,41 +175,6 @@ class AuthController extends Controller
             throw ValidationException::withMessages(['current_password' => 'Current password is incorrect.']);
         }
         $request->user()->update(['password' => $data['password']]);
-
-        return ['ok' => true];
-    }
-
-    // ---- two-factor
-
-    public function twoFactorSetup(Request $request)
-    {
-        $user = $request->user();
-        abort_if($user->hasTwoFactor(), 422, 'Two-factor authentication is already enabled.');
-        $secret = Totp::secret();
-        $user->forceFill(['two_factor_secret' => $secret, 'two_factor_confirmed_at' => null])->save();
-
-        return ['secret' => $secret, 'uri' => Totp::uri($secret, $user->email, config('app.name'))];
-    }
-
-    public function twoFactorConfirm(Request $request)
-    {
-        $data = $request->validate(['code' => 'required|string']);
-        $user = $request->user();
-        if (! $user->two_factor_secret || ! Totp::verify($user->two_factor_secret, $data['code'])) {
-            throw ValidationException::withMessages(['code' => 'Invalid authentication code.']);
-        }
-        $user->forceFill(['two_factor_confirmed_at' => now()])->save();
-
-        return ['ok' => true];
-    }
-
-    public function twoFactorDisable(Request $request)
-    {
-        $data = $request->validate(['password' => 'required|string']);
-        if (! Hash::check($data['password'], $request->user()->password)) {
-            throw ValidationException::withMessages(['password' => 'Password is incorrect.']);
-        }
-        $request->user()->forceFill(['two_factor_secret' => null, 'two_factor_confirmed_at' => null])->save();
 
         return ['ok' => true];
     }

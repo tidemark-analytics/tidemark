@@ -9,6 +9,8 @@ import { registry, pathAfterOrganizationCreated } from './extensions.js';
 import { accountTabs } from './shell.js';
 import { brandTheme } from './brand.js';
 import { importPlausible, removeImported } from './data-import.js';
+import { QrCode } from './qr.js';
+import { passkeysSupported, createPasskey } from './webauthn.js';
 
 const zones = () => { try { return ['UTC', ...Intl.supportedValuesOf('timeZone')]; } catch (e) { return ['UTC']; } };
 const firstError = (x) => (x.errors && Object.values(x.errors)[0][0]) || x.message;
@@ -748,17 +750,106 @@ function EmailReports() {
       <p class="muted small">The emails hold only totals, with no tracking pixels or tracked links, and every one has an unsubscribe link.</p><//>`;
 }
 
+/** Recovery codes, shown once when they are made: the way back in if every other second step is out of reach. */
+function RecoveryCodes({ codes, onDone }) {
+  const text = codes.join('\n');
+  const save = () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([window.SD.name + ' recovery codes\n\n' + text + '\n'], { type: 'text/plain' })); a.download = 'recovery-codes.txt'; a.click(); URL.revokeObjectURL(a.href); };
+  return html`<div class="goal-add"><b>Save your recovery codes</b>
+    <p class="muted small" style="margin:0">Each code works once, in place of a second step, if you lose your phone or key. They are shown only now, so keep them somewhere safe, like a password manager.</p>
+    <div class="recovery-codes">${codes.map((c) => html`<span key=${c}>${c}</span>`)}</div>
+    <div class="row"><button class="btn" onClick=${() => copy(text)}><${Icon} name="copy" size=${14} /> Copy</button><button class="btn" onClick=${save}><${Icon} name="download" size=${14} /> Download</button><button class="btn primary" onClick=${onDone}>I've saved them</button></div></div>`;
+}
+
+function TwoFactor() {
+  const { user, setUser } = useContext(UserCtx);
+  const [st, setSt] = useState(null);
+  const [panel, setPanel] = useState(null); // 'totp' | 'email' | 'passkey' | 'regen' | { kind, id, label } while removing something
+  const [setup, setSetup] = useState(null);
+  const [code, setCode] = useState('');
+  const [pw, setPw] = useState('');
+  const [name, setName] = useState('');
+  const [codes, setCodes] = useState(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { api('/me/two-factor').then(setSt).catch(() => {}); }, []);
+  const close = () => { setPanel(null); setSetup(null); setCode(''); setPw(''); setName(''); };
+  const done = (r, msg) => { setSt(r); if (r.recovery_codes) setCodes(r.recovery_codes); close(); toast(msg); api('/me').then((m) => setUser(m.user)).catch(() => {}); };
+  const run = (fn) => async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    setBusy(true);
+    try { await fn(); } catch (x) { toast(x.name === 'NotAllowedError' ? 'The passkey request was cancelled or not allowed.' : firstError(x), 'err'); }
+    setBusy(false);
+  };
+  if (!st) return html`<${Section} title="Two-factor authentication" help="Loading…" />`;
+
+  const startTotp = run(async () => { setSetup(await api('/me/two-factor', { method: 'POST' })); setPanel('totp'); });
+  const confirmTotp = run(async () => done(await api('/me/two-factor/confirm', { method: 'POST', body: { code } }), 'Authenticator app turned on'));
+  const startEmail = run(async () => { await api('/me/two-factor/email', { method: 'POST' }); setPanel('email'); });
+  const confirmEmail = run(async () => done(await api('/me/two-factor/email/confirm', { method: 'POST', body: { code } }), 'Email codes turned on'));
+  const addPasskey = run(async () => {
+    const options = await api('/me/passkeys/options', { method: 'POST' });
+    const response = await createPasskey(options);
+    done(await api('/me/passkeys', { method: 'POST', body: { name, ...response } }), 'Passkey added');
+  });
+  const remove = run(async () => {
+    const r = panel;
+    const url = r.kind === 'totp' ? '/me/two-factor' : r.kind === 'email' ? '/me/two-factor/email' : '/me/passkeys/' + r.id;
+    done(await api(url, { method: 'DELETE', body: { password: pw } }), r.label + ' removed');
+  });
+  const regen = run(async () => done(await api('/me/two-factor/recovery-codes', { method: 'POST', body: { password: pw } }), 'New recovery codes made'));
+  const cancel = html`<button type="button" class="btn" onClick=${close}>Cancel</button>`;
+  const removing = panel && panel.kind;
+  const supported = passkeysSupported();
+
+  return html`<${Section} title="Two-factor authentication" help="Ask for a second step when you sign in, so a leaked password is not enough. Turn on as many methods as you like.">
+    <div class="tf">
+      <div class="rowitem boxed"><span class=${'ri-ico' + (st.authenticator ? ' good' : '')} aria-hidden="true"><${Icon} name="smartphone" size=${16} /></span>
+        <div class="grow ri-main"><b>Authenticator app</b><span class="muted">${st.authenticator ? 'A code from your authenticator app is asked for at sign-in.' : 'Get a six-digit code from an app like 1Password, Authy or Google Authenticator.'}</span></div>
+        ${st.authenticator ? html`<button class="btn sm danger" onClick=${() => setPanel({ kind: 'totp', label: 'Authenticator app' })}>Remove</button>` : panel !== 'totp' && html`<button class="btn sm primary" disabled=${busy} onClick=${startTotp}>Set up</button>`}</div>
+      ${panel === 'totp' && setup && html`<form class="goal-add" onSubmit=${confirmTotp}>
+        <p style="margin:0">Scan this code with your authenticator app, then enter the six-digit code it shows.</p>
+        <div class="qr-wrap"><${QrCode} text=${setup.uri} /><div class="grow"><span class="muted small">Can't scan it? Enter this key instead:</span><${CodeBlock} text=${setup.secret} /><a class="btn" href=${setup.uri}>Open in an authenticator app</a></div></div>
+        <${Field} label="Code" class="tzfield"><input inputmode="numeric" autocomplete="one-time-code" autofocus placeholder="123456" value=${code} onInput=${(e) => setCode(e.target.value)} /><//>
+        <div class="row"><button class="btn primary" disabled=${!code.trim() || busy}>Confirm and turn on</button>${cancel}</div></form>`}
+
+      <div class="rowitem boxed"><span class=${'ri-ico' + (st.email ? ' good' : '')} aria-hidden="true"><${Icon} name="mail" size=${16} /></span>
+        <div class="grow ri-main"><b>Email codes</b><span class="muted">${st.email ? 'A code is emailed to ' + user.email + ' at sign-in.' : st.mail ? 'We email a one-time code to ' + user.email + ' at sign-in.' : 'Needs outgoing email, which this installation has not set up yet.'}</span></div>
+        ${st.email ? html`<button class="btn sm danger" onClick=${() => setPanel({ kind: 'email', label: 'Email codes' })}>Turn off</button>` : panel !== 'email' && html`<button class="btn sm primary" disabled=${!st.mail || busy} onClick=${startEmail}>Turn on</button>`}</div>
+      ${panel === 'email' && html`<form class="goal-add" onSubmit=${confirmEmail}>
+        <p style="margin:0">We sent a code to <b>${user.email}</b>. Enter it to turn email codes on.</p>
+        <${Field} label="Code" class="tzfield"><input inputmode="numeric" autocomplete="one-time-code" autofocus placeholder="123456" value=${code} onInput=${(e) => setCode(e.target.value)} /><//>
+        <div class="row"><button class="btn primary" disabled=${!code.trim() || busy}>Confirm and turn on</button>${cancel}</div></form>`}
+
+      <div class="rowitem boxed"><span class=${'ri-ico' + (st.passkeys.length ? ' good' : '')} aria-hidden="true"><${Icon} name="key" size=${16} /></span>
+        <div class="grow ri-main"><b>Passkeys</b><span class="muted">${supported ? 'Confirm sign-in with your fingerprint, face, screen lock or a security key.' : 'This browser does not support passkeys.'}</span></div>
+        ${supported && panel !== 'passkey' && html`<button class="btn sm primary" disabled=${busy} onClick=${() => setPanel('passkey')}>Add a passkey</button>`}</div>
+      ${st.passkeys.map((k) => html`<div class="rowitem boxed" key=${k.id}><span class="ri-ico" aria-hidden="true"><${Icon} name="key" size=${16} /></span>
+        <div class="grow ri-main"><b>${k.name}</b><span class="muted">Added ${ago(k.created_at)}${k.last_used_at ? ' · last used ' + ago(k.last_used_at) : ' · not used yet'}</span></div>
+        <button class="btn sm danger" onClick=${() => setPanel({ kind: 'passkey', id: k.id, label: 'Passkey' })}>Remove</button></div>`)}
+      ${panel === 'passkey' && html`<form class="goal-add" onSubmit=${addPasskey}>
+        <${Field} label="Name" help="So you can tell your passkeys apart, like “MacBook” or “YubiKey”." class="tzfield"><input autofocus maxlength="100" placeholder="My phone" value=${name} onInput=${(e) => setName(e.target.value)} /><//>
+        <div class="row"><button class="btn primary" disabled=${busy}>${busy ? 'Waiting for your device…' : 'Continue'}</button>${cancel}</div></form>`}
+
+      ${removing && html`<form class="goal-add" onSubmit=${remove}>
+        <${Field} label=${'Confirm your password to remove ' + (panel.label || '').toLowerCase()}><input type="password" autofocus required autocomplete="current-password" value=${pw} onInput=${(e) => setPw(e.target.value)} /><//>
+        <div class="row"><button class="btn danger" disabled=${!pw || busy}>Remove</button>${cancel}</div></form>`}
+
+      ${st.two_factor && html`<div class="rowitem boxed"><span class="ri-ico" aria-hidden="true"><${Icon} name="shield-check" size=${16} /></span>
+        <div class="grow ri-main"><b>Recovery codes</b><span class=${'muted' + (st.recovery_left <= 2 ? ' warn' : '')}>${st.recovery_left} of 10 left. Use one if you can't reach any other method.</span></div>
+        ${panel !== 'regen' && html`<button class="btn sm" onClick=${() => setPanel('regen')}>Make new codes</button>`}</div>`}
+      ${panel === 'regen' && html`<form class="goal-add" onSubmit=${regen}>
+        <p style="margin:0">New codes replace the old ones, which stop working.</p>
+        <${Field} label="Confirm your password"><input type="password" autofocus required autocomplete="current-password" value=${pw} onInput=${(e) => setPw(e.target.value)} /><//>
+        <div class="row"><button class="btn primary" disabled=${!pw || busy}>Make new codes</button>${cancel}</div></form>`}
+      ${codes && html`<${RecoveryCodes} codes=${codes} onDone=${() => setCodes(null)} />`}
+    </div><//>`;
+}
+
 function Security() {
   const { user, setUser } = useContext(UserCtx);
   const blank = { current_password: '', password: '', password_confirmation: '' };
   const [pw, setPw] = useState(blank);
   const [err, setErr] = useState(null);
-  const [setup, setSetup] = useState(null);
-  const [code, setCode] = useState('');
-  const [disabling, setDisabling] = useState(false);
-  const [dpw, setDpw] = useState('');
   const changePw = async (e) => { e.preventDefault(); setErr(null); try { await api('/me/password', { method: 'POST', body: pw }); setPw(blank); toast('Password updated'); } catch (x) { setErr(firstError(x)); } };
-  const refresh = async () => setUser((await api('/me')).user);
   const mismatch = pw.password_confirmation !== '' && pw.password !== pw.password_confirmation;
   return html`<form onSubmit=${changePw}><${Section} title="Password" help="Use at least 8 characters."
       footer=${html`<span class="help">${mismatch ? 'The passwords don\'t match yet.' : 'Other signed-in devices stay signed in.'}</span><button class="btn primary sm" disabled=${!pw.current_password || !pw.password || mismatch}>Update password</button>`}>
@@ -767,17 +858,7 @@ function Security() {
         <div class="fields2"><${Field} label="New password"><input type="password" required minlength="8" autocomplete="new-password" value=${pw.password} onInput=${(e) => setPw({ ...pw, password: e.target.value })} /><//>
           <${Field} label="Confirm new password"><input type="password" required autocomplete="new-password" value=${pw.password_confirmation} onInput=${(e) => setPw({ ...pw, password_confirmation: e.target.value })} /><//></div>
       <//></form>
-    <${Section} title="Two-factor authentication" help="Require a code from an authenticator app when you sign in.">
-      ${user.two_factor ? html`<div class="rowitem boxed"><span class="ri-ico good" aria-hidden="true"><${Icon} name="shield-check" size=${16} /></span><div class="grow ri-main"><b>Two-factor is on</b><span class="muted">You'll be asked for a code from your authenticator app at sign-in.</span></div>
-          ${!disabling && html`<button class="btn sm danger" onClick=${() => setDisabling(true)}>Turn off</button>`}</div>
-        ${disabling && html`<form class="goal-add" onSubmit=${async (e) => { e.preventDefault(); try { await api('/me/two-factor', { method: 'DELETE', body: { password: dpw } }); setDisabling(false); setDpw(''); await refresh(); toast('Two-factor turned off'); } catch (x) { toast(firstError(x), 'err'); } }}>
-          <${Field} label="Confirm your password to turn it off"><input type="password" autofocus required value=${dpw} onInput=${(e) => setDpw(e.target.value)} /><//>
-          <div class="row"><button class="btn danger" disabled=${!dpw}>Turn off two-factor</button><button type="button" class="btn" onClick=${() => { setDisabling(false); setDpw(''); }}>Cancel</button></div></form>`}`
-        : setup ? html`<div class="goal-add"><p>Add this secret to your authenticator app, then enter the 6-digit code it shows.</p><${CodeBlock} text=${setup.secret} /><a class="muted small" href=${setup.uri}>Open in authenticator app</a>
-          <${Field} label="Code" class="tzfield"><input inputmode="numeric" autocomplete="one-time-code" placeholder="123456" value=${code} onInput=${(e) => setCode(e.target.value)} /><//>
-          <div class="row"><button class="btn primary" disabled=${!code.trim()} onClick=${async () => { try { await api('/me/two-factor/confirm', { method: 'POST', body: { code } }); setSetup(null); setCode(''); await refresh(); toast('Two-factor enabled'); } catch (x) { toast(firstError(x), 'err'); } }}>Confirm and turn on</button><button class="btn" onClick=${() => { setSetup(null); setCode(''); }}>Cancel</button></div></div>`
-        : html`<div class="rowitem boxed"><span class="ri-ico" aria-hidden="true"><${Icon} name="shield" size=${16} /></span><div class="grow ri-main"><b>Two-factor is off</b><span class="muted">Add a second step to protect your account if your password leaks.</span></div>
-          <button class="btn sm primary" onClick=${async () => setSetup(await api('/me/two-factor', { method: 'POST' }))}>Set up</button></div>`}<//>
+    <${TwoFactor} />
 `;
 }
 

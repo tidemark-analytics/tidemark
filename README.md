@@ -129,7 +129,7 @@ Add an **`Engagement`** goal (turning the setting on creates it), then open it u
 - **Periods** — today, realtime, 24 hours, 7/28/30/91 days, month, 6/12 months, year, all time, custom; keyboard shortcuts for all of them (`D R W T Q M S L Y A C`, `X` compare, `F` filter, `←/→` step through days, months or years).
 - **Sharing** — make a dashboard public, or create private shared links with an optional password.
 - **Goals, shields, people** — conversion goals, block rules (IP, country, page, hostname allow-list), owner/admin/viewer roles per site, teams (group people once and share a site with the whole team as viewers or admins) and organizations (everyone has a Personal one; create others with an owner, admins and teams, and hand one over by transferring ownership).
-- **CSV export**, a **Stats API**, API keys and two-factor sign-in.
+- **CSV export**, a **Stats API**, API keys, and two-factor sign-in with an authenticator app, email codes or passkeys.
 
 ## Brand
 
