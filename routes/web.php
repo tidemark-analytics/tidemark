@@ -37,5 +37,5 @@ Route::middleware('installed')->group(function () {
     Route::view('/sites/{any?}', 'app')->where('any', '.*');
     Route::view('/settings/{any?}', 'app')->where('any', '.*');
     Route::view('/share/{any}', 'app')->where('any', '.*');
-    Route::view('/{domain}/{any?}', 'app')->where('domain', '(?!('.implode('|', array_map(fn ($n) => preg_quote($n, '/'), Site::reservedNames())).')$)[^/]+')->where('any', '.*');
+    Route::get('/{domain}/{any?}', fn (string $domain) => response()->view('app', [], Site::where('domain', strtolower($domain))->exists() ? 200 : 404))->where('domain', '(?!('.implode('|', array_map(fn ($n) => preg_quote($n, '/'), Site::reservedNames())).')$)[^/]+')->where('any', '.*');
 });
