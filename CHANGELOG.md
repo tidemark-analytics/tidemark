@@ -4,6 +4,9 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Changed
+- An address that is not a site or rollup, for example a mistyped page, now answers with a 404 status instead of 200. The page looks the same.
+
 ## [0.36.1] - 2026-10-29
 
 ### Added
