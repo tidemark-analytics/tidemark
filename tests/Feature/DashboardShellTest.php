@@ -10,6 +10,26 @@ class DashboardShellTest extends TestCase
 {
     use RefreshDatabase;
 
+    private bool $createdInstalledMarker = false;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $marker = storage_path('app/installed');
+        if (! file_exists($marker)) {
+            file_put_contents($marker, '1');
+            $this->createdInstalledMarker = true;
+        }
+    }
+
+    protected function tearDown(): void
+    {
+        if ($this->createdInstalledMarker) {
+            @unlink(storage_path('app/installed'));
+        }
+        parent::tearDown();
+    }
+
     public function test_a_path_that_is_not_a_site_answers_404_with_the_app(): void
     {
         $this->get('/pricing')->assertNotFound()->assertSee('id="root"', false);
