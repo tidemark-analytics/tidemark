@@ -33,7 +33,7 @@ The same open-source Tidemark, hosted for you at [tidemarkanalytics.com](https:/
 - **Still private by design:** no cookies and no stored IP addresses, and direct support from inside the app.
 - **Switching?** Import your history from Plausible's CSV export.
 
-[**Try the live demo**](https://app.tidemarkanalytics.com/tidemark) · [**See pricing**](https://www.tidemarkanalytics.com/cloud/) · [**Start free**](https://app.tidemarkanalytics.com/register?utm_source=github&utm_medium=readme&utm_campaign=readme-cloud)
+[**Try the live demo**](https://www.tidemarkanalytics.com/tidemarkanalytics.com) · [**See pricing**](https://www.tidemarkanalytics.com/cloud/) · [**Start free**](https://app.tidemarkanalytics.com/register?utm_source=github&utm_medium=readme&utm_campaign=readme-cloud)
 
 Prefer to host it yourself? Everything below is for you, and it is free under the MIT license.
 

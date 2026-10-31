@@ -4,6 +4,11 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [0.37.0] - 2026-10-31
+
+### Added
+- For extensions: `api.registerSignupField(component)` adds a field to the sign-up form; what it sets is sent with the sign-up request.
+
 ## [0.36.2] - 2026-10-30
 
 ### Changed
