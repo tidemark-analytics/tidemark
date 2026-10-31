@@ -1,6 +1,7 @@
 import { html, useState, useEffect, api, navigate, Link, toast, useLocation, Icon } from '../lib.js';
 import { Field } from '../ui.js';
 import { Lockup } from '../logo.js';
+import { registry } from '../extensions.js';
 import { passkeysSupported, usePasskey } from '../webauthn.js';
 
 
@@ -89,11 +90,12 @@ export function Login({ setUser }) {
 
 export function Register({ setUser }) {
   const [f, setF] = useState({ name: '', email: '', password: '', password_confirmation: '' });
+  const [extras, setExtras] = useState({});
   const [err, setErr] = useState('');
   if (!window.SD.registration) return html`<${AuthShell} title="Registration is closed" sub="Ask an administrator for an account."><${Link} to="/login" class="btn">Back to sign in<//><//>`;
   const submit = async (e) => {
     e.preventDefault(); setErr('');
-    try { const r = await api('/auth/register', { method: 'POST', body: f }); setUser(r.user); navigate('/sites'); toast('Welcome!'); }
+    try { const r = await api('/auth/register', { method: 'POST', body: { ...extras, ...f } }); setUser(r.user); navigate('/sites'); toast('Welcome!'); }
     catch (x) { setErr((x.errors && Object.values(x.errors)[0][0]) || x.message); }
   };
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
@@ -103,6 +105,7 @@ export function Register({ setUser }) {
       <${Field} label="Email"><input type="email" required value=${f.email} onInput=${set('email')} /><//>
       <${Field} label="Password" help="At least 8 characters."><input type="password" required minlength="8" autocomplete="new-password" value=${f.password} onInput=${set('password')} /><//>
       <${Field} label="Confirm password"><input type="password" required autocomplete="new-password" value=${f.password_confirmation} onInput=${set('password_confirmation')} /><//>
+      ${registry.signupFields.map((Extra, i) => html`<${Extra} key=${i} values=${extras} set=${(k, v) => setExtras((x) => ({ ...x, [k]: v }))} />`)}
       ${(window.SD.legal || {}).terms && html`<p class="help auth-links" style="font-size:12px">By creating an account you agree to the <a href=${window.SD.legal.terms} target="_blank" rel="noopener">Terms of Service</a>${window.SD.legal.privacy ? html` and acknowledge the <a href=${window.SD.legal.privacy} target="_blank" rel="noopener">privacy notice</a>` : ''}.</p>`}
       <button class="btn primary">Create account</button>
       <div class="auth-links">Have an account? <${Link} to="/login">Sign in<//></div>

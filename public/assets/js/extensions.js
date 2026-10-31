@@ -6,6 +6,7 @@
 //     const { html, lib, ui } = api;
 //     api.registerAccountTab({ key: 'billing', label: 'Billing', component: Billing, dot: (user) => user.needs_attention });
 //     api.registerBanner(({ user }) => html`<div class="notice">…</div>`);
+//     api.registerSignupField(({ values, set }) => html`<label class="check"><input type="checkbox" checked=${!!values.news} onChange=${(e) => set('news', e.target.checked)} /> Send me news</label>`); // sent with the sign-up request
 //     api.registerRoute('/pricing', PricingPage);
 //     api.registerMenuItem({ label: 'Support', href: 'https://help.example.com', icon: 'life-buoy', external: true });
 //     api.registerMenuItem({ label: 'Chat', onClick: () => openChat(), icon: 'life-buoy' });
@@ -25,7 +26,7 @@ import * as ui from './ui.js';
 import * as org from './org.js';
 import * as chart from './chart.js';
 
-export const registry = { routes: [], accountTabs: [], banners: [], menuItems: [], adminUi: null, afterCreateOrganization: null };
+export const registry = { routes: [], accountTabs: [], banners: [], signupFields: [], menuItems: [], adminUi: null, afterCreateOrganization: null };
 
 /** Where to go after someone creates an organization: an extension may choose (for example a page that finishes setting it up), otherwise its settings. */
 export const pathAfterOrganizationCreated = (id) => { try { return (registry.afterCreateOrganization && registry.afterCreateOrganization(id)) || '/settings/organization'; } catch (e) { return '/settings/organization'; } };
@@ -78,6 +79,8 @@ const api = {
   registerAfterCreateOrganization: (fn) => { registry.afterCreateOrganization = fn; },
   /** A component shown under the top bar on every signed-in page; receives { user }. */
   registerBanner: (component) => registry.banners.push(component),
+  /** A field on the sign-up form, shown above the Create account button: a component that receives { values, set(key, value) }. Whatever it sets is sent with the sign-up request next to the name, email and password, so a listener on the `Registered` event can read it from the request. */
+  registerSignupField: (component) => registry.signupFields.push(component),
 };
 
 export async function loadExtensions(urls = []) {

@@ -7,6 +7,7 @@ use App\Contracts\Entitlements;
 use App\Events\SiteCreated;
 use App\Models\Site;
 use App\Models\User;
+use Illuminate\Auth\Events\Registered;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -82,6 +83,21 @@ class ExtensionPointsTest extends TestCase
             }
         });
         $this->postJson('/api/sites', ['domain' => 'two.example.org'])->assertUnprocessable()->assertJsonPath('errors.domain.0', 'Upgrade to add more sites.');
+    }
+
+    public function test_a_listener_can_read_extra_sign_up_fields_from_the_request(): void
+    {
+        config(['tidemark.registration' => true]);
+        $this->withHeader('X-Requested-With', 'XMLHttpRequest');
+        $seen = [];
+        Event::listen(Registered::class, function (Registered $event) use (&$seen) {
+            $seen[$event->user->email] = request()->boolean('news');
+        });
+
+        $this->postJson('/api/auth/register', ['name' => 'A', 'email' => 'a@example.com', 'password' => 'password1', 'password_confirmation' => 'password1', 'news' => true])->assertCreated();
+        $this->postJson('/api/auth/register', ['name' => 'B', 'email' => 'b@example.com', 'password' => 'password1', 'password_confirmation' => 'password1'])->assertCreated();
+
+        $this->assertSame(['a@example.com' => true, 'b@example.com' => false], $seen);
     }
 
     public function test_the_default_entitlements_still_honor_the_site_cap_from_the_environment(): void
