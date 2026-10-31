@@ -4,6 +4,9 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Fixed
+- A checkbox on the sign-in and sign-up pages, such as an extension's opt-in, is no longer stretched tall.
+
 ## [0.37.0] - 2026-10-31
 
 ### Added
