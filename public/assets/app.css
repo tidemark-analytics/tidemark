@@ -569,6 +569,7 @@ table.t tr:hover .row-actions, table.t tr:focus-within .row-actions { opacity: 1
 .auth-card.wide { max-width: 640px; }
 .auth-card h1 { font-size: 24px; }
 .auth-card input, .auth-card select { height: 40px; }
+.auth-card input[type="checkbox"], .auth-card input[type="radio"] { height: 16px; }
 .auth-card .btn { height: 40px; }
 .auth-card .btn.sm { height: 32px; }
 .auth-sub { color: var(--muted-foreground); margin-top: 4px; font-size: 14px; }
