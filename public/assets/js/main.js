@@ -1,4 +1,4 @@
-import { html, render, useState, useEffect, useRef, useBrand, api, navigate, useLocation, matchRoute, Link, Icon, toggleTheme, UserCtx } from './lib.js';
+import { html, render, useState, useEffect, useRef, useBrand, api, navigate, leaveSignIn, useLocation, matchRoute, Link, Icon, toggleTheme, UserCtx } from './lib.js';
 import { Login, Register, ForgotPassword, ResetPassword, Invite } from './pages/auth.js';
 import { Dashboard } from './dashboard.js';
 import { reportRoute, REPORTS } from './report-page.js';
@@ -81,7 +81,7 @@ function App() {
   const m = RESERVED.has(seg) ? null : matchRoute(allRoutes(), path);
   const publicRoute = isShare || (m && m.component.public);
   useEffect(() => { if (user === null && !isAuth && !publicRoute) navigate('/login', { replace: true }); }, [user, path]);
-  useEffect(() => { if (user && isAuth && path !== '/invite') navigate('/sites', { replace: true }); }, [user, path]);
+  useEffect(() => { if (user && isAuth && path !== '/invite') leaveSignIn(); }, [user, path]);
   useEffect(() => { if (path === '/' ) navigate(user ? '/sites' : '/login', { replace: true }); }, [path, user]);
   // after a page change: move focus to the page and tell screen readers where they are
   useEffect(() => {
