@@ -1,4 +1,4 @@
-import { html, useState, useEffect, api, navigate, Link, toast, useLocation, Icon } from '../lib.js';
+import { html, useState, useEffect, api, navigate, leaveSignIn, Link, toast, useLocation, Icon } from '../lib.js';
 import { Field } from '../ui.js';
 import { Lockup } from '../logo.js';
 import { registry } from '../extensions.js';
@@ -36,7 +36,7 @@ export function Login({ setUser }) {
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
   const fail = (x) => { setErr(x.name === 'NotAllowedError' ? 'The passkey request was cancelled or not allowed.' : (x.errors && Object.values(x.errors)[0][0]) || x.message); setBusy(false); };
-  const finish = (r) => { setUser(r.user); navigate('/sites'); };
+  const finish = (r) => { setUser(r.user); leaveSignIn(); };
   const credentials = { email: f.email, password: f.password };
 
   const choose = async (m) => {
@@ -84,7 +84,7 @@ export function Login({ setUser }) {
       ${methods && method === 'email' && html`<div class="auth-links"><a href="#" onClick=${(e) => { e.preventDefault(); if (!busy) sendEmail(true); }}>Send a new code</a></div>`}
       ${others.length > 0 && html`<div class="auth-links">${others.map((m, i) => html`${i > 0 ? ' · ' : ''}<a href="#" onClick=${(e) => { e.preventDefault(); choose(m); }}>${METHOD_LABEL[m]}</a>`)}</div>`}
       ${!methods && canReset && html`<div class="auth-links"><${Link} to="/forgot-password">Forgot your password?<//></div>`}
-      ${!methods && window.SD.registration && html`<div class="auth-links">New here? <${Link} to="/register">Create an account<//></div>`}
+      ${!methods && window.SD.registration && html`<div class="auth-links">New here? <${Link} to=${'/register' + location.search}>Create an account<//></div>`}
     </form><//>`;
 }
 
@@ -95,7 +95,7 @@ export function Register({ setUser }) {
   if (!window.SD.registration) return html`<${AuthShell} title="Registration is closed" sub="Ask an administrator for an account."><${Link} to="/login" class="btn">Back to sign in<//><//>`;
   const submit = async (e) => {
     e.preventDefault(); setErr('');
-    try { const r = await api('/auth/register', { method: 'POST', body: { ...extras, ...f } }); setUser(r.user); navigate('/sites'); toast('Welcome!'); }
+    try { const r = await api('/auth/register', { method: 'POST', body: { ...extras, ...f } }); setUser(r.user); leaveSignIn(); toast('Welcome!'); }
     catch (x) { setErr((x.errors && Object.values(x.errors)[0][0]) || x.message); }
   };
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
@@ -108,7 +108,7 @@ export function Register({ setUser }) {
       ${registry.signupFields.map((Extra, i) => html`<${Extra} key=${i} values=${extras} set=${(k, v) => setExtras((x) => ({ ...x, [k]: v }))} />`)}
       ${(window.SD.legal || {}).terms && html`<p class="help auth-links" style="font-size:12px">By creating an account you agree to the <a href=${window.SD.legal.terms} target="_blank" rel="noopener">Terms of Service</a>${window.SD.legal.privacy ? html` and acknowledge the <a href=${window.SD.legal.privacy} target="_blank" rel="noopener">privacy notice</a>` : ''}.</p>`}
       <button class="btn primary">Create account</button>
-      <div class="auth-links">Have an account? <${Link} to="/login">Sign in<//></div>
+      <div class="auth-links">Have an account? <${Link} to=${'/login' + location.search}>Sign in<//></div>
     </form><//>`;
 }
 
