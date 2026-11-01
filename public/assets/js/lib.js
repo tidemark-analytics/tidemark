@@ -71,6 +71,17 @@ export const appPath = () => {
   if (BASE && p.startsWith(BASE)) p = p.slice(BASE.length);
   return p || '/';
 };
+/** Where to go after signing in: the page named by `?next=` when it is a path on this address (so a link from another service, such as the community, can come back), else null. */
+export function returnTo() {
+  const next = new URLSearchParams(location.search).get('next');
+  return next && /^\/(?![\/\\])\S*$/.test(next) ? next : null;
+}
+/** Leave the sign-in pages: to the `?next=` page when there is one (a full page load, since it may be a server page), else to `fallback`. */
+export function leaveSignIn(fallback = '/sites') {
+  const next = returnTo();
+  if (next) location.assign(next);
+  else navigate(fallback);
+}
 export function navigate(to, { replace = false } = {}) {
   const url = to.startsWith('http') || to.startsWith(BASE + '/') ? to : BASE + to;
   if (url === location.pathname + location.search) return;
