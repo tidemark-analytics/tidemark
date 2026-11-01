@@ -4,6 +4,8 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [0.37.2] - 2026-11-01
+
 ### Added
 - The sign-in and sign-up pages return you to the page named in `?next=` after you sign in, as long as it is a path on the same address. A link from another service can send people through sign-in and bring them back.
 
