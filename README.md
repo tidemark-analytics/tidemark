@@ -5,7 +5,7 @@
   </picture>
 </p>
 
-[![CI](https://github.com/tidemark-analytics/tidemark/actions/workflows/ci.yml/badge.svg)](https://github.com/tidemark-analytics/tidemark/actions/workflows/ci.yml) [![Latest release](https://img.shields.io/github/v/release/tidemark-analytics/tidemark)](https://github.com/tidemark-analytics/tidemark/releases/latest) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![Discord](https://img.shields.io/badge/chat-Discord-5865F2?logo=discord&logoColor=white)](https://discord.gg/sCkHD3PPZh)
+[![CI](https://github.com/tidemark-analytics/tidemark/actions/workflows/ci.yml/badge.svg)](https://github.com/tidemark-analytics/tidemark/actions/workflows/ci.yml) [![Latest release](https://img.shields.io/github/v/release/tidemark-analytics/tidemark)](https://github.com/tidemark-analytics/tidemark/releases/latest) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![Community](https://img.shields.io/badge/community-forum-0e7c86)](https://community.tidemarkanalytics.com)
 
 <p align="center">
   <picture>
@@ -205,7 +205,7 @@ MIT
 
 ## Community
 
-Questions, ideas and show-and-tell: join the [Tidemark Discord](https://discord.gg/sCkHD3PPZh). Bugs belong in [GitHub issues](https://github.com/tidemark-analytics/tidemark/issues).
+Questions, ideas and show-and-tell: join the [Tidemark community](https://community.tidemarkanalytics.com). Bugs belong in [GitHub issues](https://github.com/tidemark-analytics/tidemark/issues).
 
 ## Contributing
 
