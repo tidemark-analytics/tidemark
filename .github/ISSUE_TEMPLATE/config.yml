@@ -4,8 +4,8 @@ contact_links:
     url: https://github.com/tidemark-analytics/tidemark/discussions
     about: Ask questions and share ideas in Discussions.
   - name: Community chat
-    url: https://discord.gg/sCkHD3PPZh
-    about: Chat with other Tidemark users on Discord.
+    url: https://community.tidemarkanalytics.com
+    about: Talk with other Tidemark users on the community forum.
   - name: Security vulnerability
     url: https://github.com/tidemark-analytics/tidemark/security/advisories/new
     about: Report security problems privately, not as a public issue.
