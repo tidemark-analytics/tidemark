@@ -4,6 +4,11 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [0.37.3] - 2026-11-01
+
+### Changed
+- The Community link in the app now opens the new community forum at community.tidemarkanalytics.com instead of Discord.
+
 ## [0.37.2] - 2026-11-01
 
 ### Added
