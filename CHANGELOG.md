@@ -4,6 +4,9 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Changed
+- A site whose visits are all from today no longer looks empty in "Last 7/28/30/91 days": the overview explains that those periods end yesterday and offers a button to show today.
+
 ## [0.37.3] - 2026-11-01
 
 ### Changed
