@@ -63,6 +63,24 @@ jobs:
           [ -n "$NOTES" ] || NOTES="Release $V"
           gh release create "${GITHUB_REF_NAME}" dist/* --title "Tidemark $V" --notes "$NOTES"
 
+  announce:
+    name: Announce in the community
+    needs: build
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - name: Post to the community's Releases channel
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMUNITY_RELEASES_WEBHOOK: ${{ secrets.COMMUNITY_RELEASES_WEBHOOK }}
+        run: |
+          gh release view "${GITHUB_REF_NAME}" --json body -q .body > notes.md
+          scripts/announce-release.sh "${GITHUB_REF_NAME#v}" notes.md "https://github.com/${GITHUB_REPOSITORY}/releases/tag/${GITHUB_REF_NAME}"
+
   docker:
     name: Docker image
     needs: build
