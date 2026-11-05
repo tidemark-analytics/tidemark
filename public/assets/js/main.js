@@ -95,7 +95,9 @@ function App() {
   }, [path]);
 
   const Page = m && m.component;
-  const announcer = html`<div class="sr-only" role="status" aria-live="polite" ref=${announce}></div>`;
+  // keyed so Preact never reuses this node for another unkeyed <div> (e.g. .app) when the tree changes shape after sign-in;
+  // its text is set by hand below, and a reused node would keep it and show the page title above the navbar
+  const announcer = html`<div key="announcer" class="sr-only" role="status" aria-live="polite" ref=${announce}></div>`;
   if (isAuth) return html`<${UserCtx.Provider} value=${{ user, setUser }}>${Page ? html`<${Page} setUser=${setUser} />` : null}<${Toaster} />${announcer}<//>`;
   if (user === undefined) return html`<div style="display:grid;place-items:center;height:100vh"><${Logo} size=${40} /></div>`;
   if (user === null && !publicRoute) return null;
