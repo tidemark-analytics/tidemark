@@ -30,9 +30,12 @@ class FrameworkSnippetsTest extends TestCase
         $site = Site::create(['domain' => 'example.com', 'track_outbound' => true]);
 
         foreach ($this->snippets($site) as $framework => $snippet) {
+            $this->assertNotSame('', $snippet['where'], $framework);
+            if ($framework === 'wordpress') {
+                continue;
+            }
             $this->assertStringContainsString('example.com', $snippet['text'], $framework);
             $this->assertStringContainsString(self::ORIGIN.'/js/'.$site->scriptName(), $snippet['text'], $framework);
-            $this->assertNotSame('', $snippet['where'], $framework);
         }
 
         $this->get('/js/'.$site->scriptName())->assertOk();
@@ -45,7 +48,7 @@ class FrameworkSnippetsTest extends TestCase
 
         $keys = array_keys($this->snippets($site));
         $this->assertSame($keys, array_unique($keys));
-        $this->assertEqualsCanonicalizing(['html', 'next', 'nuxt', 'astro', 'sveltekit', 'laravel', 'shopify'], $keys);
+        $this->assertEqualsCanonicalizing(['html', 'wordpress', 'shopify', 'next', 'nuxt', 'astro', 'sveltekit', 'laravel'], $keys);
         $this->assertSame($this->snippets($site)['html'], $snippets['unknown']);
     }
 
@@ -58,6 +61,29 @@ class FrameworkSnippetsTest extends TestCase
             $this->assertSame($tag, $this->snippets($site)[$framework]['text'], $framework);
         }
         $this->assertSame(str_replace('<script', '<script is:inline', $tag), $this->snippets($site)['astro']['text']);
+    }
+
+    public function test_the_wordpress_entry_gives_the_address_for_the_plugin_and_links_to_it(): void
+    {
+        $site = Site::create(['domain' => 'example.com']);
+        $wordpress = $this->snippets($site)['wordpress'];
+
+        $this->assertSame(self::ORIGIN, $wordpress['text']);
+        $this->assertSame('https://wordpress.org/plugins/tidemark-analytics/', $wordpress['link']['href']);
+        $this->assertStringContainsString('example.com', $wordpress['where']);
+    }
+
+    public function test_the_groups_hold_every_framework_exactly_once(): void
+    {
+        $site = Site::create(['domain' => 'example.com']);
+        $module = $this->temporaryFile('mjs', file_get_contents(public_path('assets/js/snippets.js')));
+
+        $grouped = json_decode($this->runNode(
+            "import { FRAMEWORK_GROUPS } from 'file://{$module}'; console.log(JSON.stringify(FRAMEWORK_GROUPS.flatMap(([, items]) => items.map(([key]) => key))));",
+            module: true,
+        ), true);
+
+        $this->assertSame($grouped, array_keys($this->snippets($site)));
     }
 
     public function test_the_nuxt_snippet_is_a_valid_config_that_declares_the_script(): void
