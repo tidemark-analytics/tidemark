@@ -1,6 +1,6 @@
 // The site frame shared by the overview and the report pages: loads the site, shows the title and the scope bar, handles public and shared views.
 import { setBrand, html, useState, useEffect, useApi, api, useLocation, Link, Icon, fmt, share, useDocTitle, useScope, setQuery, UserCtx, useContext } from './lib.js';
-import { Loading, Empty, Field, CodeBlock } from './ui.js';
+import { Loading, Empty, Field, CodeBlock, Pop } from './ui.js';
 import { FRAMEWORKS, FRAMEWORK_GROUPS, snippetFor } from './snippets.js';
 import { scrollToSection } from './shell.js';
 import { ScopeBar } from './scopebar.js';
@@ -15,10 +15,13 @@ export function Snippet({ site }) {
   const [framework, setFramework] = useState(rememberedFramework);
   const base = (window.__cfg && window.__cfg.script_base) || window.SD.origin + '/js';
   const { where, text, link } = snippetFor(framework, { domain: site.domain, src: `${base}/${site.script}` });
-  const choose = (key) => { setFramework(key); rememberFramework(key); };
-  return html`<${Field} label="Install on"><select value=${framework} onChange=${(e) => choose(e.target.value)}>
-      ${FRAMEWORK_GROUPS.map(([group, items]) => html`<optgroup label=${group}>${items.map(([key, label]) => html`<option value=${key} selected=${key === framework}>${label}</option>`)}</optgroup>`)}
-    </select><//>
+  const label = FRAMEWORKS.find(([key]) => key === framework)[1];
+  const choose = (key, close) => { setFramework(key); rememberFramework(key); close(); };
+  return html`<div class="row" style="gap:10px"><span class="muted small">Install on</span>
+      <${Pop} align="left" ariaLabel=${'Install on: ' + label} btnClass="btn" label=${html`<span>${label}</span><${Icon} name="chevron-down" size=${13} class="muted" />`}>
+        ${(close) => html`<div style="min-width:240px">${FRAMEWORK_GROUPS.map(([group, items], i) => html`${i > 0 && html`<hr />`}<div class="grp">${group}</div>
+          ${items.map(([key, name]) => html`<button class=${'item ' + (key === framework ? 'on' : '')} onClick=${() => choose(key, close)}><span>${name}</span>${key === framework && html`<${Icon} name="check" size=${14} class="check" />`}</button>`)}`)}</div>`}
+      <//></div>
     <p class="muted small" style="margin:10px 0">${where}</p>
     <${CodeBlock} text=${text} />
     ${link && html`<p style="margin-top:10px"><a class="btn" href=${link.href} target="_blank" rel="noopener"><${Icon} name="external-link" size=${14} /> ${link.label}</a></p>`}`;
