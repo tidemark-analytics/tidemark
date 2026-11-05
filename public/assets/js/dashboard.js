@@ -1,15 +1,19 @@
 // The site frame shared by the overview and the report pages: loads the site, shows the title and the scope bar, handles public and shared views.
 import { setBrand, html, useState, useEffect, useApi, api, useLocation, Link, Icon, fmt, share, useDocTitle, useScope, setQuery, UserCtx, useContext } from './lib.js';
-import { Loading, Empty, Field, CodeBlock } from './ui.js';
+import { Loading, Empty, Field, CodeBlock, Tabs } from './ui.js';
+import { FRAMEWORKS, snippetFor } from './snippets.js';
 import { scrollToSection } from './shell.js';
 import { ScopeBar } from './scopebar.js';
 import { Overview } from './overview.js';
 
 // -------------------------------------------------------------------------------------------- onboarding
 export function Snippet({ site }) {
+  const [framework, setFramework] = useState('html');
   const base = (window.__cfg && window.__cfg.script_base) || window.SD.origin + '/js';
-  const tag = `<script defer data-domain="${site.domain}" src="${base}/${site.script}"></script>`;
-  return html`<${CodeBlock} text=${tag} />`;
+  const { where, text } = snippetFor(framework, { domain: site.domain, src: `${base}/${site.script}` });
+  return html`<${Tabs} items=${FRAMEWORKS} value=${framework} onChange=${setFramework} label="Framework" />
+    <p class="muted small" style="margin:10px 0">${where}</p>
+    <${CodeBlock} text=${text} />`;
 }
 
 function Waiting({ site, onData }) {
