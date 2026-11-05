@@ -4,6 +4,17 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [0.38.0] - 2026-11-04
+
+### Added
+- The install snippet in the dashboard has an "Install on" menu: HTML, WordPress, Shopify, Next.js, Nuxt, Astro, SvelteKit and Laravel. Each shows the file to open and the code to paste for your site, and WordPress links to the Tidemark Analytics plugin on WordPress.org. Tidemark remembers your choice.
+
+### Changed
+- A site whose visits are all from today no longer looks empty in "Last 7/28/30/91 days": the overview explains that those periods end yesterday and offers a button to show today.
+
+### Fixed
+- The word "Tidemark" no longer shows up above the top bar now and then after signing in.
+
 ## [0.37.3] - 2026-11-01
 
 ### Changed

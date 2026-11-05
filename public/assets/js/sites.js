@@ -108,9 +108,9 @@ export function Installation({ domain }) {
   if (res.error) return html`<main class="main"><${ErrorBox} error=${res.error} /></main>`;
   if (!s) return html`<main class="main narrow"><${Loading} /></main>`;
   const set = async (k, v) => { await api(`/sites/${domain}`, { method: 'PATCH', body: { [k]: v } }); res.reload(); };
-  return html`<main class="main narrow"><header class="page-head"><div class="grow"><${Breadcrumb} items=${[{ label: 'Sites', to: '/sites' }, { label: domain }, { label: 'Installation' }]} /><h1 style="margin-top:8px">Install the snippet</h1><div class="sub">Add this to the <code>${"<head>"}</code> of every page on ${domain}.</div></div></header>
+  return html`<main class="main narrow"><header class="page-head"><div class="grow"><${Breadcrumb} items=${[{ label: 'Sites', to: '/sites' }, { label: domain }, { label: 'Installation' }]} /><h1 style="margin-top:8px">Install the snippet</h1><div class="sub">Add the Tidemark script to every page on ${domain}.</div></div></header>
     <div class="stack">
-      <${SettingCard} title="1. Add the tracking snippet" help="Paste it before the closing head tag. It is about 1 KB and sets no cookies."
+      <${SettingCard} title="1. Add the tracking snippet" help="Choose what your site runs on to see what to add. The script is about 1 KB and sets no cookies."
         footer=${html`<span class="row" style="gap:8px"><span class="dot" aria-hidden="true"></span><span>Waiting for your first pageview. This page continues automatically once data arrives.</span></span><${Link} to=${'/' + domain} class="btn sm">Skip to the dashboard<//>`}>
         <${Snippet} site=${s} />
         <p class="muted small">Using a framework or a single-page app? Pageviews are tracked automatically on route changes. You can also send custom events with <code>window.plausible('Signup')</code>.</p>

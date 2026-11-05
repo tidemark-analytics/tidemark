@@ -74,6 +74,21 @@ function Headline({ site, scope, shared, top, graph, goals }) {
   </section>`;
 }
 
+// ------------------------------------------------------------------------------------------------ empty window
+const ROLLING = ['7d', '28d', '30d', '91d'];
+
+/** "Last N days" stop at the end of yesterday, so a site that only has visits from today shows zeros there: point at today instead. */
+function TodayHint({ site, scope, top }) {
+  const rolling = ROLLING.includes(scope.period) && !scope.query.date && !scope.goal;
+  const empty = !!top.data && !top.loading && !!top.data.stats && top.data.stats.visitors.value === 0;
+  const today = useApi(`/sites/${site.domain}/stats/top`, { period: 'day', filters: scope.params.filters }, [], { enabled: rolling && empty });
+  const n = today.data && today.data.stats ? today.data.stats.visitors.value : 0;
+  if (!rolling || !empty || !n) return null;
+  return html`<div class="empty-inline today-hint" role="status"><${Icon} name="info" size=${18} />
+    <div><b>No visitors in this period yet</b><span>${periodLabel(scope, site)} ends yesterday, and all of this site's visits so far are from today (${fmt(n)} visitor${n === 1 ? '' : 's'}).</span></div>
+    <button class="btn sm" onClick=${() => setQuery({ period: 'day', date: null, from: null, to: null, interval: null, zoom: null })}>Show today</button></div>`;
+}
+
 // ------------------------------------------------------------------------------------------------ main chart
 function MainChart({ site, scope, top, graph, live }) {
   const [metric, setMetric] = useState('visitors');
@@ -208,6 +223,7 @@ export function Overview({ site, scope, shared, live, afterCards }) {
   const cardPoll = live ? 10000 : 0;
   const cardProps = { site, scope: cscope, poll: cardPoll, shared };
   return html`<${Headline} site=${site} scope=${scope} shared=${shared} top=${top} graph=${graph} goals=${{ now: goalsNow, before: goalsBefore }} />
+    <${TodayHint} site=${site} scope=${scope} top=${top} />
     <${MainChart} site=${site} scope=${scope} top=${top} graph=${graph} live=${live} />
     <${Insights} site=${site} scope=${scope} top=${top} graph=${graph} />
     <div class="cards-grid">

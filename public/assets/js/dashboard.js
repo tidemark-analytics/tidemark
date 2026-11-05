@@ -1,22 +1,37 @@
 // The site frame shared by the overview and the report pages: loads the site, shows the title and the scope bar, handles public and shared views.
 import { setBrand, html, useState, useEffect, useApi, api, useLocation, Link, Icon, fmt, share, useDocTitle, useScope, setQuery, UserCtx, useContext } from './lib.js';
-import { Loading, Empty, Field, CodeBlock } from './ui.js';
+import { Loading, Empty, Field, CodeBlock, Pop } from './ui.js';
+import { FRAMEWORKS, FRAMEWORK_GROUPS, snippetFor } from './snippets.js';
 import { scrollToSection } from './shell.js';
 import { ScopeBar } from './scopebar.js';
 import { Overview } from './overview.js';
 
 // -------------------------------------------------------------------------------------------- onboarding
+const FRAMEWORK_KEY = 'tidemark.framework';
+const rememberedFramework = () => { try { const key = localStorage.getItem(FRAMEWORK_KEY); return FRAMEWORKS.some(([k]) => k === key) ? key : 'html'; } catch (e) { return 'html'; } };
+const rememberFramework = (key) => { try { localStorage.setItem(FRAMEWORK_KEY, key); } catch (e) { /* private mode */ } };
+
 export function Snippet({ site }) {
+  const [framework, setFramework] = useState(rememberedFramework);
   const base = (window.__cfg && window.__cfg.script_base) || window.SD.origin + '/js';
-  const tag = `<script defer data-domain="${site.domain}" src="${base}/${site.script}"></script>`;
-  return html`<${CodeBlock} text=${tag} />`;
+  const { where, text, link } = snippetFor(framework, { domain: site.domain, src: `${base}/${site.script}` });
+  const label = FRAMEWORKS.find(([key]) => key === framework)[1];
+  const choose = (key, close) => { setFramework(key); rememberFramework(key); close(); };
+  return html`<div class="row" style="gap:10px"><span class="muted small">Install on</span>
+      <${Pop} align="left" ariaLabel=${'Install on: ' + label} btnClass="btn" label=${html`<span>${label}</span><${Icon} name="chevron-down" size=${13} class="muted" />`}>
+        ${(close) => html`<div style="min-width:240px">${FRAMEWORK_GROUPS.map(([group, items], i) => html`${i > 0 && html`<hr />`}<div class="grp">${group}</div>
+          ${items.map(([key, name]) => html`<button class=${'item ' + (key === framework ? 'on' : '')} onClick=${() => choose(key, close)}><span>${name}</span>${key === framework && html`<${Icon} name="check" size=${14} class="check" />`}</button>`)}`)}</div>`}
+      <//></div>
+    <p class="muted small" style="margin:10px 0">${where}</p>
+    <${CodeBlock} text=${text} />
+    ${link && html`<p style="margin-top:10px"><a class="btn" href=${link.href} target="_blank" rel="noopener"><${Icon} name="external-link" size=${14} /> ${link.label}</a></p>`}`;
 }
 
 function Waiting({ site, onData }) {
   useEffect(() => { const id = setInterval(() => api(`/sites/${site.domain}`).then((r) => r.data.has_data && onData()).catch(() => {}), 5000); return () => clearInterval(id); }, [site.domain]);
   if (site.rollup) return html`<section class="card waiting"><div class="onboard-ico"><span class="dot"></span></div><div class="grow"><h2>No visits yet</h2><p class="muted">${site.rollup.count === 0 ? 'This rollup has no sites yet.' : `The ${site.rollup.count} ${site.rollup.count === 1 ? 'site' : 'sites'} in this rollup haven't recorded a visit.`} ${site.can_manage ? html`<${Link} to=${`/${site.domain}/settings/sites`}>Choose its sites<//>` : ''}</p></div></section>`;
   return html`<section class="card waiting"><div class="onboard-ico"><span class="dot"></span></div>
-    <div class="grow"><h2>Waiting for your first pageview</h2><p class="muted">Paste this snippet in the <code>${"<head>"}</code> of every page on <b>${site.domain}</b>. This page updates as soon as the first visit arrives.</p><${Snippet} site=${site} /></div></section>`;
+    <div class="grow"><h2>Waiting for your first pageview</h2><p class="muted">Add the snippet below to every page on <b>${site.domain}</b>. This page updates as soon as the first visit arrives.</p><${Snippet} site=${site} /></div></section>`;
 }
 
 // ----------------------------------------------------------------------------------------------- page
