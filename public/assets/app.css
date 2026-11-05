@@ -139,6 +139,8 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 14px 0; }
 
 /* setting card with footer (Vercel project settings) */
 .setting { padding: 0; overflow: hidden; }
+.setting:has(.pop) { overflow: visible; }
+.setting:has(.pop) .setting-f { border-radius: 0 0 calc(var(--radius) - 1px) calc(var(--radius) - 1px); }
 .setting-h { padding: 20px 24px 0; }
 .setting.no-body .setting-h { padding-bottom: 20px; }
 .setting-h h2 { font-size: 18px; line-height: 28px; letter-spacing: -0.015em; }

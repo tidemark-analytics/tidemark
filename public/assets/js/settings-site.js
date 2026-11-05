@@ -130,7 +130,7 @@ function BotFiltering({ site, reload }) {
 /** How visits get in: the snippet, its extensions and the rules that drop traffic you don't want counted. */
 function Tracking({ site, reload }) {
   const patch = async (body) => { try { await api(`/sites/${site.domain}`, { method: 'PATCH', body }); reload(); toast('Saved'); } catch (x) { toast(firstError(x), 'err'); } };
-  return html`<${Section} title="Tracking snippet" help="Place this in the <head> of every page."><${Snippet} site=${site} /><//>
+  return html`<${Section} title="Tracking snippet" help="Choose what your site runs on to see what to add."><${Snippet} site=${site} /><//>
     <${Section} title="Tracking extras" help="Each one adds a small extension to the script and a matching goal.">
       <${Toggle} label="Outbound link clicks" checked=${site.track_outbound} onChange=${(v) => patch({ track_outbound: v })} />
       <${Toggle} label="File downloads" checked=${site.track_downloads} onChange=${(v) => patch({ track_downloads: v })} />
