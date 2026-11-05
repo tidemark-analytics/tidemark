@@ -4,6 +4,8 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [0.38.0] - 2026-11-04
+
 ### Added
 - The install snippet in the dashboard has an "Install on" menu: HTML, WordPress, Shopify, Next.js, Nuxt, Astro, SvelteKit and Laravel. Each shows the file to open and the code to paste for your site, and WordPress links to the Tidemark Analytics plugin on WordPress.org. Tidemark remembers your choice.
 
