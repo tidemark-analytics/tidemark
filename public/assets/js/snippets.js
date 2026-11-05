@@ -74,7 +74,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       };
     case 'shopify':
       return {
-        where: 'Online Store > Themes > Edit code > layout/theme.liquid, just before </head>. Shopify does not run custom scripts on checkout pages.',
+        where: 'Online Store > Themes > Edit code > layout/theme.liquid, just before </head>.',
         text: plainTag(domain, src),
       };
     default:
