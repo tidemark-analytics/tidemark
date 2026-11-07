@@ -4,6 +4,9 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Fixed
+- Site settings → Data → Delete by filter: the confirmation window now closes after the visits are deleted, instead of staying open and ignoring the close button.
+
 ## [0.38.0] - 2026-11-04
 
 ### Added
