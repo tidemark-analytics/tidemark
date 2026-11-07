@@ -7,6 +7,8 @@
 
 [![CI](https://github.com/tidemark-analytics/tidemark/actions/workflows/ci.yml/badge.svg)](https://github.com/tidemark-analytics/tidemark/actions/workflows/ci.yml) [![Latest release](https://img.shields.io/github/v/release/tidemark-analytics/tidemark)](https://github.com/tidemark-analytics/tidemark/releases/latest) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![Community](https://img.shields.io/badge/community-forum-0e7c86)](https://community.tidemarkanalytics.com)
 
+<a href="https://www.opensourcealternatives.to"><img src="https://www.opensourcealternatives.to/badge-osa.svg" alt="As seen on Open Source Alternatives"></a>
+
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset=".github/assets/dashboard-dark.png">
